@@ -1,0 +1,11 @@
+[package]
+name = "cmtool"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+
+[dependencies]
+cmtool-core = { workspace = true }
+

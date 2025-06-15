@@ -1,0 +1,14 @@
+[package]
+name = "cmtool-data"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+
+
+
+
