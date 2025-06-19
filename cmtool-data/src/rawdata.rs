@@ -1,24 +1,26 @@
-use std::io::Write;
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 
 use serde::{Deserialize, Serialize};
 
-#[repr(C, packed)]
-#[derive(Deserialize, Serialize)]
+#[repr(C)]
+#[derive(Deserialize, Serialize,Clone, Copy)]
 pub struct FluxFileHeader {
     pub n_zone: u32,
     pub n_max: u32,
 }
 
-
-
-#[repr(C, packed)]
-#[derive(Deserialize, Serialize)]
+#[repr(C)]
+#[derive(Deserialize, Serialize,Clone, Copy)]
 pub struct ScalarFileHeader {
     pub n_zone: u32,
 }
 
-#[repr(C, packed)]
-#[derive(Deserialize, Serialize)]
+#[repr(C)]
+#[derive(Deserialize, Serialize,Clone, Copy)]
 pub struct RawFlux {
     pub id_source: u32,
     pub id_target: u32,
@@ -26,8 +28,8 @@ pub struct RawFlux {
     pub flux_target_source: f64,
 }
 
-#[repr(C, packed)]
-#[derive(Deserialize, Serialize)]
+#[repr(C)]
+#[derive(Deserialize, Serialize,Clone, Copy)]
 pub struct RawScalar {
     pub value: f64,
 }
@@ -43,24 +45,191 @@ pub struct RawDataFlux {
     pub fluxes: Vec<RawFlux>,
 }
 
-pub trait RawData:where Self: std::marker::Sized
-{
-    fn read(path: &str) -> Option<Self> ;
-    fn write(&self, path: &str);
+pub trait RawData: Sized {
+    fn read_raw(path: &str) -> Option<Self>;
+    fn write_raw(&self, path: &str) -> Result<(), ()>;
 }
 
+impl RawData for RawDataScalar {
+    fn read_raw(path: &str) -> Option<Self> {
+        let mut file = File::open(Path::new(path)).ok()?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).ok()?;
 
+        let mut offset = 0;
+        let header = ScalarFileHeader::from_bytes(&buffer, &mut offset)?;
 
+        let mut values = Vec::new();
+        while offset < buffer.len() {
+            values.push(RawScalar::from_bytes(&buffer, &mut offset)?);
+        }
 
-// impl RawData for RawDataScalar
-// {
-//     fn read(path: &str) -> Option<Self> {
-        
-//     }
-//     fn write(&self, path: &str) {
-//         let data = self.serialize(serializer);
-//         let mut file = File::create(path)?;
-//         file.write_all(xml.as_bytes())?;
-//         Ok(())
-//     }
-// }
+        Some(RawDataScalar { header, values })
+    }
+
+    fn write_raw(&self, path: &str) -> Result<(), ()> {
+        let mut file = File::create(Path::new(path)).map_err(|_| ())?;
+        let mut buffer = Vec::new();
+
+        self.header.to_bytes(&mut buffer);
+        for value in &self.values {
+            value.to_bytes(&mut buffer);
+        }
+
+        file.write_all(&buffer).map_err(|_| ())
+    }
+}
+
+impl RawData for RawDataFlux {
+    fn read_raw(path: &str) -> Option<Self> {
+        let mut file = File::open(Path::new(path)).ok()?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).ok()?;
+
+        let mut offset = 0;
+        let header = FluxFileHeader::from_bytes(&buffer, &mut offset)?;
+
+        let mut fluxes = Vec::new();
+        while offset < buffer.len() {
+            fluxes.push(RawFlux::from_bytes(&buffer, &mut offset)?);
+        }
+
+        Some(RawDataFlux { header, fluxes })
+    }
+
+    fn write_raw(&self, path: &str) -> Result<(), ()> {
+        let mut file = File::create(Path::new(path)).map_err(|_| ())?;
+        let mut buffer = Vec::new();
+
+        self.header.to_bytes(&mut buffer);
+        for flux in &self.fluxes {
+            flux.to_bytes(&mut buffer);
+        }
+
+        file.write_all(&buffer).map_err(|_| ())
+    }
+}
+pub trait FromBytes: Sized {
+    fn from_bytes(buffer: &[u8], offset: &mut usize) -> Option<Self>;
+}
+
+pub trait ToBytes {
+    fn to_bytes(&self, buffer: &mut Vec<u8>);
+}
+
+impl FromBytes for ScalarFileHeader {
+    fn from_bytes(buffer: &[u8], offset: &mut usize) -> Option<Self> {
+        if *offset + size_of::<u32>() > buffer.len() {
+            return None;
+        }
+        let n_zone = u32::from_le_bytes(
+            buffer[*offset..*offset + size_of::<u32>()]
+                .try_into()
+                .unwrap(),
+        );
+        *offset += size_of::<u32>();
+        Some(ScalarFileHeader { n_zone })
+    }
+}
+
+impl ToBytes for ScalarFileHeader {
+    fn to_bytes(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(&self.n_zone.to_le_bytes());
+    }
+}
+
+impl FromBytes for FluxFileHeader {
+    fn from_bytes(buffer: &[u8], offset: &mut usize) -> Option<Self> {
+        if *offset + 2 * size_of::<u32>() > buffer.len() {
+            return None;
+        }
+        let n_zone = u32::from_le_bytes(
+            buffer[*offset..*offset + size_of::<u32>()]
+                .try_into()
+                .unwrap(),
+        );
+        *offset += size_of::<u32>();
+        let n_max = u32::from_le_bytes(
+            buffer[*offset..*offset + size_of::<u32>()]
+                .try_into()
+                .unwrap(),
+        );
+        *offset += size_of::<u32>();
+        Some(FluxFileHeader { n_zone, n_max })
+    }
+}
+
+impl ToBytes for FluxFileHeader {
+    fn to_bytes(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(&self.n_zone.to_le_bytes());
+        buffer.extend_from_slice(&self.n_max.to_le_bytes());
+    }
+}
+
+impl FromBytes for RawScalar {
+    fn from_bytes(buffer: &[u8], offset: &mut usize) -> Option<Self> {
+        if *offset + size_of::<f64>() > buffer.len() {
+            return None;
+        }
+        let value = f64::from_le_bytes(
+            buffer[*offset..*offset + size_of::<f64>()]
+                .try_into()
+                .unwrap(),
+        );
+        *offset += size_of::<f64>();
+        Some(RawScalar { value })
+    }
+}
+
+impl ToBytes for RawScalar {
+    fn to_bytes(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(&self.value.to_le_bytes());
+    }
+}
+
+impl FromBytes for RawFlux {
+    fn from_bytes(buffer: &[u8], offset: &mut usize) -> Option<Self> {
+        if *offset + 2 * size_of::<u32>() + 2 * size_of::<f64>() > buffer.len() {
+            return None;
+        }
+        let id_source = u32::from_le_bytes(
+            buffer[*offset..*offset + size_of::<u32>()]
+                .try_into()
+                .unwrap(),
+        );
+        *offset += size_of::<u32>();
+        let id_target = u32::from_le_bytes(
+            buffer[*offset..*offset + size_of::<u32>()]
+                .try_into()
+                .unwrap(),
+        );
+        *offset += size_of::<u32>();
+        let flux_source_target = f64::from_le_bytes(
+            buffer[*offset..*offset + size_of::<f64>()]
+                .try_into()
+                .unwrap(),
+        );
+        *offset += size_of::<f64>();
+        let flux_target_source = f64::from_le_bytes(
+            buffer[*offset..*offset + size_of::<f64>()]
+                .try_into()
+                .unwrap(),
+        );
+        *offset += size_of::<f64>();
+        Some(RawFlux {
+            id_source,
+            id_target,
+            flux_source_target,
+            flux_target_source,
+        })
+    }
+}
+
+impl ToBytes for RawFlux {
+    fn to_bytes(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(&self.id_source.to_le_bytes());
+        buffer.extend_from_slice(&self.id_target.to_le_bytes());
+        buffer.extend_from_slice(&self.flux_source_target.to_le_bytes());
+        buffer.extend_from_slice(&self.flux_target_source.to_le_bytes());
+    }
+}
