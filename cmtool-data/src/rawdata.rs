@@ -233,3 +233,209 @@ impl ToBytes for RawFlux {
         buffer.extend_from_slice(&self.flux_target_source.to_le_bytes());
     }
 }
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use crate::rawdata::{FromBytes, RawData, ToBytes};
+
+    use super::*;
+
+    #[test]
+    fn test_flux_file_header_serialization() {
+        let header = FluxFileHeader {
+            n_zone: 10,
+            n_max: 100,
+        };
+
+        let mut buffer = Vec::new();
+        header.to_bytes(&mut buffer);
+        let mut offset = 0;
+        let deserialized = FluxFileHeader::from_bytes(&buffer, &mut offset).unwrap();
+
+        assert_eq!(header.n_zone, deserialized.n_zone);
+        assert_eq!(header.n_max, deserialized.n_max);
+    }
+
+    #[test]
+    fn test_scalar_file_header_serialization() {
+        let header = ScalarFileHeader { n_zone: 5 };
+
+        let mut buffer = Vec::new();
+        header.to_bytes(&mut buffer);
+        let mut offset = 0;
+        let deserialized = ScalarFileHeader::from_bytes(&buffer, &mut offset).unwrap();
+
+        assert_eq!(header.n_zone, deserialized.n_zone);
+    }
+
+    #[test]
+    fn test_raw_flux_serialization() {
+        let raw_flux = RawFlux {
+            id_source: 1,
+            id_target: 2,
+            flux_source_target: 0.1,
+            flux_target_source: 2.71,
+        };
+
+        let mut buffer = Vec::new();
+        raw_flux.to_bytes(&mut buffer);
+        let mut offset = 0;
+        let deserialized = RawFlux::from_bytes(&buffer, &mut offset).unwrap();
+
+        assert_eq!(raw_flux.id_source, deserialized.id_source);
+        assert_eq!(raw_flux.id_target, deserialized.id_target);
+        assert_eq!(raw_flux.flux_source_target, deserialized.flux_source_target);
+        assert_eq!(raw_flux.flux_target_source, deserialized.flux_target_source);
+    }
+
+    #[test]
+    fn test_raw_scalar_serialization() {
+        let raw_scalar = RawScalar { value: 0.1 };
+
+        let mut buffer = Vec::new();
+        raw_scalar.to_bytes(&mut buffer);
+        let mut offset = 0;
+        let deserialized = RawScalar::from_bytes(&buffer, &mut offset).unwrap();
+
+        assert_eq!(raw_scalar.value, deserialized.value);
+    }
+
+    #[test]
+    fn test_raw_data_scalar_serialization() {
+        let raw_data_scalar = RawDataScalar {
+            header: ScalarFileHeader { n_zone: 5 },
+            values: vec![RawScalar { value: 0.1 }, RawScalar { value: 2.71 }],
+        };
+
+        let mut buffer = Vec::new();
+        raw_data_scalar.header.to_bytes(&mut buffer);
+        for value in &raw_data_scalar.values {
+            value.to_bytes(&mut buffer);
+        }
+
+        let mut offset = 0;
+        let header = ScalarFileHeader::from_bytes(&buffer, &mut offset).unwrap();
+        let mut values = Vec::new();
+        while offset < buffer.len() {
+            values.push(RawScalar::from_bytes(&buffer, &mut offset).unwrap());
+        }
+
+        assert_eq!(raw_data_scalar.header.n_zone, header.n_zone);
+        assert_eq!(raw_data_scalar.values.len(), values.len());
+        assert_eq!(raw_data_scalar.values[0].value, values[0].value);
+        assert_eq!(raw_data_scalar.values[1].value, values[1].value);
+    }
+
+    #[test]
+    fn test_raw_data_flux_serialization() {
+        let raw_data_flux = RawDataFlux {
+            header: FluxFileHeader {
+                n_zone: 10,
+                n_max: 100,
+            },
+            fluxes: vec![RawFlux {
+                id_source: 1,
+                id_target: 2,
+                flux_source_target: 0.1,
+                flux_target_source: 2.71,
+            }],
+        };
+
+        let mut buffer = Vec::new();
+        raw_data_flux.header.to_bytes(&mut buffer);
+        for flux in &raw_data_flux.fluxes {
+            flux.to_bytes(&mut buffer);
+        }
+
+        let mut offset = 0;
+        let header = FluxFileHeader::from_bytes(&buffer, &mut offset).unwrap();
+        let mut fluxes = Vec::new();
+        while offset < buffer.len() {
+            fluxes.push(RawFlux::from_bytes(&buffer, &mut offset).unwrap());
+        }
+
+        assert_eq!(raw_data_flux.header.n_zone, header.n_zone);
+        assert_eq!(raw_data_flux.header.n_max, header.n_max);
+        assert_eq!(raw_data_flux.fluxes.len(), fluxes.len());
+        assert_eq!(raw_data_flux.fluxes[0].id_source, fluxes[0].id_source);
+        assert_eq!(raw_data_flux.fluxes[0].id_target, fluxes[0].id_target);
+        assert_eq!(
+            raw_data_flux.fluxes[0].flux_source_target,
+            fluxes[0].flux_source_target
+        );
+        assert_eq!(
+            raw_data_flux.fluxes[0].flux_target_source,
+            fluxes[0].flux_target_source
+        );
+    }
+
+    #[test]
+    fn test_raw_data_trait() {
+        let raw_data_scalar = RawDataScalar {
+            header: ScalarFileHeader { n_zone: 5 },
+            values: vec![RawScalar { value: 0.1 }, RawScalar { value: 2.71 }],
+        };
+
+        let path = "./test.raw";
+        raw_data_scalar.write_raw(path).unwrap();
+        let deserialized = RawDataScalar::read_raw(path).unwrap();
+
+        assert_eq!(raw_data_scalar.header.n_zone, deserialized.header.n_zone);
+        assert_eq!(raw_data_scalar.values.len(), deserialized.values.len());
+        assert_eq!(
+            raw_data_scalar.values[0].value,
+            deserialized.values[0].value
+        );
+        assert_eq!(
+            raw_data_scalar.values[1].value,
+            deserialized.values[1].value
+        );
+
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_raw_data_flux_write() {
+        let raw_data_flux = RawDataFlux {
+            header: FluxFileHeader {
+                n_zone: 10,
+                n_max: 100,
+            },
+            fluxes: vec![RawFlux {
+                id_source: 1,
+                id_target: 2,
+                flux_source_target: 0.1,
+                flux_target_source: 2.71,
+            }],
+        };
+
+        let path = "./tes2t.raw";
+        raw_data_flux.write_raw(path).unwrap();
+        let deserialized = RawDataFlux::read_raw(path).unwrap();
+
+        assert_eq!(raw_data_flux.header.n_zone, deserialized.header.n_zone);
+        assert_eq!(raw_data_flux.header.n_max, deserialized.header.n_max);
+        assert_eq!(raw_data_flux.fluxes.len(), deserialized.fluxes.len());
+        assert_eq!(
+            raw_data_flux.fluxes[0].id_source,
+            deserialized.fluxes[0].id_source
+        );
+        assert_eq!(
+            raw_data_flux.fluxes[0].id_target,
+            deserialized.fluxes[0].id_target
+        );
+        assert_eq!(
+            raw_data_flux.fluxes[0].flux_source_target,
+            deserialized.fluxes[0].flux_source_target
+        );
+        assert_eq!(
+            raw_data_flux.fluxes[0].flux_target_source,
+            deserialized.fluxes[0].flux_target_source
+        );
+
+        std::fs::remove_file(path).unwrap();
+    }
+}
