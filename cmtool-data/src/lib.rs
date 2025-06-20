@@ -1,10 +1,11 @@
 mod rawdata;
+mod case;
 
-use std::{fmt::Formatter, os::{linux::raw, unix::raw::gid_t}};
-
+pub use case::{CMCase,CMCaseReader,CMCaseWriter,CCMCaseInfo};
 pub use rawdata::{
     FluxFileHeader, RawDataFlux, RawDataScalar, RawFlux, RawScalar, ScalarFileHeader,
 };
+
 
 pub enum Layout {
     RowMajor,

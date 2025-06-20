@@ -45,10 +45,10 @@ impl CoordAxis {
     pub fn index_from_edge_value(&self, axis_value: f64) -> Option<usize> {
         let mut cell_id = 0;
         let n_point = self.edges.len();
-        while (cell_id < n_point && self.edges[cell_id + 1] < axis_value) {
+        while  cell_id < n_point && self.edges[cell_id + 1] < axis_value {
             cell_id += 1;
         }
-        if (cell_id == n_point) {
+        if cell_id == n_point {
             return None;
         }
 
