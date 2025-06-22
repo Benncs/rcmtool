@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 mod collections;
 use collections::*;
-
+pub use collections::Coords3;
 
 pub enum MeshType
 {

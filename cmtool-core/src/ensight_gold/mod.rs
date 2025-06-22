@@ -7,12 +7,13 @@ use std::{
     str::FromStr,
 };
 mod geo;
-mod types;
+pub mod types;
 use crate::{ensight_gold::types::ElementsType, CfdCase};
 pub use crate::{ensight_gold::reader::Reader, utils};
 pub mod scalar;
 
 pub use geo::Geometry;
+pub use geo::Part;
 
 #[derive(Default, Debug)]
 pub struct VariableInfo {
@@ -87,7 +88,6 @@ impl Case {
                     || line.contains("FILE")
                     || line.contains("TIME"))
                 {
-                    println!("{}", line);
                     case.paths.push(VariableInfo::read(&line)?);
                     line.clear();
                     reader.read_line(&mut line)?;

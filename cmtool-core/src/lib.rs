@@ -2,7 +2,10 @@ use std::{path::Path, sync::Arc};
 
 use cmtool_data::RawData;
 
-use crate::{ensight_gold::Reader, model::scalar::Scalar};
+use crate::{
+    ensight_gold::Reader,
+    model::{scalar::Scalar, CMGeometry, CMModel},
+};
 
 pub mod ensight_gold;
 pub mod grid;
@@ -26,15 +29,12 @@ pub struct CMHandle {
 
 impl CMHandle {
     pub fn init(
-        _n_div: [usize; 3],
+        n_div: [usize; 3],
         root: &str,
         geometry_filename: &str,
         _meshtype: grid::MeshType,
     ) -> Result<Self, ()> {
         let fullpath = format!("{}/{}", root, geometry_filename);
-
-        
-
 
         let task_io =
             std::thread::spawn(move || ensight_gold::Geometry::new(Path::new(&fullpath.clone())));
@@ -43,12 +43,17 @@ impl CMHandle {
 
         println!("{:?}", eg_geometry);
 
+        let cm_geometry = CMGeometry::init(n_div,eg_geometry);
+
+        Ok(Self {
+            model: CMModel::init(cm_geometry),
+            root_result: String::from("./test"),
+        })
+
         // let fullpath = format!("{}/wall_cart.scl1", root);
         // let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))
         //     .unwrap();
         // println!("{:?}", s);
-
-        todo!()
     }
 
     pub fn dump_volume(&self) {
@@ -62,7 +67,6 @@ impl CMHandle {
         let scalar = Scalar::new();
         let scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
 
-        
         let path = todo!();
         scalar_data.write_raw(path)
     }
