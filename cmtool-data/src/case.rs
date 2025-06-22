@@ -53,8 +53,6 @@ pub trait CMCaseWriter {
 
 pub struct CMCaseJson;
 
-
-
 impl CMCaseReader for CMCaseJson {
     fn read_case(path: &Path) -> Result<CMCase, ()> {
         let mut file = std::fs::File::open(path).map_err(|_| ())?;
@@ -161,13 +159,20 @@ impl CMCaseWriter for CCMCaseInfo {
 #[cfg(test)]
 mod test {
 
-    use std::fs::remove_file;
+    use std::{fs::remove_file, path::PathBuf};
 
     use super::*;
 
+    fn crate_root_path() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
+    }
+
     fn commomn_read_test<T: CMCaseReader>() {
-        let path =
-            Path::new("/home-local/casale/Documents/thesis/cfd-cma/cma_data/sanofi/cma_case");
+        let manifest_dir = env!("CARGO_MANIFEST_DIR"); // compile-time
+        let binding = Path::new(manifest_dir).join("test_data/cma_case");
+        let path = binding.as_path();
+
+        println!("{:?}",path);
 
         let rcase = T::read_case(path);
 
@@ -184,8 +189,9 @@ mod test {
     }
 
     fn commomn_write_read_test<T: CMCaseReader, F: CMCaseWriter>() {
-        let path =
-            Path::new("/home-local/casale/Documents/thesis/cfd-cma/cma_data/sanofi/cma_case");
+        let manifest_dir = env!("CARGO_MANIFEST_DIR"); // compile-time
+        let binding = Path::new(manifest_dir).join("test_data/cma_case");
+        let path = binding.as_path();
 
         let rcase = T::read_case(path);
 
@@ -218,8 +224,9 @@ mod test {
 
     #[test]
     fn test_conversion() {
-        let c_path =
-            Path::new("/home-local/casale/Documents/thesis/cfd-cma/cma_data/sanofi/cma_case");
+        let manifest_dir = env!("CARGO_MANIFEST_DIR"); // compile-time
+        let binding = Path::new(manifest_dir).join("test_data/cma_case");
+        let c_path = binding.as_path();
 
         let reference_case = CCMCaseInfo::read_case(c_path).unwrap();
 
@@ -235,7 +242,6 @@ mod test {
         assert!(reference_case.paths == converted.paths);
 
         remove_file(Path::new("test_2case.json")).expect("Failed to remove test file")
-
     }
 
     fn common_write_read_test<T: CMCaseWriter + CMCaseReader>(path: &Path) -> Result<(), ()> {
