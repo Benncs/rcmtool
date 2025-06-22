@@ -8,14 +8,14 @@ use std::{
 };
 mod geo;
 mod types;
-use crate::ensight_gold::types::ElementsType;
+use crate::{ensight_gold::types::ElementsType, CfdCase};
 pub use crate::{ensight_gold::reader::Reader, utils};
 pub mod scalar;
 
 pub use geo::Geometry;
 
 #[derive(Default, Debug)]
-struct VariableInfo {
+pub struct VariableInfo {
     var_type: String,
     name: String,
     filepath: String,
@@ -50,8 +50,9 @@ impl VariableInfo {
 
 #[derive(Debug)]
 pub struct Case {
-    geometry_file_path: String,
-    paths: Vec<VariableInfo>,
+    pub geometry_file_path: String,
+    pub paths: Vec<VariableInfo>,
+    pub root: String,
 }
 
 impl Case {
@@ -100,16 +101,42 @@ impl Case {
     pub fn read(path: &Path) -> std::io::Result<Case> {
         let fd = File::open(path)?;
         let mut buffer = BufReader::new(fd);
-        let mut case = Case {
-            geometry_file_path: String::new(),
-            paths: vec![],
-        };
 
-        Self::read_from_buffer(&mut buffer, &mut case)?;
+        if let Some(root_path) = path.parent() {
+            if let Some(root_str) = root_path.to_str() {
+                let root = root_str.to_string();
+                let mut case = Case {
+                    geometry_file_path: String::new(),
+                    paths: vec![],
+                    root: root,
+                };
 
-        
+                Self::read_from_buffer(&mut buffer, &mut case)?;
 
-        Ok(case)
+                Ok(case)
+            } else {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Path is not valid UTF-8",
+                ))
+            }
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "No parent directory",
+            ))
+        }
+    }
+}
+
+impl super::CfdCase for Case
+{
+    fn get_root(&self) -> String {
+        self.root.clone()
+    }
+
+    fn get_geometry_relative_path(&self) -> String {
+        self.geometry_file_path.clone()
     }
 }
 
@@ -120,7 +147,6 @@ mod test {
     use std::env;
     use std::fs::File;
     use std::io::Write;
-    use std::path::Path;
     #[test]
     fn test_read() {
         let reference = "FORMAT
@@ -138,18 +164,14 @@ SCRIPTS
 metadata: \"test.xml\"
 ";
 
-        // Create a temporary file path
         let mut temp_file_path = env::temp_dir();
         temp_file_path.push("temp_test_file.encas");
 
-        // Write the reference string to the temporary file
         let mut file = File::create(&temp_file_path).expect("Failed to create temporary file");
         write!(file, "{}", reference).expect("Failed to write to temporary file");
 
-        // Read the temporary file using the `Case::read` function
         let case = Case::read(&temp_file_path).expect("Failed to read temporary file");
 
-        // Define the reference `Case` object
         let reference_case = Case {
             geometry_file_path: "test.geo".to_string(),
             paths: vec![
@@ -184,9 +206,9 @@ metadata: \"test.xml\"
                     filepath: "test.vel".to_string(),
                 },
             ],
+            root:String::new()
         };
 
-        // Compare the result to the reference `Case` object
         assert_eq!(case.geometry_file_path, reference_case.geometry_file_path);
         assert_eq!(case.paths.len(), reference_case.paths.len());
 
@@ -196,8 +218,6 @@ metadata: \"test.xml\"
             assert_eq!(path.name, reference_path.name);
             assert_eq!(path.filepath, reference_path.filepath);
         }
-
-        // Clean up: remove the temporary file
         std::fs::remove_file(&temp_file_path).expect("Failed to remove temporary file");
     }
 }

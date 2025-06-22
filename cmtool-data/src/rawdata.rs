@@ -6,15 +6,17 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+pub type ScalarValueType=f64;
+
 #[repr(C)]
-#[derive(Deserialize, Serialize,Clone, Copy)]
+#[derive(Deserialize, Serialize,Clone, Copy,Default)]
 pub struct FluxFileHeader {
     pub n_zone: u32,
-    pub n_max: u32,
+    pub n_fluxes: u32,
 }
 
 #[repr(C)]
-#[derive(Deserialize, Serialize,Clone, Copy)]
+#[derive(Deserialize, Serialize,Clone, Copy,Default)]
 pub struct ScalarFileHeader {
     pub n_zone: u32,
 }
@@ -48,6 +50,23 @@ pub struct RawDataFlux {
 pub trait RawData: Sized {
     fn read_raw(path: &str) -> Option<Self>;
     fn write_raw(&self, path: &str) -> Result<(), ()>;
+}
+
+impl RawDataScalar
+{
+    pub fn new(n_zone:usize)->Self
+    {
+        Self{header:ScalarFileHeader{n_zone: n_zone.try_into().unwrap()},values:Vec::with_capacity(n_zone)}
+    }
+}
+
+
+impl RawDataFlux
+{
+    pub fn new(n_zone:usize,n_fluxes:usize)->Self
+    {
+        Self{header:FluxFileHeader { n_zone:n_zone as u32, n_fluxes: n_fluxes as u32 },fluxes:Vec::with_capacity(n_zone) }
+    }
 }
 
 impl RawData for RawDataScalar {
@@ -155,14 +174,14 @@ impl FromBytes for FluxFileHeader {
                 .unwrap(),
         );
         *offset += size_of::<u32>();
-        Some(FluxFileHeader { n_zone, n_max })
+        Some(FluxFileHeader { n_zone, n_fluxes: n_max })
     }
 }
 
 impl ToBytes for FluxFileHeader {
     fn to_bytes(&self, buffer: &mut Vec<u8>) {
         buffer.extend_from_slice(&self.n_zone.to_le_bytes());
-        buffer.extend_from_slice(&self.n_max.to_le_bytes());
+        buffer.extend_from_slice(&self.n_fluxes.to_le_bytes());
     }
 }
 
@@ -247,7 +266,7 @@ mod tests {
     fn test_flux_file_header_serialization() {
         let header = FluxFileHeader {
             n_zone: 10,
-            n_max: 100,
+            n_fluxes: 100,
         };
 
         let mut buffer = Vec::new();
@@ -256,7 +275,7 @@ mod tests {
         let deserialized = FluxFileHeader::from_bytes(&buffer, &mut offset).unwrap();
 
         assert_eq!(header.n_zone, deserialized.n_zone);
-        assert_eq!(header.n_max, deserialized.n_max);
+        assert_eq!(header.n_fluxes, deserialized.n_fluxes);
     }
 
     #[test]
@@ -334,7 +353,7 @@ mod tests {
         let raw_data_flux = RawDataFlux {
             header: FluxFileHeader {
                 n_zone: 10,
-                n_max: 100,
+                n_fluxes: 100,
             },
             fluxes: vec![RawFlux {
                 id_source: 1,
@@ -358,7 +377,7 @@ mod tests {
         }
 
         assert_eq!(raw_data_flux.header.n_zone, header.n_zone);
-        assert_eq!(raw_data_flux.header.n_max, header.n_max);
+        assert_eq!(raw_data_flux.header.n_fluxes, header.n_fluxes);
         assert_eq!(raw_data_flux.fluxes.len(), fluxes.len());
         assert_eq!(raw_data_flux.fluxes[0].id_source, fluxes[0].id_source);
         assert_eq!(raw_data_flux.fluxes[0].id_target, fluxes[0].id_target);
@@ -402,7 +421,7 @@ mod tests {
         let raw_data_flux = RawDataFlux {
             header: FluxFileHeader {
                 n_zone: 10,
-                n_max: 100,
+                n_fluxes: 100,
             },
             fluxes: vec![RawFlux {
                 id_source: 1,
@@ -417,7 +436,7 @@ mod tests {
         let deserialized = RawDataFlux::read_raw(path).unwrap();
 
         assert_eq!(raw_data_flux.header.n_zone, deserialized.header.n_zone);
-        assert_eq!(raw_data_flux.header.n_max, deserialized.header.n_max);
+        assert_eq!(raw_data_flux.header.n_fluxes, deserialized.header.n_fluxes);
         assert_eq!(raw_data_flux.fluxes.len(), deserialized.fluxes.len());
         assert_eq!(
             raw_data_flux.fluxes[0].id_source,

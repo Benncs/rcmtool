@@ -3,7 +3,7 @@ mod case;
 
 pub use case::{CMCase,CMCaseReader,CMCaseWriter,CCMCaseInfo};
 pub use rawdata::{
-    FluxFileHeader, RawDataFlux, RawDataScalar, RawFlux, RawScalar, ScalarFileHeader,
+    FluxFileHeader, RawDataFlux, RawDataScalar, RawFlux, RawScalar, ScalarFileHeader,RawData,ScalarValueType
 };
 
 #[inline(always)]

@@ -23,3 +23,4 @@ rpath = false
 
 [workspace.dependencies]
 cmtool-core = { version = "0.1.0", path = "./cmtool-core" }
+cmtool-data = { version = "0.1.0", path = "./cmtool-data" }

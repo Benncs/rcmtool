@@ -3,6 +3,12 @@ mod collections;
 use collections::*;
 
 
+pub enum MeshType
+{
+    Cylindrical,
+    MeshRectangular
+}
+
 pub enum NeighborDirection {
     NotNeighbors = 0,
     XMinus = 1,
@@ -107,11 +113,7 @@ pub type MeshCylindrical = BaseCompartmentMesh<CylindricalMarker>;
 pub type MeshRectangular = BaseCompartmentMesh<RectangularMarker>;
 
 
-pub enum MeshType
-{
-    Cylindrical,
-    MeshRectangular
-}
+
 
 impl CompartmentMeshManip for MeshCylindrical {
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
