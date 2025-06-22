@@ -48,10 +48,10 @@ pub trait CompartmentMeshAccessor {
 
 pub trait CompartmentMeshManip {
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection;
-    fn cell_surface(cell_id: usize) -> f64;
-    fn cell_volume(cell_id: usize) -> f64;
+    fn cell_surface(&self,cell_id: usize) -> f64;
+    fn cell_volume(&self,cell_id: usize) -> f64;
     fn cell_from_coordinates(&self, coords: &Coords3) -> Option<usize>;
-    fn is_point_inside(cell_id: usize, point_coords: &Coords3) -> bool;
+    fn is_point_inside(&self,cell_id: usize, point_coords: &Coords3) -> bool;
     fn cell_points(&self, cell_1d: usize) -> AxisPoints;
 }
 
@@ -64,11 +64,10 @@ impl<T: Send + Sync + Debug + CompartmentMeshAccessor + CompartmentMeshManip> Co
 {
 }
 
-// Define a generic struct for the mesh
 pub struct BaseCompartmentMesh<T> {
     axes: [CoordAxis; 3],
     n_cells: usize,
-    _marker: std::marker::PhantomData<T>, // PhantomData to hold the generic type without using it
+    _marker: std::marker::PhantomData<T>, 
 }
 
 impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
@@ -106,6 +105,13 @@ pub struct RectangularMarker;
 
 pub type MeshCylindrical = BaseCompartmentMesh<CylindricalMarker>;
 pub type MeshRectangular = BaseCompartmentMesh<RectangularMarker>;
+
+
+pub enum MeshType
+{
+    Cylindrical,
+    MeshRectangular
+}
 
 impl CompartmentMeshManip for MeshCylindrical {
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
@@ -161,11 +167,11 @@ impl CompartmentMeshManip for MeshCylindrical {
         NeighborDirection::NotNeighbors
     }
 
-    fn cell_surface(cell_id: usize) -> f64 {
+    fn cell_surface(&self,_cell_id: usize) -> f64 {
         todo!()
     }
 
-    fn cell_volume(cell_id: usize) -> f64 {
+    fn cell_volume(&self,cell_id: usize) -> f64 {
         todo!()
     }
 
@@ -181,7 +187,7 @@ impl CompartmentMeshManip for MeshCylindrical {
         Some(mesh_id)
     }
 
-    fn is_point_inside(cell_id: usize, point_coords: &Coords3) -> bool {
+    fn is_point_inside(&self,cell_id: usize, point_coords: &Coords3) -> bool {
         todo!()
     }
 
@@ -197,5 +203,21 @@ impl CompartmentMeshManip for MeshCylindrical {
         }
 
         axis_points
+    }
+}
+
+
+pub fn get_mesh(meshtype:MeshType)->Box<dyn CompartmentMesh>
+{
+    match meshtype
+    {
+        MeshType::Cylindrical =>
+        {
+            todo!()
+        },
+        MeshType::MeshRectangular =>
+        {
+            todo!()
+        }
     }
 }

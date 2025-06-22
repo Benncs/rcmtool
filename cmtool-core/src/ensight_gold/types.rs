@@ -1,4 +1,5 @@
-use std::str::FromStr;
+use std::{default, str::FromStr};
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ElementsType {
@@ -37,6 +38,14 @@ pub enum ElementsType {
     Nfaced,
     GNfaced,
 }
+
+impl Default for ElementsType
+{
+    fn default() -> Self {
+        Self::Point
+    }
+}
+
 
 impl FromStr for ElementsType {
     type Err = ();
