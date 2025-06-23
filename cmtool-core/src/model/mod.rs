@@ -1,9 +1,4 @@
-use std::{
-    default,
-    fs::File,
-    io::{BufWriter, Write},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use crate::{
     ensight_gold::{

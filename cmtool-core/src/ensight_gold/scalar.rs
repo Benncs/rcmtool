@@ -1,5 +1,5 @@
 use std::{
-    io::{Error, ErrorKind}, ops::{Index, IndexMut}, path::Path, sync::Arc
+    io::ErrorKind, path::Path, sync::Arc
 };
 
 use crate::ensight_gold::{geo::Geometry, reader::EnsightGoldReader, Reader};

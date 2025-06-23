@@ -2,10 +2,7 @@ use std::{path::Path, sync::Arc};
 
 use cmtool_data::RawData;
 
-use crate::{
-    ensight_gold::Reader,
-    model::{scalar::Scalar, CMGeometry, CMModel},
-};
+use crate::model::{scalar::Scalar, CMGeometry, CMModel};
 
 pub mod ensight_gold;
 pub mod grid;

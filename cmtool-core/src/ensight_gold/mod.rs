@@ -1,15 +1,13 @@
 mod reader;
 use std::{
     fmt::Debug,
-    fs::{read, File},
-    io::{BufRead, BufReader, Error, ErrorKind, Lines},
+    fs::File,
+    io::{BufRead, BufReader},
     path::Path,
-    str::FromStr,
 };
 mod geo;
 pub mod types;
 pub use crate::{ensight_gold::reader::Reader, utils};
-use crate::{ensight_gold::types::ElementsType, CfdCase};
 pub mod scalar;
 
 pub use geo::Geometry;
