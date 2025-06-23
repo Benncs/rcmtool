@@ -159,13 +159,10 @@ impl CMCaseWriter for CCMCaseInfo {
 #[cfg(test)]
 mod test {
 
-    use std::{fs::remove_file, path::PathBuf};
+    use std::{fs::remove_file};
 
     use super::*;
 
-    fn crate_root_path() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
-    }
 
     fn commomn_read_test<T: CMCaseReader>() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR"); // compile-time

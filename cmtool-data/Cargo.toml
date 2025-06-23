@@ -7,12 +7,10 @@ description.workspace = true
 documentation.workspace = true
 
 [dependencies]
-serde = { version = "1.0.219", features = ["derive"] }
-serde_cbor = "0.11.2"
-serde_json = "1.0.140"
+serde.workspace=true
+serde_cbor.workspace=true
+serde_json.workspace=true
 
-[dev-dependencies]
-tempfile = "3.20.0"
 
 
 

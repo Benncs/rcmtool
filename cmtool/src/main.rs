@@ -1,11 +1,8 @@
-use cmtool_core::ensight_gold::{self, Geometry};
-use std::path::Path;
 fn main() {
-
-
-    let case = cmtool_core::ensight_gold::Case::read(Path::new(
+    let case = cmtool_core::ensight_gold::Case::read(
         "/home/benjamin/Documents/thesis/cfd-cma/Cas_Test_CMA/export/wall_cart.encas",
-    )).unwrap();
+    )
+    .unwrap();
 
     let geo = cmtool_core::CMHandle::init(
         [0, 0, 0],
