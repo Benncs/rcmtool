@@ -6,23 +6,23 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-pub type ScalarValueType=f64;
+pub type ScalarValueType = f64;
 
 #[repr(C)]
-#[derive(Deserialize, Serialize,Clone, Copy,Default)]
+#[derive(Deserialize, Serialize, Clone, Copy, Default)]
 pub struct FluxFileHeader {
     pub n_zone: u32,
     pub n_fluxes: u32,
 }
 
 #[repr(C)]
-#[derive(Deserialize, Serialize,Clone, Copy,Default)]
+#[derive(Deserialize, Serialize, Clone, Copy, Default)]
 pub struct ScalarFileHeader {
     pub n_zone: u32,
 }
 
 #[repr(C)]
-#[derive(Deserialize, Serialize,Clone, Copy)]
+#[derive(Deserialize, Serialize, Clone, Copy)]
 pub struct RawFlux {
     pub id_source: u32,
     pub id_target: u32,
@@ -31,7 +31,7 @@ pub struct RawFlux {
 }
 
 #[repr(C)]
-#[derive(Deserialize, Serialize,Clone, Copy)]
+#[derive(Deserialize, Serialize, Clone, Copy)]
 pub struct RawScalar {
     pub value: f64,
 }
@@ -48,30 +48,36 @@ pub struct RawDataFlux {
 }
 
 pub trait RawData: Sized {
-    fn read_raw(path: &str) -> Option<Self>;
+    fn read_raw(path: impl AsRef<std::path::Path>) -> Option<Self>;
     fn write_raw(&self, path: &str) -> Result<(), ()>;
 }
 
-impl RawDataScalar
-{
-    pub fn new(n_zone:usize)->Self
-    {
-        Self{header:ScalarFileHeader{n_zone: n_zone.try_into().unwrap()},values:Vec::with_capacity(n_zone)}
+impl RawDataScalar {
+    pub fn new(n_zone: usize) -> Self {
+        Self {
+            header: ScalarFileHeader {
+                n_zone: n_zone.try_into().unwrap(),
+            },
+            values: Vec::with_capacity(n_zone),
+        }
     }
 }
 
-
-impl RawDataFlux
-{
-    pub fn new(n_zone:usize,n_fluxes:usize)->Self
-    {
-        Self{header:FluxFileHeader { n_zone:n_zone as u32, n_fluxes: n_fluxes as u32 },fluxes:Vec::with_capacity(n_zone) }
+impl RawDataFlux {
+    pub fn new(n_zone: usize, n_fluxes: usize) -> Self {
+        Self {
+            header: FluxFileHeader {
+                n_zone: n_zone as u32,
+                n_fluxes: n_fluxes as u32,
+            },
+            fluxes: Vec::with_capacity(n_zone),
+        }
     }
 }
 
 impl RawData for RawDataScalar {
-    fn read_raw(path: &str) -> Option<Self> {
-        let mut file = File::open(Path::new(path)).ok()?;
+    fn read_raw(path: impl AsRef<std::path::Path>) -> Option<Self> {
+        let mut file = File::open(path).ok()?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer).ok()?;
 
@@ -100,8 +106,8 @@ impl RawData for RawDataScalar {
 }
 
 impl RawData for RawDataFlux {
-    fn read_raw(path: &str) -> Option<Self> {
-        let mut file = File::open(Path::new(path)).ok()?;
+    fn read_raw(path: impl AsRef<std::path::Path>) -> Option<Self> {
+        let mut file = File::open(path).ok()?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer).ok()?;
 
@@ -174,7 +180,10 @@ impl FromBytes for FluxFileHeader {
                 .unwrap(),
         );
         *offset += size_of::<u32>();
-        Some(FluxFileHeader { n_zone, n_fluxes: n_max })
+        Some(FluxFileHeader {
+            n_zone,
+            n_fluxes: n_max,
+        })
     }
 }
 
@@ -252,9 +261,6 @@ impl ToBytes for RawFlux {
         buffer.extend_from_slice(&self.flux_target_source.to_le_bytes());
     }
 }
-
-
-
 
 #[cfg(test)]
 mod tests {

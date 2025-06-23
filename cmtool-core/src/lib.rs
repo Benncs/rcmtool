@@ -43,17 +43,17 @@ impl CMHandle {
 
         println!("{:?}", eg_geometry);
 
-        let cm_geometry = CMGeometry::init(n_div,eg_geometry);
+        let cm_geometry = CMGeometry::init(n_div, eg_geometry.clone());
+
+        let fullpath = format!("{}/wall_cart.scl1", root);
+        let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))
+            .unwrap();
+   
 
         Ok(Self {
             model: CMModel::init(cm_geometry),
             root_result: String::from("./test"),
         })
-
-        // let fullpath = format!("{}/wall_cart.scl1", root);
-        // let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))
-        //     .unwrap();
-        // println!("{:?}", s);
     }
 
     pub fn dump_volume(&self) {

@@ -8,8 +8,8 @@ use std::{
 };
 mod geo;
 pub mod types;
-use crate::{ensight_gold::types::ElementsType, CfdCase};
 pub use crate::{ensight_gold::reader::Reader, utils};
+use crate::{ensight_gold::types::ElementsType, CfdCase};
 pub mod scalar;
 
 pub use geo::Geometry;
@@ -32,9 +32,15 @@ impl VariableInfo {
         }
 
         if var_info.var_type == "scalar" || var_info.var_type == "vector" {
-            tokens.next(); // Skip "per"
-
-            tokens.next(); // Skip "element:"
+            tokens.next().expect("Error "); // Skip "per"
+            
+            if tokens.next().expect("Error") =="element:"
+            {
+                
+            }
+            else {
+                panic!("Scalar: per node non implemented");
+            }
         }
 
         if let Some(name) = tokens.next() {
@@ -98,11 +104,8 @@ impl Case {
         Ok(())
     }
 
-    pub fn read(path: &Path) -> std::io::Result<Case> {
-        let fd = File::open(path)?;
-        let mut buffer = BufReader::new(fd);
-
-        if let Some(root_path) = path.parent() {
+    pub fn read(path: impl AsRef<Path>) -> std::io::Result<Case> {
+        if let Some(root_path) = path.as_ref().parent() {
             if let Some(root_str) = root_path.to_str() {
                 let root = root_str.to_string();
                 let mut case = Case {
@@ -110,6 +113,8 @@ impl Case {
                     paths: vec![],
                     root: root,
                 };
+                let fd = File::open(path)?;
+                let mut buffer = BufReader::new(fd);
 
                 Self::read_from_buffer(&mut buffer, &mut case)?;
 
@@ -129,8 +134,7 @@ impl Case {
     }
 }
 
-impl super::CfdCase for Case
-{
+impl super::CfdCase for Case {
     fn get_root(&self) -> String {
         self.root.clone()
     }
@@ -206,7 +210,7 @@ metadata: \"test.xml\"
                     filepath: "test.vel".to_string(),
                 },
             ],
-            root:String::new()
+            root: String::new(),
         };
 
         assert_eq!(case.geometry_file_path, reference_case.geometry_file_path);

@@ -29,7 +29,7 @@ pub struct Reader<const N:usize> {
 }
 
 impl<const N:usize> Reader<N> {
-    pub fn new(path: &Path) -> std::io::Result<Self> {
+    pub fn new(path: impl AsRef<Path>) -> std::io::Result<Self> {
         let fd = File::open(path)?;
         Ok(Reader {
             reader: BufReader::new(fd),
