@@ -32,14 +32,11 @@ impl VariableInfo {
         }
 
         if var_info.var_type == "scalar" || var_info.var_type == "vector" {
-            tokens.next().expect("Error "); // Skip "per"
+            tokens.next().expect("Error reading case"); // Skip "per"
             
-            if tokens.next().expect("Error") =="element:"
+            if tokens.next().expect("Error reading case") !="element:"
             {
-                
-            }
-            else {
-                panic!("Scalar: per node non implemented");
+                unimplemented!("Eg case Vector/Scalar: per node");
             }
         }
 
