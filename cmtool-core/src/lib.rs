@@ -45,7 +45,6 @@ impl CMHandle {
         let fullpath = format!("{}/wall_cart.scl1", root);
         let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))
             .unwrap();
-   
 
         Ok(Self {
             model: CMModel::init(cm_geometry),

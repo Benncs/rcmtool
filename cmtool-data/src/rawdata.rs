@@ -22,7 +22,7 @@ pub struct ScalarFileHeader {
 }
 
 #[repr(C)]
-#[derive(Deserialize, Serialize, Clone, Copy)]
+#[derive(Deserialize, Serialize, Clone, Copy, Default)]
 pub struct RawFlux {
     pub id_source: u32,
     pub id_target: u32,
@@ -45,6 +45,12 @@ pub struct RawDataScalar {
 pub struct RawDataFlux {
     pub header: FluxFileHeader,
     pub fluxes: Vec<RawFlux>,
+}
+
+impl From<f64> for RawScalar {
+    fn from(value: f64) -> Self {
+        Self { value }
+    }
 }
 
 pub trait RawData: Sized {
@@ -70,7 +76,7 @@ impl RawDataFlux {
                 n_zone: n_zone as u32,
                 n_fluxes: n_fluxes as u32,
             },
-            fluxes: Vec::with_capacity(n_zone),
+            fluxes: vec![RawFlux::default(); n_zone],
         }
     }
 }
@@ -125,13 +131,14 @@ impl RawData for RawDataFlux {
     fn write_raw(&self, path: &str) -> Result<(), ()> {
         let mut file = File::create(Path::new(path)).map_err(|_| ())?;
         let mut buffer = Vec::new();
-
         self.header.to_bytes(&mut buffer);
         for flux in &self.fluxes {
             flux.to_bytes(&mut buffer);
         }
 
-        file.write_all(&buffer).map_err(|_| ())
+        file.write_all(&buffer).map_err(|e| {
+            eprintln!("{}", e);
+        })
     }
 }
 pub trait FromBytes: Sized {

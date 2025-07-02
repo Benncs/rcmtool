@@ -1,20 +1,19 @@
-mod rawdata;
 mod case;
+mod rawdata;
 
-pub use case::{CMCase,CMCaseReader,CMCaseWriter,CCMCaseInfo};
+pub use case::{CCMCaseInfo, CMAExportType, CMCase, CMCaseReader, CMCaseWriter,CMCaseJson};
 pub use rawdata::{
-    FluxFileHeader, RawDataFlux, RawDataScalar, RawFlux, RawScalar, ScalarFileHeader,RawData,ScalarValueType
+    FluxFileHeader, RawData, RawDataFlux, RawDataScalar, RawFlux, RawScalar, ScalarFileHeader,
+    ScalarValueType,
 };
 
 #[inline(always)]
-fn linear_index_row_major(_n_row: usize, n_col: usize, i: usize, j: usize)->usize
-{
+fn linear_index_row_major(_n_row: usize, n_col: usize, i: usize, j: usize) -> usize {
     i * n_col + j
 }
 
 #[inline(always)]
-fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize)->usize
-{
+fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> usize {
     j * n_row + i
 }
 
@@ -29,10 +28,8 @@ pub struct LightView2D<'a> {
     n_row: usize,
     n_col: usize,
     layout: Layout,
-    f:fn(n_row: usize, n_col: usize, i: usize, j: usize) -> usize,
+    f: fn(n_row: usize, n_col: usize, i: usize, j: usize) -> usize,
 }
-
-
 
 impl<'a> LightView2D<'a> {
     pub fn new(data: &'a mut [f64], n_row: usize, n_col: usize, layout: Layout) -> Self {
@@ -42,24 +39,21 @@ impl<'a> LightView2D<'a> {
             "Data length does not match the specified dimensions"
         );
 
-        let f = match layout
-        {
-            Layout::RowMajor=>linear_index_row_major,
-            Layout::ColMajor=>linear_index_col_major,
+        let f = match layout {
+            Layout::RowMajor => linear_index_row_major,
+            Layout::ColMajor => linear_index_col_major,
         };
-
 
         LightView2D {
             non_owning_data: data,
             n_row,
             n_col,
             layout,
-            f
+            f,
         }
     }
 
-    pub fn get_layout(&self)->Layout
-    {
+    pub fn get_layout(&self) -> Layout {
         self.layout
     }
 
@@ -68,7 +62,7 @@ impl<'a> LightView2D<'a> {
             return None;
         }
 
-        let index = (self.f)(self.n_row,self.n_col,i,j);
+        let index = (self.f)(self.n_row, self.n_col, i, j);
 
         Some(self.non_owning_data[index])
     }
@@ -78,7 +72,7 @@ impl<'a> LightView2D<'a> {
             return None;
         }
 
-        let index = (self.f)(self.n_row,self.n_col,i,j);
+        let index = (self.f)(self.n_row, self.n_col, i, j);
 
         Some(&mut self.non_owning_data[index])
     }
@@ -88,7 +82,7 @@ impl<'a> LightView2D<'a> {
             return Err("Index out of bounds");
         }
 
-        let index = (self.f)(self.n_row,self.n_col,i,j);
+        let index = (self.f)(self.n_row, self.n_col, i, j);
 
         self.non_owning_data[index] = value;
         Ok(())
@@ -124,13 +118,12 @@ struct FlowMapDescriptor {
 }
 
 impl FlowMapDescriptor {
-
     fn from_raw_data(data: &rawdata::RawDataFlux) -> Result<Self, ()> {
         let mut flowmap = FlowMap::new(data.header.n_zone as usize);
 
         let mut neighbors: Vec<Vec<usize>> = Vec::with_capacity(data.header.n_zone as usize);
 
-        //Scope to drop the view 
+        //Scope to drop the view
         {
             let mut view = flowmap.get_view();
 
@@ -152,9 +145,6 @@ impl FlowMapDescriptor {
             }
         }
 
-        
-
         Ok(FlowMapDescriptor { flowmap, neighbors })
     }
 }
-

@@ -1,15 +1,14 @@
 use std::ops::Index;
 
-pub struct Scalar
-{
-    value_in_vo:Vec<cmtool_data::ScalarValueType>
+pub struct Scalar {
+    value_in_vo: Vec<cmtool_data::ScalarValueType>,
 }
 
-impl Scalar
-{
-    pub fn new()->Self
-    {
-        Self{value_in_vo:vec![]}
+impl Scalar {
+    pub fn new() -> Self {
+        Self {
+            value_in_vo: vec![],
+        }
     }
 }
 

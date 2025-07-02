@@ -4,7 +4,7 @@ use std::{collections::HashMap, fs, path::Path};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone, Copy)]
-enum CMAExportType {
+pub enum CMAExportType {
     LiquidFlow = 0,
     GasFlow,
     GasVolume,
@@ -40,6 +40,15 @@ pub struct CMCase {
 impl CMCase {
     pub fn n_compartment(&self) -> u32 {
         self.n_div.iter().product()
+    }
+
+    pub fn add(&mut self, stype: CMAExportType, relative_path: &str) {
+        self.paths.insert(stype, relative_path.to_string());
+    }
+
+    pub fn resolve(&self, root: &str, stype: CMAExportType) -> Option<String> {
+        let rel = self.paths.get(&stype)?;
+        Some(Path::new(root).join(rel).to_str()?.to_string())
     }
 }
 
@@ -159,17 +168,16 @@ impl CMCaseWriter for CCMCaseInfo {
 #[cfg(test)]
 mod test {
 
-    use std::{fs::remove_file};
+    use std::fs::remove_file;
 
     use super::*;
-
 
     fn commomn_read_test<T: CMCaseReader>() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR"); // compile-time
         let binding = Path::new(manifest_dir).join("test_data/cma_case");
         let path = binding.as_path();
 
-        println!("{:?}",path);
+        println!("{:?}", path);
 
         let rcase = T::read_case(path);
 

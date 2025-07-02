@@ -31,9 +31,8 @@ impl VariableInfo {
 
         if var_info.var_type == "scalar" || var_info.var_type == "vector" {
             tokens.next().expect("Error reading case"); // Skip "per"
-            
-            if tokens.next().expect("Error reading case") !="element:"
-            {
+
+            if tokens.next().expect("Error reading case") != "element:" {
                 unimplemented!("Eg case Vector/Scalar: per node");
             }
         }

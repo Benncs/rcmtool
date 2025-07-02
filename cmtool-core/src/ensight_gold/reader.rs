@@ -5,12 +5,9 @@ use std::io::ErrorKind;
 use std::io::SeekFrom;
 use std::path::Path;
 
+pub struct FileBuffer<const N: usize>([u8; N]);
 
-pub struct FileBuffer<const N:usize>([u8; N]);
-
-
-
-impl<const N:usize> FileBuffer<N> {
+impl<const N: usize> FileBuffer<N> {
     pub fn to_string(&self) -> String {
         let trimmed = match self.0.iter().position(|&b| b == 0) {
             Some(pos) => &self.0[..pos],
@@ -21,12 +18,12 @@ impl<const N:usize> FileBuffer<N> {
     }
 }
 
-pub struct Reader<const N:usize> {
+pub struct Reader<const N: usize> {
     reader: BufReader<File>,
     line_buffer: FileBuffer<N>,
 }
 
-impl<const N:usize> Reader<N> {
+impl<const N: usize> Reader<N> {
     pub fn new(path: impl AsRef<Path>) -> std::io::Result<Self> {
         let fd = File::open(path)?;
         Ok(Reader {
@@ -35,23 +32,20 @@ impl<const N:usize> Reader<N> {
         })
     }
 
-    pub fn check_lines_contains(&mut self,name:&str)->std::io::Result<()>
-    {
+    pub fn check_lines_contains(&mut self, name: &str) -> std::io::Result<()> {
         if !self.get_line()?.to_string().contains(name) {
             return Err(std::io::Error::new(
                 ErrorKind::Unsupported,
-                format!("Missing '{}' in header",name),
+                format!("Missing '{}' in header", name),
             ));
         }
         Ok(())
     }
-    pub fn checK_eof(&mut self)->std::io::Result<bool>
-    {
+    pub fn checK_eof(&mut self) -> std::io::Result<bool> {
         let buffer = self.reader.fill_buf()?; //Fill_buff does not consum, keep current file position
         if buffer.is_empty() {
-            Ok(true)  // EOF
+            Ok(true) // EOF
         } else {
-            
             Ok(false) // Not EOF
         }
     }
@@ -61,8 +55,7 @@ impl<const N:usize> Reader<N> {
         Ok(&self.line_buffer)
     }
 
-    pub fn get_line_string(&mut self)->std::io::Result<String>
-    {
+    pub fn get_line_string(&mut self) -> std::io::Result<String> {
         self.reader.read_exact(&mut self.line_buffer.0)?;
         Ok(self.line_buffer.to_string())
     }
@@ -102,5 +95,5 @@ impl<const N:usize> Reader<N> {
         Ok(f32::from_le_bytes(buf))
     }
 }
-const ENSIGHT_GOLDER_BINARY_FORMAT_LINE_SIZE : usize = 80; //Bytes; 
+const ENSIGHT_GOLDER_BINARY_FORMAT_LINE_SIZE: usize = 80; //Bytes;
 pub type EnsightGoldReader = Reader<ENSIGHT_GOLDER_BINARY_FORMAT_LINE_SIZE>;

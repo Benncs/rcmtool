@@ -1,6 +1,4 @@
-use std::{
-    io::ErrorKind, path::Path, sync::Arc
-};
+use std::{io::ErrorKind, path::Path, sync::Arc};
 
 use crate::ensight_gold::{geo::Geometry, reader::EnsightGoldReader, Reader};
 
@@ -10,8 +8,7 @@ pub struct ScalarField {
     // parts: usize,
     // mesh_element_types: usize,
     // mesh_cells: usize,
-
-    data:Vec<Vec<Vec<f32>>>
+    data: Vec<Vec<Vec<f32>>>,
 }
 
 // impl Index<(usize, usize, usize)> for ScalarField {
@@ -39,60 +36,47 @@ pub struct ScalarField {
 impl ScalarField {
     fn new() -> Self {
         let data = Vec::new();
-        ScalarField {
-            data}
+        ScalarField { data }
     }
 
-
-    pub fn init(geometry: Arc<Geometry>,path:&Path)-> std::io::Result<Self> 
-    {
+    pub fn init(geometry: Arc<Geometry>, path: &Path) -> std::io::Result<Self> {
         let mut reader = Reader::new(path)?;
-        Self::read(&geometry,&mut reader)
+        Self::read(&geometry, &mut reader)
     }
-  
-    fn read(
-        geometry: &Arc<Geometry>,
-        reader: &mut EnsightGoldReader,
-    ) -> std::io::Result<Self> {
+
+    fn read(geometry: &Arc<Geometry>, reader: &mut EnsightGoldReader) -> std::io::Result<Self> {
         reader.ignore_line()?; //description
 
         let mut scalar = ScalarField::new();
         scalar.data.resize(geometry.number_of_part(), Vec::new());
 
         for i_part in &mut scalar.data {
-      
             reader.check_lines_contains("part")?;
 
             let id = reader.read_i32()?;
-            println!("{:?}",id);
+            println!("{:?}", id);
 
             if let Some(part) = geometry.get_part_by_id(id as u32) {
                 let n_elements = part.elements.len();
                 i_part.push(Vec::with_capacity(n_elements));
-                
+
                 let element_type_name = reader.get_line_string()?;
-                println!("{}",element_type_name);
-                for (i_element,element) in i_part.iter_mut().enumerate()
-                {
+                println!("{}", element_type_name);
+                for (i_element, element) in i_part.iter_mut().enumerate() {
                     element.resize(part.elements[i_element].n_elements, 0.);
-                    for element_value in element
-                    {
-                        *element_value=reader.read_f32()?;
+                    for element_value in element {
+                        *element_value = reader.read_f32()?;
                     }
                 }
             }
         }
-        if reader.checK_eof()?
-        {
+        if reader.checK_eof()? {
             Ok(scalar)
-        }
-        else
-        {
+        } else {
             Err(std::io::Error::new(
                 ErrorKind::Unsupported,
                 "Reader should have been reached EOF".to_string(),
             ))
         }
-        
     }
 }

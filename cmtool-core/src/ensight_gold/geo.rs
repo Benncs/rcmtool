@@ -16,7 +16,7 @@ pub(crate) struct MeshElementType {
     pub n_nodes: usize,
     pub(crate) n_elements: usize,
     pub etype: ElementsType,
-    pub vertices:Vec<usize>
+    pub vertices: Vec<usize>,
 }
 
 pub struct Part {
@@ -69,7 +69,7 @@ impl MeshElementType {
                 n_nodes,
                 n_elements,
                 etype,
-                vertices
+                vertices,
             })
         } else {
             let n_nodes = etype.node_count() as usize;
