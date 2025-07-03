@@ -50,6 +50,15 @@ impl CMCase {
         let rel = self.paths.get(&stype)?;
         Some(Path::new(root).join(rel).to_str()?.to_string())
     }
+    //pub fn resolve_all(&self, root: &str) -> Vec<String> {
+    //let mut paths = Vec::with_capacity(6); //TODO clean 6 is the number of exporttype
+    //
+    //for (key, val) in map.iter() {
+    //paths.
+    //}
+    //
+    //Some(Path::new(root).join(rel).to_str()?.to_string())
+    //}
 }
 
 pub trait CMCaseReader {

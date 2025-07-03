@@ -36,12 +36,12 @@ pub struct RawScalar {
     pub value: f64,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct RawDataScalar {
     pub header: ScalarFileHeader,
     pub values: Vec<RawScalar>,
 }
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct RawDataFlux {
     pub header: FluxFileHeader,
     pub fluxes: Vec<RawFlux>,

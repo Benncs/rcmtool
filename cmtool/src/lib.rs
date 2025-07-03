@@ -1,7 +1,23 @@
-use cmtool_data::CMAExportType;
 use cmtool_data::CMCase;
+use cmtool_data::CMCaseReader;
 use cmtool_data::RawData;
+use cmtool_data::{CMAExportType, CMCaseJson, RawDataFlux, RawDataScalar,RawFlux};
 use std::path::Path;
+
+const LIQUID_PAIR: (CMAExportType, CMAExportType) = (
+    CMAExportType::LiquidFlow,
+    CMAExportType::LiquidVolume,
+);
+
+const GAS_PAIR: (CMAExportType, CMAExportType) = (
+    CMAExportType::GasFlow,
+    CMAExportType::GasVolume,
+);
+
+type PairType = (CMAExportType, CMAExportType);
+
+const PAIRS: (PairType, PairType) = (LIQUID_PAIR, GAS_PAIR);
+
 pub struct Generator {
     dest: String,
 }
@@ -111,31 +127,23 @@ impl Generator {
         let n_flow = n_compartment - 1;
 
         let flow_source_target = reactor_section_area / dx * (flow_velocity + axial_dispersion);
-
         let flow_target_source = reactor_section_area / dx * axial_dispersion;
 
-        let tolerance = 1e-5;
         assert!(
             ((compartment_volume * n_compartment as f64)
                 - (volume_fraction * reactor_section_area * length))
                 .abs()
-                < 1e-5,
-            "Volume mismatch: got {}, expected {}, diff {}",
-            compartment_volume * n_compartment as f64,
-            volume_fraction * reactor_section_area * length,
-            ((compartment_volume * n_compartment as f64)
-                - (volume_fraction * reactor_section_area * length))
-                .abs()
+                < 1e-5
         );
-        let mut flow_rd = cmtool_data::RawDataFlux::new(n_compartment, n_flow);
 
+        let mut flow_rd = cmtool_data::RawDataFlux::new(n_compartment, n_flow);
         let mut vol_rd = cmtool_data::RawDataScalar::new(n_compartment);
+
         for (current_index, flow) in flow_rd.fluxes.iter_mut().enumerate() {
             flow.id_source = current_index as u32;
             flow.id_target = (current_index + 1) as u32;
             flow.flux_source_target = flow_source_target;
             flow.flux_target_source = flow_target_source;
-
             vol_rd.values.push(compartment_volume.into());
         }
 
@@ -169,7 +177,7 @@ impl Generator {
         diameter: f64,
         flow: f64,
         gas_fraction: f64,
-        axial_dispersion: f64
+        axial_dispersion: f64,
     ) -> Result<CMCase, ()> {
         let mut case = CMCase::default();
         case.n_div = [0, 0, n_compartment as u32];
@@ -203,12 +211,69 @@ impl Generator {
 
         Ok(case)
     }
+    
+    //TODO add result type
+    fn merge_phase(flows:Vec<RawDataFlux>,volumes:Vec<RawDataScalar>,connections:RawDataFlux)->Result<(),()>
+    {
+        let mut merge_phase_flow = RawDataFlux::new(0,0); //
+        let mut offset_compartment =0;
+
+        let mut incr_id = |mut flow:RawFlux|->RawFlux
+        {
+            flow.id_source+=offset_compartment;
+            flow.id_target+= offset_compartment;
+            return flow;
+        };
+
+        for (i,rd) in flows.iter().enumerate()
+        {
+            println!("{}",i);
+        }
+
+        Ok(())
+
+    }
+
+    pub fn merge(&self, ids: &[String], connections: Option<[RawDataFlux; 2]>) -> Result<(), ()> {
+        let mut liquid_flows = Vec::with_capacity(ids.len());
+        let mut liquid_volumes = Vec::with_capacity(ids.len());
+        let mut gas_flows = Vec::with_capacity(ids.len());
+        let mut gas_volumes = Vec::with_capacity(ids.len());
+
+        for id in ids.iter() {
+            let case = CMCaseJson::read_case(Path::new(&format!("{}/{}/cma_case", self.dest, id)))?;
+            let relative_path = format!("{}/{}", self.dest, id);
+
+            let (liquid_flow, liquid_volume) = PAIRS.0;
+            let path = case.resolve(&relative_path, liquid_flow).ok_or(())?;
+            let sc = RawDataFlux::read_raw(path).ok_or(())?;
+            liquid_flows.push(sc);
+
+            let path = case.resolve(&relative_path, liquid_volume).ok_or(())?;
+            let sc = RawDataScalar::read_raw(path).ok_or(())?;
+            liquid_volumes.push(sc);
+
+            let (gas_flow, gas_volume) = PAIRS.1;
+            let path = case.resolve(&relative_path, gas_flow).ok_or(())?;
+            let sc = RawDataFlux::read_raw(path).ok_or(())?;
+            gas_flows.push(sc);
+
+            let path = case.resolve(&relative_path, gas_volume).ok_or(())?;
+            let sc = RawDataScalar::read_raw(path).ok_or(())?;
+            gas_volumes.push(sc);
+        }
+        let c = connections.unwrap().clone();
+        let merged_liquid_data = Self::merge_phase(liquid_flows,liquid_volumes,c[0].clone())?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
+    #[test]
     fn test_0d() {
         let case = Generator::new("/tmp")
             .generate_0d_from_fraction(10., 0.2)
@@ -252,7 +317,7 @@ mod tests {
         //volume is h*pi*d^2/4
         let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
 
-        assert!(liquid_volume - (1.-alpha_g)*geo_volume < 1e-9);
+        assert!(liquid_volume - (1. - alpha_g) * geo_volume < 1e-9);
         //TODO clean
     }
 }

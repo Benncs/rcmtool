@@ -1,7 +1,7 @@
 mod case;
 mod rawdata;
 
-pub use case::{CCMCaseInfo, CMAExportType, CMCase, CMCaseReader, CMCaseWriter,CMCaseJson};
+pub use case::{CCMCaseInfo, CMAExportType, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter};
 pub use rawdata::{
     FluxFileHeader, RawData, RawDataFlux, RawDataScalar, RawFlux, RawScalar, ScalarFileHeader,
     ScalarValueType,
