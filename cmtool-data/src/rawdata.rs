@@ -1,12 +1,21 @@
 use std::{
     fs::File,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
 
+use crate::descriptors::{CMExportType, PhaseCM};
+
 pub type ScalarValueType = f64;
+
+use crate::DataError;
+
+pub trait RawData: Sized {
+    fn read_raw(path: impl AsRef<std::path::Path>) -> Option<Self>;
+    fn write_raw(&self, path: &str) -> Result<(), DataError>;
+}
 
 #[repr(C)]
 #[derive(Deserialize, Serialize, Clone, Copy, Default)]
@@ -22,7 +31,7 @@ pub struct ScalarFileHeader {
 }
 
 #[repr(C)]
-#[derive(Deserialize, Serialize, Clone, Copy, Default)]
+#[derive(Deserialize, Serialize, Clone, Copy)]
 pub struct RawFlux {
     pub id_source: u32,
     pub id_target: u32,
@@ -47,15 +56,60 @@ pub struct RawDataFlux {
     pub fluxes: Vec<RawFlux>,
 }
 
+#[derive(Deserialize, Serialize, Clone)]
+pub struct RawPhase
+{
+    pub flow:RawDataFlux,
+    pub volume:RawDataScalar,
+    pub identifier:PhaseCM,
+}
+
+
+impl RawPhase
+{
+    pub fn new_liquid(n_zone: usize, n_fluxes: usize)->Self
+    {
+        Self::new(n_zone,n_fluxes,PhaseCM::Liquid)
+    }
+    pub fn new_gas(n_zone: usize, n_fluxes: usize)->Self
+    {
+        Self::new(n_zone,n_fluxes,PhaseCM::Gas)
+    }
+
+    pub fn new(n_zone: usize, n_fluxes: usize,phase:PhaseCM)->Self
+    {
+        Self{flow:RawDataFlux::new(n_zone,n_fluxes),volume:RawDataScalar::new(n_zone),identifier:phase}
+    }
+
+    pub fn write(&self,root:impl AsRef<std::path::Path>)-> Result<(String,String), DataError>
+    {
+        let path = PathBuf::from(root.as_ref()).join(CMExportType::Flow(self.identifier).default_filename());
+        self.flow.write_raw(path.to_str().unwrap())?;
+        
+        let path = PathBuf::from(root.as_ref()).join(CMExportType::Volume(self.identifier).default_filename());
+        self.volume.write_raw(path.to_str().unwrap())?;
+
+        Ok((CMExportType::Flow(self.identifier).default_filename(),CMExportType::Volume(self.identifier).default_filename()))
+    }
+}
+
+ 
+
+impl Default for RawFlux {
+    fn default() -> Self {
+        Self {
+            id_source: 0,
+            id_target: 0,
+            flux_source_target: 0.,
+            flux_target_source: 0.,
+        }
+    }
+}
+
 impl From<f64> for RawScalar {
     fn from(value: f64) -> Self {
         Self { value }
     }
-}
-
-pub trait RawData: Sized {
-    fn read_raw(path: impl AsRef<std::path::Path>) -> Option<Self>;
-    fn write_raw(&self, path: &str) -> Result<(), ()>;
 }
 
 impl RawDataScalar {
@@ -76,7 +130,7 @@ impl RawDataFlux {
                 n_zone: n_zone as u32,
                 n_fluxes: n_fluxes as u32,
             },
-            fluxes: vec![RawFlux::default(); n_zone],
+            fluxes: vec![RawFlux::default(); n_fluxes],
         }
     }
 }
@@ -98,8 +152,8 @@ impl RawData for RawDataScalar {
         Some(RawDataScalar { header, values })
     }
 
-    fn write_raw(&self, path: &str) -> Result<(), ()> {
-        let mut file = File::create(Path::new(path)).map_err(|_| ())?;
+    fn write_raw(&self, path: &str) -> Result<(), DataError> {
+        let mut file = File::create(Path::new(path))?;
         let mut buffer = Vec::new();
 
         self.header.to_bytes(&mut buffer);
@@ -107,7 +161,9 @@ impl RawData for RawDataScalar {
             value.to_bytes(&mut buffer);
         }
 
-        file.write_all(&buffer).map_err(|_| ())
+        file.write_all(&buffer)?;
+        Ok(())
+        
     }
 }
 
@@ -128,17 +184,16 @@ impl RawData for RawDataFlux {
         Some(RawDataFlux { header, fluxes })
     }
 
-    fn write_raw(&self, path: &str) -> Result<(), ()> {
-        let mut file = File::create(Path::new(path)).map_err(|_| ())?;
+    fn write_raw(&self, path: &str) -> Result<(), DataError> {
+        let mut file = File::create(Path::new(path))?;
         let mut buffer = Vec::new();
         self.header.to_bytes(&mut buffer);
         for flux in &self.fluxes {
             flux.to_bytes(&mut buffer);
         }
 
-        file.write_all(&buffer).map_err(|e| {
-            eprintln!("{}", e);
-        })
+        file.write_all(&buffer)?;
+        Ok(())
     }
 }
 pub trait FromBytes: Sized {

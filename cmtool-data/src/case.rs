@@ -1,35 +1,9 @@
+use crate::{CMAExportType, DataError};
+use serde::{Deserialize, Serialize};
 use std::io::{BufReader, Read, Write};
 use std::{collections::HashMap, fs, path::Path};
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone, Copy)]
-pub enum CMAExportType {
-    LiquidFlow = 0,
-    GasFlow,
-    GasVolume,
-    LiquidVolume,
-    EnergyDissipation,
-    Kla,
-    Other,
-}
-
-impl From<i8> for CMAExportType {
-    fn from(value: i8) -> Self {
-        match value {
-            0 => CMAExportType::LiquidFlow,
-            1 => CMAExportType::GasFlow,
-            2 => CMAExportType::GasVolume,
-            3 => CMAExportType::LiquidVolume,
-            4 => CMAExportType::EnergyDissipation,
-            5 => CMAExportType::Kla,
-            6 => CMAExportType::Other,
-            _ => panic!("Invalid value for CMAExportType: {}", value),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CMCase {
     pub n_div: [u32; 3],
     pub description: String,
@@ -50,43 +24,35 @@ impl CMCase {
         let rel = self.paths.get(&stype)?;
         Some(Path::new(root).join(rel).to_str()?.to_string())
     }
-    //pub fn resolve_all(&self, root: &str) -> Vec<String> {
-    //let mut paths = Vec::with_capacity(6); //TODO clean 6 is the number of exporttype
-    //
-    //for (key, val) in map.iter() {
-    //paths.
-    //}
-    //
-    //Some(Path::new(root).join(rel).to_str()?.to_string())
-    //}
+
 }
 
 pub trait CMCaseReader {
-    fn read_case(path: &Path) -> Result<CMCase, ()>;
+    fn read_case(path: &Path) -> Result<CMCase, DataError>;
 }
 
 pub trait CMCaseWriter {
-    fn write_case(case: CMCase, path: &Path) -> Result<(), ()>;
+    fn write_case(case: CMCase, path: &Path) -> Result<(), DataError>;
 }
 
 pub struct CMCaseJson;
 
 impl CMCaseReader for CMCaseJson {
-    fn read_case(path: &Path) -> Result<CMCase, ()> {
-        let mut file = std::fs::File::open(path).map_err(|_| ())?;
+    fn read_case(path: &Path) -> Result<CMCase, DataError> {
+        let mut file = std::fs::File::open(path)?;
         let mut contents = String::new();
-        file.read_to_string(&mut contents).map_err(|_| ())?;
+        file.read_to_string(&mut contents)?;
 
-        let case = serde_json::from_str(&contents).map_err(|_| ())?;
+        let case = serde_json::from_str(&contents).map_err(|_| DataError::Serde)?;
         Ok(case)
     }
 }
 
 impl CMCaseWriter for CMCaseJson {
-    fn write_case(case: CMCase, path: &Path) -> Result<(), ()> {
-        let json_string = serde_json::to_string(&case).map_err(|_| ())?;
-        let mut file = std::fs::File::create(path).map_err(|_| ())?;
-        file.write_all(json_string.as_bytes()).map_err(|_| ())?;
+    fn write_case(case: CMCase, path: &Path) -> Result<(), DataError> {
+        let json_string = serde_json::to_string(&case).map_err(|_| DataError::Serde)?;
+        let mut file = std::fs::File::create(path)?;
+        file.write_all(json_string.as_bytes())?;
 
         Ok(())
     }
@@ -95,8 +61,8 @@ impl CMCaseWriter for CMCaseJson {
 pub struct CCMCaseInfo;
 
 impl CMCaseReader for CCMCaseInfo {
-    fn read_case(path: &Path) -> Result<CMCase, ()> {
-        let file = fs::File::open(path).map_err(|_| ())?;
+    fn read_case(path: &Path) -> Result<CMCase, DataError> {
+        let file = fs::File::open(path)?;
         let mut buffer = BufReader::new(file);
 
         let mut char_buf = [0u8; 1];
@@ -106,34 +72,34 @@ impl CMCaseReader for CCMCaseInfo {
         let mut case = CMCase::default();
 
         for i in &mut case.n_div {
-            buffer.read_exact(&mut buf).map_err(|_| ())?;
+            buffer.read_exact(&mut buf)?;
             *i = u32::from_le_bytes(buf);
         }
 
-        buffer.read_exact(&mut buf).map_err(|_| ())?;
+        buffer.read_exact(&mut buf)?;
         let string_size = u32::from_le_bytes(buf);
 
         let mut string_buf = vec![0; string_size as usize];
-        buffer.read_exact(&mut string_buf).map_err(|_| ())?;
+        buffer.read_exact(&mut string_buf)?;
         case.description = unsafe { String::from_utf8_unchecked(string_buf) };
 
-        buffer.read_exact(&mut buffer_8bytes).map_err(|_| ())?;
+        buffer.read_exact(&mut buffer_8bytes)?;
 
         case.time_per_flow_map = f64::from_le_bytes(buffer_8bytes);
 
-        buffer.read_exact(&mut buffer_8bytes).map_err(|_| ())?;
+        buffer.read_exact(&mut buffer_8bytes)?;
         let map_size = usize::from_le_bytes(buffer_8bytes);
 
         for _ in 0..map_size {
-            buffer.read_exact(&mut char_buf).map_err(|_| ())?;
+            buffer.read_exact(&mut char_buf)?;
 
             let key = CMAExportType::from(i8::from_le_bytes(char_buf));
 
-            buffer.read_exact(&mut buf).map_err(|_| ())?;
+            buffer.read_exact(&mut buf)?;
             let string_size = u32::from_le_bytes(buf);
 
             let mut string_buf = vec![0; string_size as usize];
-            buffer.read_exact(&mut string_buf).map_err(|_| ())?;
+            buffer.read_exact(&mut string_buf)?;
             let value = unsafe { String::from_utf8_unchecked(string_buf) };
 
             case.paths.insert(key, value);
@@ -144,30 +110,26 @@ impl CMCaseReader for CCMCaseInfo {
 }
 
 impl CMCaseWriter for CCMCaseInfo {
-    fn write_case(case: CMCase, path: &Path) -> Result<(), ()> {
-        let mut file = std::fs::File::create(path).map_err(|_| ())?;
+    fn write_case(case: CMCase, path: &Path) -> Result<(), DataError> {
+        let mut file = std::fs::File::create(path)?;
 
         for &div in &case.n_div {
-            file.write_all(&div.to_le_bytes()).map_err(|_| ())?;
+            file.write_all(&div.to_le_bytes())?;
         }
 
         let description_bytes = case.description.as_bytes();
-        file.write_all(&(description_bytes.len() as u32).to_le_bytes())
-            .map_err(|_| ())?;
-        file.write_all(description_bytes).map_err(|_| ())?;
+        file.write_all(&(description_bytes.len() as u32).to_le_bytes())?;
+        file.write_all(description_bytes)?;
 
-        file.write_all(&case.time_per_flow_map.to_le_bytes())
-            .map_err(|_| ())?;
+        file.write_all(&case.time_per_flow_map.to_le_bytes())?;
 
-        file.write_all(&(case.paths.len() as u64).to_le_bytes())
-            .map_err(|_| ())?;
+        file.write_all(&(case.paths.len() as u64).to_le_bytes())?;
+
         for (key, value) in &case.paths {
-            file.write_all(&(*key as i8).to_le_bytes())
-                .map_err(|_| ())?;
+            file.write_all(&(*key as i8).to_le_bytes())?;
             let value_bytes = value.as_bytes();
-            file.write_all(&(value_bytes.len() as u32).to_le_bytes())
-                .map_err(|_| ())?;
-            file.write_all(value_bytes).map_err(|_| ())?;
+            file.write_all(&(value_bytes.len() as u32).to_le_bytes())?;
+            file.write_all(value_bytes)?;
         }
 
         Ok(())
@@ -266,8 +228,8 @@ mod test {
             paths: HashMap::new(),
         };
 
-        T::write_case(case, path)?;
-        let read_case = T::read_case(path)?;
+        T::write_case(case, path).map_err(|_| ());
+        let read_case = T::read_case(path).map_err(|_| ())?;
         assert!(read_case.n_div == [4, 5, 1]);
         assert!(read_case.description == *"Test");
         assert!(read_case.time_per_flow_map == 0.01);

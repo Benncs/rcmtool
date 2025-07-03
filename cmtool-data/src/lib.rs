@@ -1,11 +1,30 @@
+mod descriptors;
 mod case;
 mod rawdata;
-
-pub use case::{CCMCaseInfo, CMAExportType, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter};
+use std::io;
+pub use descriptors::{CMAExportType,PhaseCM,CMExportType};
+pub use case::{CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter};
 pub use rawdata::{
     FluxFileHeader, RawData, RawDataFlux, RawDataScalar, RawFlux, RawScalar, ScalarFileHeader,
-    ScalarValueType,
+    ScalarValueType,RawPhase
 };
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum DataError {
+    #[error("Error writing/reading file: {0}")]
+    IO(#[from] io::Error),
+
+    #[error("Error SerDe")]
+    Serde,
+
+
+    #[error("unknown data store error")]
+    Unknown,
+
+   
+}
 
 #[inline(always)]
 fn linear_index_row_major(_n_row: usize, n_col: usize, i: usize, j: usize) -> usize {

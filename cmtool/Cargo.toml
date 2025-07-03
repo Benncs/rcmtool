@@ -9,6 +9,7 @@ documentation.workspace = true
 [dependencies]
 cmtool-core.workspace = true
 cmtool-data.workspace = true
+thiserror = "2.0.12"
 
 [lib]
 path = "src/lib.rs"

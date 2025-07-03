@@ -19,6 +19,9 @@ trait CfdCase {
     fn get_geometry_relative_path(&self) -> String;
 }
 
+
+
+
 pub struct CMHandle {
     model: model::CMModel,
     root_result: String,
@@ -64,7 +67,7 @@ impl CMHandle {
         let scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
 
         let path = todo!();
-        scalar_data.write_raw(path)
+        scalar_data.write_raw(path).map_err(|_| ())
     }
 
     pub fn dump_vector(&self) {
