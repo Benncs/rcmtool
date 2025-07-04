@@ -25,6 +25,24 @@ impl PhaseCM {
     }
 }
 
+impl Into<String> for PhaseCM
+{
+    fn into(self)->String
+    {
+       match self{
+            Self::Liquid => String::from("liquid"),
+            Self::Gas => String::from("gas")
+        } 
+    }
+}
+
+impl From<String> for PhaseCM
+{
+    fn from(value:String)->Self
+    {
+        todo!()
+    }
+}
 pub enum CMExportType {
     Flow(PhaseCM),
     Volume(PhaseCM),
