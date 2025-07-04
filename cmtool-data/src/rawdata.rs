@@ -57,43 +57,43 @@ pub struct RawDataFlux {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub struct RawPhase
-{
-    pub flow:RawDataFlux,
-    pub volume:RawDataScalar,
-    pub identifier:PhaseCM,
+pub struct RawPhase {
+    pub flow: RawDataFlux,
+    pub volume: RawDataScalar,
+    pub identifier: PhaseCM,
 }
 
-
-impl RawPhase
-{
-    pub fn new_liquid(n_zone: usize, n_fluxes: usize)->Self
-    {
-        Self::new(n_zone,n_fluxes,PhaseCM::Liquid)
+impl RawPhase {
+    pub fn new_liquid(n_zone: usize, n_fluxes: usize) -> Self {
+        Self::new(n_zone, n_fluxes, PhaseCM::Liquid)
     }
-    pub fn new_gas(n_zone: usize, n_fluxes: usize)->Self
-    {
-        Self::new(n_zone,n_fluxes,PhaseCM::Gas)
+    pub fn new_gas(n_zone: usize, n_fluxes: usize) -> Self {
+        Self::new(n_zone, n_fluxes, PhaseCM::Gas)
     }
 
-    pub fn new(n_zone: usize, n_fluxes: usize,phase:PhaseCM)->Self
-    {
-        Self{flow:RawDataFlux::new(n_zone,n_fluxes),volume:RawDataScalar::new(n_zone),identifier:phase}
+    pub fn new(n_zone: usize, n_fluxes: usize, phase: PhaseCM) -> Self {
+        Self {
+            flow: RawDataFlux::new(n_zone, n_fluxes),
+            volume: RawDataScalar::new(n_zone),
+            identifier: phase,
+        }
     }
 
-    pub fn write(&self,root:impl AsRef<std::path::Path>)-> Result<(String,String), DataError>
-    {
-        let path = PathBuf::from(root.as_ref()).join(CMExportType::Flow(self.identifier).default_filename());
+    pub fn write(&self, root: impl AsRef<std::path::Path>) -> Result<(String, String), DataError> {
+        let path = PathBuf::from(root.as_ref())
+            .join(CMExportType::Flow(self.identifier).default_filename());
         self.flow.write_raw(path.to_str().unwrap())?;
-        
-        let path = PathBuf::from(root.as_ref()).join(CMExportType::Volume(self.identifier).default_filename());
+
+        let path = PathBuf::from(root.as_ref())
+            .join(CMExportType::Volume(self.identifier).default_filename());
         self.volume.write_raw(path.to_str().unwrap())?;
 
-        Ok((CMExportType::Flow(self.identifier).default_filename(),CMExportType::Volume(self.identifier).default_filename()))
+        Ok((
+            CMExportType::Flow(self.identifier).default_filename(),
+            CMExportType::Volume(self.identifier).default_filename(),
+        ))
     }
 }
-
- 
 
 impl Default for RawFlux {
     fn default() -> Self {
@@ -163,7 +163,6 @@ impl RawData for RawDataScalar {
 
         file.write_all(&buffer)?;
         Ok(())
-        
     }
 }
 

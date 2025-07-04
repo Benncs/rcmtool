@@ -1,13 +1,13 @@
-mod descriptors;
 mod case;
+mod descriptors;
 mod rawdata;
-use std::io;
-pub use descriptors::{CMAExportType,PhaseCM,CMExportType};
 pub use case::{CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter};
+pub use descriptors::{CMAExportType, CMExportType, PhaseCM};
 pub use rawdata::{
-    FluxFileHeader, RawData, RawDataFlux, RawDataScalar, RawFlux, RawScalar, ScalarFileHeader,
-    ScalarValueType,RawPhase
+    FluxFileHeader, RawData, RawDataFlux, RawDataScalar, RawFlux, RawPhase, RawScalar,
+    ScalarFileHeader, ScalarValueType,
 };
+use std::io;
 
 use thiserror::Error;
 
@@ -19,11 +19,8 @@ pub enum DataError {
     #[error("Error SerDe")]
     Serde,
 
-
     #[error("unknown data store error")]
     Unknown,
-
-   
 }
 
 #[inline(always)]

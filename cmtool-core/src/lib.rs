@@ -19,9 +19,6 @@ trait CfdCase {
     fn get_geometry_relative_path(&self) -> String;
 }
 
-
-
-
 pub struct CMHandle {
     model: model::CMModel,
     root_result: String,

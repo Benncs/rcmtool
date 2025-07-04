@@ -49,8 +49,7 @@ impl From<CMAExportType> for CMExportType {
 
 impl From<CMExportType> for CMAExportType {
     fn from(val: CMExportType) -> Self {
-        match val
-        {
+        match val {
             // CMExportType::Flow(phase_cm) => {},
             CMExportType::Flow(PhaseCM::Gas) => CMAExportType::GasFlow,
             CMExportType::Flow(PhaseCM::Liquid) => CMAExportType::LiquidFlow,

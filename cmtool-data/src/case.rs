@@ -24,7 +24,6 @@ impl CMCase {
         let rel = self.paths.get(&stype)?;
         Some(Path::new(root).join(rel).to_str()?.to_string())
     }
-
 }
 
 pub trait CMCaseReader {

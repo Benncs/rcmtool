@@ -220,7 +220,7 @@ impl Generator {
         // flows: Vec<RawDataFlux>,
         // volumes: Vec<RawDataScalar>
         phases: Vec<RawPhase>,
-        connections: RawDataFlux,
+        connections: Option<RawDataFlux>,
     ) -> Result<RawPhase, CmtoolError> {
         let mut phase = RawPhase::new(0, 0, phases[0].identifier);
 
@@ -246,9 +246,10 @@ impl Generator {
             phase.volume.values.extend(v.values.clone().into_iter());
             offset_compartment.set(offset_compartment.get() + rd.header.n_zone);
         }
-
-        phase.flow.header.n_fluxes += connections.header.n_fluxes;
-        phase.flow.fluxes.extend(connections.fluxes);
+        if let Some(connections) = connections {
+            phase.flow.header.n_fluxes += connections.header.n_fluxes;
+            phase.flow.fluxes.extend(connections.fluxes);
+        }
 
         if phase.flow.fluxes.len() != phase.flow.header.n_fluxes as usize {
             panic!(
@@ -273,25 +274,37 @@ impl Generator {
             .cloned()
             .collect();
 
-        let gasphase = self
+        let gasphase:Vec<_> = self
             .raw_phase
             .iter()
             .filter(|p| p.identifier == PhaseCM::Gas)
             .cloned()
             .collect();
 
-        let c = connections.unwrap().clone();
 
         let path = format!("{}/merged", dest);
         std::fs::create_dir_all(&path).unwrap(); //FIXME
         let mut case = CMCase::default();
         // case.n_div = n_div;
 
-        let phase = Self::merge_phase(liquid_phase, c[0].clone())?;
-        Self::write_phase(&path, &mut case, phase)?;
+        let liquid_connection = match connections {
+            Some(ref c) => Some(c[0].clone()),
+            None => None,
+        };
+        let gas_connection = match connections {
+            Some(ref c) => Some(c[1].clone()),
+            None => None,
+        };
 
-        let phase = Self::merge_phase(gasphase, c[0].clone())?;
+        let phase = Self::merge_phase(liquid_phase, liquid_connection)?;
         Self::write_phase(&path, &mut case, phase)?;
+        
+        if !gasphase.is_empty()
+        {
+
+        let phase = Self::merge_phase(gasphase, gas_connection)?;
+        Self::write_phase(&path, &mut case, phase)?;
+        }
 
         CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
         let _ =
@@ -359,14 +372,13 @@ impl Generator {
             };
             gas_volumes.push(rs);
         }
-        let c = connections.unwrap().clone();
 
         let path = format!("{}/merged", dest);
         std::fs::create_dir_all(&path).unwrap(); //FIXME
         let mut case = CMCase::default();
         case.n_div = n_div;
 
-        let liquid_phase = liquid_flows
+        let liquid_phases = liquid_flows
             .into_iter()
             .zip(liquid_volumes)
             .map(|(f, v)| RawPhase {
@@ -376,7 +388,7 @@ impl Generator {
             })
             .collect();
 
-        let gas_phases = gas_flows
+        let gas_phases:Vec<_> = gas_flows
             .into_iter()
             .zip(gas_volumes)
             .map(|(f, v)| RawPhase {
@@ -386,11 +398,26 @@ impl Generator {
             })
             .collect();
 
-        let phase = Self::merge_phase(liquid_phase, c[0].clone())?;
-        Self::write_phase(&path, &mut case, phase)?;
 
-        let phase = Self::merge_phase(gas_phases, c[0].clone())?;
+        let liquid_connection = match connections {
+            Some(ref c) => Some(c[0].clone()),
+            None => None,
+        };
+        let gas_connection = match connections {
+            Some(ref c) => Some(c[1].clone()),
+            None => None,
+        };
+
+        let phase = Self::merge_phase(liquid_phases, liquid_connection)?;
         Self::write_phase(&path, &mut case, phase)?;
+        
+        if !gas_phases.is_empty()
+        {
+            let phase = Self::merge_phase(gas_phases, gas_connection)?;
+            Self::write_phase(&path, &mut case, phase)?;
+        }
+
+
 
         CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
         let _ =
