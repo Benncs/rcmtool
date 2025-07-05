@@ -90,7 +90,9 @@ impl Case {
                 {
                     case.paths.push(VariableInfo::read(&line)?);
                     line.clear();
-                    reader.read_line(&mut line)?;
+                    if reader.read_line(&mut line)? == 0 {
+                        break;
+                    }
                 }
             }
         }

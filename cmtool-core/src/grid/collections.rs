@@ -35,12 +35,36 @@ pub struct AxisDescriptor {
     pub step: f64,
 }
 
-
 pub struct CoordAxis {
     pub edges: Vec<f64>,
     pub centers: Vec<f64>,
     pub descriptor: AxisDescriptor,
-    pub i_axis: usize,
+    // pub i_axis: usize,
+}
+
+impl From<AxisDescriptor> for CoordAxis {
+    fn from(descriptor: AxisDescriptor) -> Self {
+        const STEP_OFFSET: f64 = 0.5;
+        let mut edges = Vec::with_capacity(descriptor.n_range + 1);
+        let mut centers = Vec::with_capacity(descriptor.n_range);
+
+        let mut i_point = 0;
+        while i_point < descriptor.n_range {
+            let f_i_point = i_point as f64;
+            centers.push(descriptor.min_range + descriptor.step * (f_i_point + STEP_OFFSET));
+
+            edges.push(descriptor.min_range + descriptor.step * f_i_point);
+            i_point += 1;
+        }
+        let f_i_point = i_point as f64;
+        edges.push(descriptor.min_range + descriptor.step * f_i_point);
+
+        Self {
+            edges,
+            centers,
+            descriptor,
+        }
+    }
 }
 
 impl CoordAxis {

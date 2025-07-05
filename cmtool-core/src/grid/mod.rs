@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 mod collections;
 use collections::*;
 pub use collections::{cylindrical_index, AxisDescriptor, Coords3, CylindricalAxis};
@@ -74,6 +74,20 @@ pub struct BaseCompartmentMesh<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
+impl<T> BaseCompartmentMesh<T>
+{
+    fn new(descriptors:[AxisDescriptor;3])->Self
+    {
+        let axes: [CoordAxis; 3] = descriptors.map(CoordAxis::from); 
+        let n_cells = axes.iter().map(|ax| ax.descriptor.n_range).product::<usize>();
+        Self {
+            axes,
+            n_cells,
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
 impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
     fn min_axis(&self, i_axis: usize) -> f64 {
         self.axes[i_axis].descriptor.min_range
@@ -107,17 +121,6 @@ impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
 pub type MeshCylindrical = BaseCompartmentMesh<CylindricalMarker>;
 pub type MeshRectangular = BaseCompartmentMesh<RectangularMarker>;
 
-impl MeshCylindrical {
-    fn new() -> Self {
-        todo!()
-    }
-}
-
-impl MeshRectangular {
-    fn new() -> Self {
-        todo!()
-    }
-}
 
 impl CompartmentMeshManip for MeshCylindrical {
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
@@ -214,9 +217,9 @@ impl CompartmentMeshManip for MeshCylindrical {
     }
 }
 
-pub fn get_mesh(meshtype: MeshType,axis:[AxisDescriptor;3]) -> Box<dyn CompartmentMesh> {
+pub fn get_mesh(meshtype: MeshType,ax_descriptor:[AxisDescriptor;3]) -> Box<dyn CompartmentMesh> {
     match meshtype {
-        MeshType::Cylindrical => Box::new(MeshCylindrical::new()),
+        MeshType::Cylindrical => Box::new(MeshCylindrical::new(ax_descriptor)),
         MeshType::MeshRectangular => unimplemented!("Manip for Rectangular impl"),
     }
 }

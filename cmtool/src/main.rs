@@ -1,6 +1,10 @@
 fn main() {
+    // let case = cmtool_core::ensight_gold::Case::read(
+    //     "/home/benjamin/Documents/thesis/cfd-cma/Cas_Test_CMA/export/wall_cart.encas",
+    // )
+    // .unwrap();
     let case = cmtool_core::ensight_gold::Case::read(
-        "/home/benjamin/Documents/thesis/cfd-cma/Cas_Test_CMA/export/wall_cart.encas",
+        "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.encas",
     )
     .unwrap();
 
@@ -9,7 +13,7 @@ fn main() {
         &case.root,
         &case.geometry_file_path,
         cmtool_core::grid::MeshType::Cylindrical,
-    );
+    ).unwrap();
 
     //     println!("{:?}", geo);
 }

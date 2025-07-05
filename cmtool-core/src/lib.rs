@@ -63,8 +63,8 @@ impl CMHandle {
 
         let cm_geometry = CMGeometry::init(n_div, eg_geometry.clone(),grid::MeshType::Cylindrical);
 
-        let fullpath = format!("{}/wall_cart.scl1", root);
-        let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))?;
+        // let fullpath = format!("{}/wall_cart.scl1", root);
+        // let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))?;
 
         Ok(Self {
             model: CMModel::init(cm_geometry),

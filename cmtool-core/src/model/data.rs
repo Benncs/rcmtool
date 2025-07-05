@@ -1,34 +1,36 @@
-use crate::{ensight_gold::{types::{ElementsType, VolumeElementTypes}, Part}, model::{ C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM}};
+use crate::ensight_gold::{
+    types::{ElementsType, VolumeElementTypes},
+    Part,
+};
+const C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM: usize = 20;
 
 #[derive(Default, Debug)]
 pub struct VolumeElementData {
     global_id: Vec<Vec<usize>>,
-    part_global_id: Vec<usize>,   // Part GID accessed via voGID
-    vtype: Vec<VolumeElementTypes>,            // Volume element type accessed via voGID
-    ids: Vec<usize>,              // Volume element ID accessed via voGID
-    vertices: Vec<usize>,         // List of vertices attached to volume element
+    part_global_id: Vec<usize>,     // Part GID accessed via voGID
+    vtype: Vec<VolumeElementTypes>, // Volume element type accessed via voGID
+    ids: Vec<usize>,                // Volume element ID accessed via voGID
+    vertices: Vec<usize>,           // List of vertices attached to volume element
     // xyz: Vec<f64>,                // Coordinates of center of volume element
     // raz: Vec<f64>,                // Additional coordinates or metadata
 
     // cell_id: Vec<usize>,          // cID accessed via voGID
-
     vertices_cell_id: Vec<usize>, // cID associated with each vertex of volume element
     nc_id: Vec<usize>,            // Number of cID per volume element
     limit_cell_id: Vec<usize>,    // List of cID in which vertices are
 }
 
-
-
 impl VolumeElementData {
-
-    pub fn get_vertex_per_element(&self,global_id:usize)->usize
-    {
-        self.vtype[global_id].to_index()
+    pub fn get_vertex_per_element(&self, global_id: usize) -> usize {
+        if self.vtype.len() <= global_id {
+            return 0;
+        } else {
+            self.vtype[global_id].to_index()
+        }
     }
 
-    pub fn set_number_cid(&mut self,global_id:usize,n_cid:usize)
-    {
-        self.nc_id[global_id]=n_cid;
+    pub fn set_number_cid(&mut self, global_id: usize, n_cid: usize) {
+        self.nc_id[global_id] = n_cid;
     }
 
     pub fn resize(&mut self, n_part: usize, n_velement: usize, velement_detail: &[usize]) {
@@ -39,7 +41,7 @@ impl VolumeElementData {
         }
 
         self.part_global_id.resize(n_velement, 0);
-        // self.vtype.resize(n_velement);
+        // self.vtype.resize(n_velement,VolumeElementTypes::Hexa8);
         self.vtype = Vec::with_capacity(n_velement);
         self.ids.resize(n_velement, 0);
         self.nc_id.resize(n_velement, 0);
@@ -56,8 +58,7 @@ impl VolumeElementData {
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
     }
 
-    pub fn n_element(&self)->usize
-    {
+    pub fn n_element(&self) -> usize {
         self.ids.len()
     }
 
@@ -65,9 +66,12 @@ impl VolumeElementData {
         self.global_id[VolumeElementTypes::number_of_types() * i_part + element_index][ve_id] = val;
     }
 
-    pub fn get_vertex_from_vol_global_id(&self,vol_element_global_id:usize,k_vertex:usize)->usize
-    {
-        vol_element_global_id*C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM+k_vertex
+    pub fn get_vertex_from_vol_global_id(
+        &self,
+        vol_element_global_id: usize,
+        k_vertex: usize,
+    ) -> usize {
+        vol_element_global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex
     }
 
     pub fn fill_from_part(
@@ -102,8 +106,6 @@ impl VolumeElementData {
                             self.vertices[ve_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] =
                                 current_vertex_vegid[vtx - 1];
                         }
-
-                        *ve_counter += 1;
                     }
                 }
                 _ => {
@@ -111,18 +113,17 @@ impl VolumeElementData {
                     continue;
                 }
             }
+            *ve_counter += 1;
         }
     }
 }
-
-
 
 #[derive(Default, Debug)]
 pub struct VerticesData {
     ve_gid: Vec<Vec<usize>>, // Access to veGID by part and vertex
     part_id: Vec<usize>,     // Access to vertex partID from veGID
-    pub ve_id: Vec<usize>,       // Access to vertex veID from veGID
-    pub xyz: Vec<f64>,           // Vertices coordinates
+    pub ve_id: Vec<usize>,   // Access to vertex veID from veGID
+    pub xyz: Vec<f64>,       // Vertices coordinates
     vertex_c_id: Vec<usize>, // Access to vertex cID from veGID
 }
 
@@ -171,4 +172,3 @@ impl VerticesData {
             .expect("Slice with exactly 3 elements")
     }
 }
-
