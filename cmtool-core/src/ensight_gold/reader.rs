@@ -4,6 +4,7 @@ use std::io::BufReader;
 use std::io::ErrorKind;
 use std::io::SeekFrom;
 use std::path::Path;
+use std::path::PathBuf;
 
 pub struct FileBuffer<const N: usize>([u8; N]);
 
@@ -19,14 +20,17 @@ impl<const N: usize> FileBuffer<N> {
 }
 
 pub struct Reader<const N: usize> {
+    filepath:PathBuf,
     reader: BufReader<File>,
     line_buffer: FileBuffer<N>,
 }
 
 impl<const N: usize> Reader<N> {
     pub fn new(path: impl AsRef<Path>) -> std::io::Result<Self> {
-        let fd = File::open(path)?;
+        let filepath = path.as_ref().to_path_buf(); 
+        let fd = File::open(filepath.clone())?;
         Ok(Reader {
+            filepath,
             reader: BufReader::new(fd),
             line_buffer: FileBuffer([0; N]),
         })
@@ -36,7 +40,7 @@ impl<const N: usize> Reader<N> {
         if !self.get_line()?.to_string().contains(name) {
             return Err(std::io::Error::new(
                 ErrorKind::Unsupported,
-                format!("Missing '{}' in header", name),
+                format!("Missing '{}' in header {:?}", name,self.filepath),
             ));
         }
         Ok(())
@@ -94,6 +98,23 @@ impl<const N: usize> Reader<N> {
         self.reader.read_exact(&mut buf)?;
         Ok(f32::from_le_bytes(buf))
     }
+
+    pub fn read_buffer_f32(&mut self, size: usize) -> std::io::Result<Vec<f32>> {
+    let mut raw_buf = vec![0u8; size * 4];
+    self.reader.read_exact(&mut raw_buf)?;
+
+    // SAFETY: We're interpreting bytes as f32s, assuming alignment and correctness.
+    let float_buf: Vec<f32> = raw_buf
+        .chunks_exact(4)
+        .map(|bytes| {
+            let array = bytes.try_into().unwrap(); // &[u8; 4]
+            f32::from_le_bytes(array) // or from_be_bytes depending on your format
+        })
+        .collect();
+
+    Ok(float_buf)
+}
+
 }
 const ENSIGHT_GOLDER_BINARY_FORMAT_LINE_SIZE: usize = 80; //Bytes;
 pub type EnsightGoldReader = Reader<ENSIGHT_GOLDER_BINARY_FORMAT_LINE_SIZE>;
