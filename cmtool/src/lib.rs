@@ -274,13 +274,12 @@ impl Generator {
             .cloned()
             .collect();
 
-        let gasphase:Vec<_> = self
+        let gasphase: Vec<_> = self
             .raw_phase
             .iter()
             .filter(|p| p.identifier == PhaseCM::Gas)
             .cloned()
             .collect();
-
 
         let path = format!("{}/merged", dest);
         std::fs::create_dir_all(&path).unwrap(); //FIXME
@@ -298,12 +297,10 @@ impl Generator {
 
         let phase = Self::merge_phase(liquid_phase, liquid_connection)?;
         Self::write_phase(&path, &mut case, phase)?;
-        
-        if !gasphase.is_empty()
-        {
 
-        let phase = Self::merge_phase(gasphase, gas_connection)?;
-        Self::write_phase(&path, &mut case, phase)?;
+        if !gasphase.is_empty() {
+            let phase = Self::merge_phase(gasphase, gas_connection)?;
+            Self::write_phase(&path, &mut case, phase)?;
         }
 
         CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
@@ -388,7 +385,7 @@ impl Generator {
             })
             .collect();
 
-        let gas_phases:Vec<_> = gas_flows
+        let gas_phases: Vec<_> = gas_flows
             .into_iter()
             .zip(gas_volumes)
             .map(|(f, v)| RawPhase {
@@ -397,7 +394,6 @@ impl Generator {
                 identifier: PhaseCM::Gas,
             })
             .collect();
-
 
         let liquid_connection = match connections {
             Some(ref c) => Some(c[0].clone()),
@@ -410,14 +406,11 @@ impl Generator {
 
         let phase = Self::merge_phase(liquid_phases, liquid_connection)?;
         Self::write_phase(&path, &mut case, phase)?;
-        
-        if !gas_phases.is_empty()
-        {
+
+        if !gas_phases.is_empty() {
             let phase = Self::merge_phase(gas_phases, gas_connection)?;
             Self::write_phase(&path, &mut case, phase)?;
         }
-
-
 
         CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
         let _ =
@@ -429,28 +422,52 @@ impl Generator {
 #[cfg(test)]
 mod tests {
 
+    fn clean(case:CMCase)
+    {
+        std::fs::remove_file(
+            case.resolve("/tmp", cmtool_data::CMAExportType::GasVolume)
+                .expect("path"),
+        )
+        .unwrap();
+        std::fs::remove_file(
+            case.resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
+                .expect("path"),
+        )
+        .unwrap();
+        std::fs::remove_file(
+            case.resolve("/tmp", cmtool_data::CMAExportType::LiquidFlow)
+                .unwrap(),
+        ).unwrap();
+        std::fs::remove_file(
+            case.resolve("/tmp", cmtool_data::CMAExportType::GasFlow)
+                .unwrap(),
+        ).unwrap();
+    }
+
     use super::*;
     #[test]
     fn test_0d() {
         let case = Generator::new()
             .generate_0d_from_fraction(10., 0.2, Some("/tmp".to_owned()))
-            .expect("AA");
+            .expect("case");
 
-        let path = case
+        let liquid_volume_path = case
             .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
-            .expect("AAA");
+            .expect("path");
 
-        let liquid_volume = cmtool_data::RawDataScalar::read_raw(path).expect("Liquid error");
-        let path = case
+        let liquid_volume =
+            cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone()).expect("Liquid error");
+        let gas_volume_path = case
             .resolve("/tmp", cmtool_data::CMAExportType::GasVolume)
-            .expect("AAA");
+            .expect("path");
 
-        let gas_volume = cmtool_data::RawDataScalar::read_raw(path).expect("AAA");
+        let gas_volume =
+            cmtool_data::RawDataScalar::read_raw(gas_volume_path.clone()).expect("gas_volume");
         assert_eq!(gas_volume.values.len(), 1);
         assert_eq!(gas_volume.values[0].value, 2.0);
         assert_eq!(liquid_volume.values[0].value, 8.0);
 
-        //TODO clean
+        clean(case);
     }
     #[test]
     fn test_1d() {
@@ -458,13 +475,13 @@ mod tests {
         let d = 0.2;
         let alpha_g = 0.1;
         let case = Generator::new()
-            .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, None)
-            .expect("AA");
-        let path = case
+            .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, Some("/tmp".to_owned()))
+            .expect("case");
+        let liquid_volume_path: String = case
             .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
-            .expect("AAA");
+            .expect("path");
 
-        let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(path)
+        let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone())
             .expect("Liquid error")
             .values
             .iter()
@@ -475,7 +492,7 @@ mod tests {
         let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
 
         assert!(liquid_volume - (1. - alpha_g) * geo_volume < 1e-9);
-        //TODO clean
+        clean(case);
     }
 
     #[test]
@@ -484,13 +501,13 @@ mod tests {
         let d = 0.2;
         let alpha_g = 0.1;
         let case = Generator::new()
-            .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, None)
-            .expect("AA");
-        let path = case
+            .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, Some("/tmp".to_owned()))
+            .expect("case");
+        let liquid_volume_path = case
             .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
-            .expect("AAA");
+            .expect("path");
 
-        let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(path)
+        let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone())
             .expect("Liquid error")
             .values
             .iter()
@@ -501,6 +518,6 @@ mod tests {
         let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
 
         assert!(liquid_volume - (1. - alpha_g) * geo_volume < 1e-9);
-        //TODO clean
+        clean(case);
     }
 }
