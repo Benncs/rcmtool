@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 mod collections;
-pub use collections::Coords3;
 use collections::*;
+pub use collections::{cylindrical_index, AxisDescriptor, Coords3, CylindricalAxis};
 
+#[derive(PartialEq)]
 pub enum MeshType {
     Cylindrical,
     MeshRectangular,
@@ -60,14 +61,12 @@ pub trait CompartmentMeshManip {
     fn cell_points(&self, cell_1d: usize) -> AxisPoints;
 }
 
-pub trait CompartmentMesh:
-    Send + Sync + Debug + CompartmentMeshAccessor + CompartmentMeshManip
-{
-}
-impl<T: Send + Sync + Debug + CompartmentMeshAccessor + CompartmentMeshManip> CompartmentMesh
-    for T
-{
-}
+pub trait CompartmentMesh:  CompartmentMeshAccessor + CompartmentMeshManip {}
+impl<T: CompartmentMeshAccessor + CompartmentMeshManip> CompartmentMesh for T {}
+
+pub struct CylindricalMarker;
+pub struct RectangularMarker;
+
 
 pub struct BaseCompartmentMesh<T> {
     axes: [CoordAxis; 3],
@@ -105,11 +104,20 @@ impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
     }
 }
 
-pub struct CylindricalMarker;
-pub struct RectangularMarker;
-
 pub type MeshCylindrical = BaseCompartmentMesh<CylindricalMarker>;
 pub type MeshRectangular = BaseCompartmentMesh<RectangularMarker>;
+
+impl MeshCylindrical {
+    fn new() -> Self {
+        todo!()
+    }
+}
+
+impl MeshRectangular {
+    fn new() -> Self {
+        todo!()
+    }
+}
 
 impl CompartmentMeshManip for MeshCylindrical {
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
@@ -129,12 +137,14 @@ impl CompartmentMeshManip for MeshCylindrical {
             })
             .collect();
 
-        let rmax = self.axes[index(CylindricalAxis::R)].descriptor.n_range;
+        let rmax = self.axes[cylindrical_index(CylindricalAxis::R)]
+            .descriptor
+            .n_range;
 
-        let theta_cell1 = indices_points_cell1[index(CylindricalAxis::Theta)];
-        let theta_cell2 = indices_points_cell2[index(CylindricalAxis::Theta)];
-        let r_cell1 = indices_points_cell1[index(CylindricalAxis::R)];
-        let r_cell2 = indices_points_cell2[index(CylindricalAxis::R)];
+        let theta_cell1 = indices_points_cell1[cylindrical_index(CylindricalAxis::Theta)];
+        let theta_cell2 = indices_points_cell2[cylindrical_index(CylindricalAxis::Theta)];
+        let r_cell1 = indices_points_cell1[cylindrical_index(CylindricalAxis::R)];
+        let r_cell2 = indices_points_cell2[cylindrical_index(CylindricalAxis::R)];
 
         if theta_cell1 == theta_cell2 {
             if r_cell1 == 0 && r_cell2 == rmax {
@@ -204,13 +214,10 @@ impl CompartmentMeshManip for MeshCylindrical {
     }
 }
 
-pub fn get_mesh(meshtype: MeshType) -> Box<dyn CompartmentMesh> {
+pub fn get_mesh(meshtype: MeshType,axis:[AxisDescriptor;3]) -> Box<dyn CompartmentMesh> {
     match meshtype {
-        MeshType::Cylindrical => {
-            todo!()
-        }
-        MeshType::MeshRectangular => {
-            todo!()
-        }
+        MeshType::Cylindrical => Box::new(MeshCylindrical::new()),
+        MeshType::MeshRectangular => unimplemented!("Manip for Rectangular impl"),
     }
 }
+

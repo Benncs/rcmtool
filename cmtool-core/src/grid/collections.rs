@@ -13,7 +13,7 @@ pub enum CylindricalAxis {
     Z = 2,
 }
 
-pub const fn index(axis: CylindricalAxis) -> usize {
+pub const fn cylindrical_index(axis: CylindricalAxis) -> usize {
     match axis {
         CylindricalAxis::R => 0,
         CylindricalAxis::Theta => 1,
@@ -27,12 +27,14 @@ enum ProjectCoordinates {
     None,
 }
 
+#[derive(Default)]
 pub struct AxisDescriptor {
     pub min_range: f64,
     pub max_range: f64,
     pub n_range: usize,
     pub step: f64,
 }
+
 
 pub struct CoordAxis {
     pub edges: Vec<f64>,

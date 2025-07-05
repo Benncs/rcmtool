@@ -16,6 +16,7 @@ name = "cmtool-core"
 version = "0.1.0"
 dependencies = [
  "cmtool-data",
+ "thiserror",
 ]
 
 [[package]]

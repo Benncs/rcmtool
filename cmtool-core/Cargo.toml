@@ -8,3 +8,4 @@ documentation.workspace = true
 
 [dependencies]
 cmtool-data.workspace = true
+thiserror.workspace =true

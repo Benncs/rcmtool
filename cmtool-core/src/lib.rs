@@ -19,6 +19,22 @@ trait CfdCase {
     fn get_geometry_relative_path(&self) -> String;
 }
 
+use thiserror::Error;
+#[derive(Error, Debug)]
+pub enum CoreError {
+    #[error("Cmtool: {0}")]
+    Data(#[from] cmtool_data::DataError),
+
+    #[error("Cmtool: {0}")]
+    Custom(String),
+
+    #[error("Handle")]
+    Handle,
+
+    #[error("Error writing/reading file: {0}")]
+    IO(#[from] std::io::Error),
+}
+
 pub struct CMHandle {
     model: model::CMModel,
     root_result: String,
@@ -30,21 +46,25 @@ impl CMHandle {
         root: &str,
         geometry_filename: &str,
         _meshtype: grid::MeshType,
-    ) -> Result<Self, ()> {
+    ) -> Result<Self, CoreError> {
         let fullpath = format!("{}/{}", root, geometry_filename);
 
         let task_io =
             std::thread::spawn(move || ensight_gold::Geometry::new(Path::new(&fullpath.clone())));
 
-        let eg_geometry = Arc::new(task_io.join().map_err(|_| ())?.map_err(|_| ())?); //FIXME
+        let eg_geometry = Arc::new(
+            task_io
+                .join()
+                .map_err(|_| CoreError::Custom("Thread error".to_string()))?
+                .map_err(|_| CoreError::Custom("Arc error".to_string()))?,
+        ); //FIXME
 
         println!("{:?}", eg_geometry);
 
-        let cm_geometry = CMGeometry::init(n_div, eg_geometry.clone());
+        let cm_geometry = CMGeometry::init(n_div, eg_geometry.clone(),grid::MeshType::Cylindrical);
 
         let fullpath = format!("{}/wall_cart.scl1", root);
-        let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))
-            .unwrap();
+        let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))?;
 
         Ok(Self {
             model: CMModel::init(cm_geometry),
@@ -57,17 +77,19 @@ impl CMHandle {
 
         todo!()
     }
-    pub fn dump_scalar(&self) -> Result<(), ()> {
+    pub fn dump_scalar(&self) -> Result<(), CoreError> {
         let n_zone = 10;
 
         let scalar = Scalar::new();
         let scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
 
-        let path = todo!();
-        scalar_data.write_raw(path).map_err(|_| ())
+        let path = "todo!()";
+        scalar_data.write_raw(path)?;
+
+        Ok(())
     }
 
-    pub fn dump_vector(&self) {
+    pub fn dump_vector(&self) -> Result<(), CoreError> {
         let n_zone = 10;
         let n_flux = 20;
         let mut flow_data = cmtool_data::RawDataFlux::new(n_zone, n_flux);

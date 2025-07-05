@@ -1,37 +1,22 @@
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use crate::{
     ensight_gold::{
         self,
         types::{ElementsType, VolumeElementTypes},
+        Part,
+    },
+    grid::{
+        cylindrical_index, get_mesh, AxisDescriptor, CompartmentMesh, Coords3, CylindricalAxis,
+        MeshType,
     },
     model::scalar::Scalar,
+    CoreError,
 };
+mod data;
 pub mod scalar;
-const c_max_number_vertex_per_volume_elem: usize = 20;
-#[derive(Default, Debug)]
-struct VolumeElementData {
-    global_id: Vec<Vec<usize>>,
-    part_global_id: Vec<usize>,   // Part GID accessed via voGID
-    vtype: Vec<usize>,            // Volume element type accessed via voGID
-    ids: Vec<usize>,              // Volume element ID accessed via voGID
-    vertices: Vec<usize>,         // List of vertices attached to volume element
-    xyz: Vec<f64>,                // Coordinates of center of volume element
-    raz: Vec<f64>,                // Additional coordinates or metadata
-    cell_id: Vec<usize>,          // cID accessed via voGID
-    vertices_cell_id: Vec<usize>, // cID associated with each vertex of volume element
-    nc_id: Vec<usize>,            // Number of cID per volume element
-    limit_cell_id: Vec<usize>,    // List of cID in which vertices are
-}
-
-#[derive(Default, Debug)]
-struct VerticesData {
-    ve_gid: Vec<Vec<usize>>, // Access to veGID by part and vertex
-    part_id: Vec<usize>,     // Access to vertex partID from veGID
-    ve_id: Vec<usize>,       // Access to vertex veID from veGID
-    xyz: Vec<f64>,           // Vertices coordinates
-    vertex_c_id: Vec<usize>, // Access to vertex cID from veGID
-}
+use data::*;
+const C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM: usize = 20;
 
 pub struct CMGeometry {
     n_zones: usize,
@@ -40,15 +25,8 @@ pub struct CMGeometry {
 }
 
 impl CMGeometry {
-    pub fn init(n_div: [usize; 3], geometry: Arc<ensight_gold::Geometry>) -> Self {
-        let mut cm_geometry = Self {
-            n_zones: n_div.iter().product::<usize>(),
-            vertices: Default::default(),
-            volume_elements: Default::default(),
-        };
-
+    fn fill_detail(&mut self, geometry: &Arc<ensight_gold::Geometry>) -> (Vec<usize>, Vec<usize>) {
         let n_number_type = ensight_gold::types::VolumeElementTypes::number_of_types();
-
         let n_part = geometry.number_of_part();
         let mut vertex_detail = Vec::<usize>::with_capacity(n_part);
         let mut velem_detail = vec![0; n_part * n_number_type];
@@ -63,7 +41,7 @@ impl CMGeometry {
                 match element.etype {
                     ElementsType::VolumeElementType(_) => {
                         let n_nodes = element.etype.node_count() as usize;
-                        n_volume_elements_total += element.n_elements as usize;
+                        n_volume_elements_total += element.n_elements;
                         velem_detail[(i * n_number_type) + n_nodes] += element.n_elements;
                     }
                     e => {
@@ -74,74 +52,101 @@ impl CMGeometry {
             }
         }
 
-        cm_geometry
-            .vertices
-            .resize(n_part, n_vertex_total, &vertex_detail);
+        self.vertices.resize(n_part, n_vertex_total, &vertex_detail);
 
-        cm_geometry
-            .volume_elements
+        self.volume_elements
             .resize(n_part, n_volume_elements_total, &velem_detail);
+
+        (vertex_detail, velem_detail)
+    }
+
+    fn init_cm_grid(&self, n_div: [usize; 3], mesh_type: MeshType) -> Box<dyn CompartmentMesh> {
+        let mut axis: [super::grid::AxisDescriptor; 3] = Default::default();
+
+        axis.iter_mut().zip(n_div).for_each(|(ax, div)| {
+            ax.n_range = div;
+        });
+
+        for vertex_global_id in 0..self.vertices.n_vertex() {
+            axis.iter_mut()
+                .zip(self.vertices.get_slice_xyz(vertex_global_id))
+                .for_each(|(axe, &vertex)| {
+                    axe.min_range = axe.min_range.min(vertex);
+                    axe.max_range = axe.max_range.max(vertex);
+                });
+            if mesh_type == MeshType::Cylindrical {
+                let offset = vertex_global_id * 3;
+                let radius = self.vertices.xyz[offset].hypot(self.vertices.xyz[offset + 1]);
+                axis[cylindrical_index(CylindricalAxis::R)].max_range =
+                    axis[0].max_range.max(radius);
+            }
+        }
+        if mesh_type == MeshType::Cylindrical {
+            axis[cylindrical_index(CylindricalAxis::R)].min_range = 0.;
+        }
+
+        get_mesh(mesh_type, axis)
+    }
+
+    fn compute_centroid(&self, volume_element_global_id: usize, n_vertex: usize) -> Coords3 {
+        todo!("centroid")
+    }
+
+    fn detect_compartment(&mut self, n_div: [usize; 3], mesh_type: MeshType) {
+        let grid = self.init_cm_grid(n_div, mesh_type);
+
+        // let vertices_id: Vec<_> = (0..self.vertices.n_vertex())
+        //     .map(|global_id| {
+        //         grid.cell_from_coordinates(self.vertices.get_slice_xyz(global_id))
+        //             .unwrap()
+        //     })
+        //     .collect();
+
+        for vol_element_global_id in 0..self.volume_elements.n_element() {
+            let n_vertex = self
+                .volume_elements
+                .get_vertex_per_element(vol_element_global_id);
+
+            let unique_cids: BTreeSet<_> = (0..n_vertex)
+                .map(|k_vertex| {
+                    let vertex_global_id = self.volume_elements.get_vertex_from_vol_global_id(vol_element_global_id,k_vertex);
+                    self.vertices.ve_id[vertex_global_id]
+                })
+                .collect();
+            self.volume_elements.set_number_cid(vol_element_global_id,unique_cids.len());
+        }
+    }
+
+    pub fn init(
+        n_div: [usize; 3],
+        geometry: Arc<ensight_gold::Geometry>,
+        mesh_type: super::grid::MeshType,
+    ) -> Self {
+        let mut cm_geometry = Self {
+            n_zones: n_div.iter().product::<usize>(),
+            vertices: Default::default(),
+            volume_elements: Default::default(),
+        };
+
+        let (vertex_detail, velem_detail) = cm_geometry.fill_detail(&geometry);
 
         let mut vertex_counter = 0;
         let mut ve_counter = 0;
 
-        for (i_part, part) in geometry.parts.iter().enumerate() {
-            for ve_id in 0..vertex_detail[i_part] {
-                let vertex_global_identifier = vertex_counter;
+        for part_it in geometry.parts.iter().enumerate() {
+            cm_geometry
+                .vertices
+                .fill_from_part(&mut vertex_counter, &vertex_detail, part_it);
 
-                cm_geometry.vertices.ve_gid[i_part][ve_id] = vertex_global_identifier;
-                cm_geometry.vertices.part_id[vertex_counter] = i_part;
-                cm_geometry.vertices.ve_id[vertex_global_identifier] = ve_id;
-
-                let offset = vertex_counter * 3;
-                let coords = part.get_vertex_coordinates_vec(ve_id);
-                cm_geometry.vertices.xyz[offset] = coords[0];
-                cm_geometry.vertices.xyz[offset + 1] = coords[1];
-                cm_geometry.vertices.xyz[offset + 2] = coords[2];
-                vertex_counter += 1;
-            }
-
-            for (i, element) in part.elements.iter().enumerate() {
-                match element.etype {
-                    ElementsType::VolumeElementType(var) => {
-                        let n_vertex = element.etype.node_count() as usize;
-                        let n_volume_element = velem_detail[(i * n_number_type) + var.to_index()];
-
-                        let current_vertex_vegid = &cm_geometry.vertices.ve_gid[i_part];
-
-                        for ve_id in 0..n_volume_element {
-                            let ve_global_id = ve_counter;
-
-                            cm_geometry.volume_elements.set_global_id(
-                                i_part,
-                                n_vertex,
-                                ve_id,
-                                ve_global_id,
-                            );
-
-                            cm_geometry.volume_elements.part_global_id[ve_global_id] = i_part;
-                            cm_geometry.volume_elements.vtype[ve_global_id] = n_vertex;
-                            cm_geometry.volume_elements.ids[ve_global_id] = ve_id;
-
-                            for k_vertex in 0..n_vertex {
-                                let vtx = element.vertices[ve_id * n_vertex + k_vertex];
-                                cm_geometry.volume_elements.vertices
-                                    [ve_id * c_max_number_vertex_per_volume_elem + k_vertex] =
-                                    current_vertex_vegid[vtx - 1];
-                            }
-
-                            ve_counter += 1;
-                        }
-                    }
-                    _ => {
-                        // panic!("TODO Not a volume element {:?}",e);
-                        continue;
-                    }
-                }
-            }
+            cm_geometry.volume_elements.fill_from_part(
+                part_it,
+                &velem_detail,
+                &cm_geometry.vertices,
+                &mut ve_counter,
+            )
         }
 
-        todo!("DetectCompartments");
+        cm_geometry.detect_compartment(n_div, mesh_type);
 
         cm_geometry
     }
@@ -177,7 +182,7 @@ impl CMModel {
     pub fn export_volume_integral_per_zone(
         &self,
         scalar: Scalar,
-    ) -> Result<cmtool_data::RawDataScalar, ()> {
+    ) -> Result<cmtool_data::RawDataScalar, CoreError> {
         todo!()
     }
 
@@ -187,49 +192,5 @@ impl CMModel {
 
     pub fn get_real_volume(&self) -> &[f64] {
         todo!()
-    }
-}
-
-impl VerticesData {
-    fn resize(&mut self, n_part: usize, n_vertices: usize, vertex_detail: &[usize]) {
-        self.ve_gid.resize(n_part, Vec::new());
-        for i in 0..n_part {
-            self.ve_gid[i].resize(vertex_detail[i], 0);
-        }
-
-        self.part_id.resize(n_vertices, 0);
-        self.ve_id.resize(n_vertices, 0);
-        self.xyz.resize(n_vertices * 3, 0.);
-        self.vertex_c_id.resize(n_vertices, 0);
-    }
-}
-
-impl VolumeElementData {
-    fn resize(&mut self, n_part: usize, n_velement: usize, velement_detail: &[usize]) {
-        self.global_id
-            .resize(n_part * VolumeElementTypes::number_of_types(), Vec::new());
-        for i in 0..self.global_id.len() {
-            self.global_id[i].resize(velement_detail[i], 0);
-        }
-
-        self.part_global_id.resize(n_velement, 0);
-        self.vtype.resize(n_velement, 0);
-        self.ids.resize(n_velement, 0);
-        self.nc_id.resize(n_velement, 0);
-        self.cell_id.resize(n_velement, 0);
-
-        self.vertices
-            .resize(n_velement * c_max_number_vertex_per_volume_elem, 0);
-        self.limit_cell_id
-            .resize(n_velement * c_max_number_vertex_per_volume_elem, 0);
-        self.xyz.resize(n_velement * 3, 0.);
-        self.raz.resize(n_velement * 3, 0.);
-
-        self.vertices_cell_id
-            .resize(n_velement * c_max_number_vertex_per_volume_elem, 0);
-    }
-
-    fn set_global_id(&mut self, i_part: usize, element_index: usize, ve_id: usize, val: usize) {
-        self.global_id[VolumeElementTypes::number_of_types() * i_part + element_index][ve_id] = val;
     }
 }
