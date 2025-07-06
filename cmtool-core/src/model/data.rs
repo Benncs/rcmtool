@@ -17,7 +17,7 @@ pub struct VolumeElementData {
     // cell_id: Vec<usize>,          // cID accessed via voGID
     vertices_cell_id: Vec<usize>, // cID associated with each vertex of volume element
     nc_id: Vec<usize>,            // Number of cID per volume element
-    limit_cell_id: Vec<usize>,    // List of cID in which vertices are
+    compartment_ids: Vec<usize>,    // List of cID in which vertices are
 }
 
 impl VolumeElementData {
@@ -60,7 +60,7 @@ impl VolumeElementData {
 
         self.vertices
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
-        self.limit_cell_id
+        self.compartment_ids
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
         // self.xyz.resize(n_velement * 3, 0.);
         // self.raz.resize(n_velement * 3, 0.);
@@ -73,12 +73,12 @@ impl VolumeElementData {
         self.ids.len()
     }
 
-    pub fn set_limit_cell_id(&mut self, global_id: usize, k_vertex: usize, val: usize) {
-        self.limit_cell_id[global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] = val;
+    pub fn set_list_compartment_id(&mut self, global_id: usize, k_vertex: usize, val: usize) {
+        self.compartment_ids[global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] = val;
     }
 
-    pub fn get_limit_cell_id(&self, global_id: usize, k_vertex: usize) -> usize {
-        self.limit_cell_id[global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex]
+    pub fn get_list_compartment_id(&self, global_id: usize, k_vertex: usize) -> usize {
+        self.compartment_ids[global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex]
     }
 
     pub fn set_global_id(

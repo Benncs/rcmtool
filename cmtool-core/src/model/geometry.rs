@@ -120,7 +120,7 @@ impl CMGeometry {
 
             for (index, c_id) in unique_cids.into_iter().enumerate() {
                 self.volume_elements
-                    .set_limit_cell_id(vol_element_global_id, index, c_id);
+                    .set_list_compartment_id(vol_element_global_id, index, c_id);
             }
         }
     }
@@ -136,12 +136,12 @@ impl CMGeometry {
         for vol_element_global_id in 0..self.volume_elements.n_element() {
             let interface_cid_0 = self
                 .volume_elements
-                .get_limit_cell_id(vol_element_global_id, 0);
+                .get_list_compartment_id(vol_element_global_id, 0);
 
             for k_vertex in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
                 let interface_cid_k = self
                     .volume_elements
-                    .get_limit_cell_id(vol_element_global_id, k_vertex);
+                    .get_list_compartment_id(vol_element_global_id, k_vertex);
 
                 count.incr_compartment(interface_cid_k);
 

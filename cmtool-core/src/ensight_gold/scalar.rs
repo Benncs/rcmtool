@@ -13,6 +13,7 @@ pub struct ScalarField {
     // parts: usize,
     // mesh_element_types: usize,
     // mesh_cells: usize,
+    name:String,
     pub part_id: Vec<u32>,
     data: Vec<Vec<Vec<f32>>>,
 }
@@ -43,7 +44,7 @@ impl ScalarField {
     fn new() -> Self {
         let data = Vec::new();
         let part_id = Vec::new();
-        ScalarField { data, part_id }
+        ScalarField { data, part_id,name:String::new() }
     }
 
     pub fn init(geometry: Arc<Geometry>, path: impl AsRef<Path>) -> std::io::Result<Self> {
@@ -100,9 +101,11 @@ impl ScalarField {
         geometry: &Geometry,
         reader: &mut EnsightGoldReader,
     ) -> std::io::Result<Self> {
-        reader.ignore_line()?; //description
-
+        // reader.ignore_line()?; //description
         let mut scalar = ScalarField::new();
+        scalar.name =reader.get_line_string()?;
+
+        
         scalar.data.resize(geometry.number_of_part(), Vec::new());
         for data_in_part in &mut scalar.data {
             reader.check_lines_contains("part")?;
@@ -117,6 +120,10 @@ impl ScalarField {
 
                 for element in &part.elements {
                     let element_type_name = reader.get_line_string()?;
+                    if element_type_name.contains("undef")
+                    {
+                        unimplemented!("Undef varaible per element");
+                    }
                     // let _ = reader.read_f32()?; //undef
                     // println!("{}", element_type_name);
                     if ElementsType::from_str(&element_type_name) == Ok(element.etype) {

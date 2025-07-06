@@ -20,7 +20,7 @@ fn main() {
         cmtool_core::grid::MeshType::Cylindrical,
     ).unwrap();
 
-    geo.dump_scalar(resolve_path(&case.root, &case.paths[0].filepath)).unwrap();
+    geo.dump_scalar(resolve_path(&case.root, &case.paths[8].filepath)).unwrap();
 
     //     println!("{:?}", geo);
 }

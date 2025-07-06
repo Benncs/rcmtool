@@ -116,12 +116,11 @@ impl<const N: usize> Reader<N> {
     let mut raw_buf = vec![0u8; size * 4];
     self.reader.read_exact(&mut raw_buf)?;
 
-    // SAFETY: We're interpreting bytes as f32s, assuming alignment and correctness.
     let float_buf: Vec<f32> = raw_buf
         .chunks_exact(4)
         .map(|bytes| {
-            let array = bytes.try_into().unwrap(); // &[u8; 4]
-            f32::from_le_bytes(array) // or from_be_bytes depending on your format
+            let array = bytes.try_into().unwrap(); 
+            f32::from_le_bytes(array)
         })
         .collect();
 
