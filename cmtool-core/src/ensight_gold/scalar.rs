@@ -109,7 +109,6 @@ impl ScalarField {
 
             let id = reader.read_i32()?;
             scalar.part_id.push(id as u32);
-            println!("id {:?}", id);
 
             if let Some(part) = geometry.get_part_by_id(id as u32) {
                 let n_elements = part.elements.len();

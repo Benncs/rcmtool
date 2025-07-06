@@ -82,7 +82,6 @@ impl CMHandle {
         todo!()
     }
     pub fn dump_scalar(&self, path: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
-        let n_zone = 10;
 
         let s = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path)?;
 

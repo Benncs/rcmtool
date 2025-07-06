@@ -15,6 +15,7 @@ use crate::{
 };
 mod data;
 pub mod scalar;
+use cmtool_data::RawDataScalar;
 use data::*;
 mod geometry;
 use geometry::*;
@@ -28,6 +29,19 @@ impl CMModel {}
 
 impl CMModel {
     pub fn init(geometry: Arc<CMGeometry>) -> Self {
+        println!("Init model with {} compartment",geometry.n_zone());
+        let volume_element_count = geometry.get_count_volume_element();
+        let n_zone_with_volume_element = volume_element_count
+            .per_compartment
+            .iter()
+            .filter(|v| **v != 0)
+            .count();
+
+        let n_interfaces = volume_element_count
+            .at_interface
+            .iter()
+            .filter(|&&v| v > 0)
+            .count();
         Self { geometry }
     }
 
@@ -51,7 +65,13 @@ impl CMModel {
         &self,
         scalar: Scalar,
     ) -> Result<cmtool_data::RawDataScalar, CoreError> {
-        todo!()
+        println!(
+            "Creating scalar with {} compartment",
+            self.geometry.n_zone()
+        );
+        let mut scalar_field = RawDataScalar::new(self.geometry.n_zone());
+
+        todo!("export_volume_integral_per_zone")
     }
 
     pub fn compartments_volumes(&self) -> Vec<f64> {

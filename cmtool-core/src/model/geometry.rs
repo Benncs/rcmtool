@@ -1,17 +1,96 @@
 use std::{collections::BTreeSet, sync::Arc};
 
-use crate::{ensight_gold::{self, types::ElementsType}, grid::{cylindrical_index, get_mesh, CompartmentMesh, Coords3, CylindricalAxis, MeshType}, model::data::{VerticesData, VolumeElementData}};
-
+use crate::{
+    ensight_gold::{self, types::ElementsType},
+    grid::{
+        cylindrical_index, get_mesh, CompartmentMesh, Coords3, CylindricalAxis, MeshType,
+        NeighborDirection,
+    },
+    model::data::{VerticesData, VolumeElementData},
+};
 
 pub struct CMGeometry {
     n_zones: usize,
     pub vertices: VerticesData,
     pub volume_elements: VolumeElementData,
-    grid:Option<Box<dyn CompartmentMesh>>,
-  
+    grid: Option<Box<dyn CompartmentMesh>>,
+}
+
+pub struct CountVolumeElement {
+    pub per_compartment: Vec<usize>,
+    pub at_interface: Vec<usize>,
+}
+
+impl CountVolumeElement {
+    fn incr_compartment(&mut self, compartment_id: usize) {
+        self.per_compartment[compartment_id] += 1;
+    }
+    fn incr_interface(&mut self, compartment_id_0: usize, compartment_id_k: usize) {
+        self.at_interface[compartment_id_0 * self.per_compartment.len() + compartment_id_k] += 1;
+    }
 }
 
 impl CMGeometry {
+    pub fn n_zone(&self) -> usize {
+        self.n_zones
+    }
+
+    pub fn get_count_volume_element(&self) -> CountVolumeElement {
+        let mut count = CountVolumeElement {
+            per_compartment: vec![0; self.n_zones],
+            at_interface: vec![0; self.n_zones * self.n_zones],
+        };
+        const INVALID_CELL_ID: usize = 0;
+        for vol_element_global_id in 0..self.volume_elements.n_element() {
+            let interface_cid_0 = self
+                .volume_elements
+                .get_limit_cell_id(vol_element_global_id, 0);
+
+            for k_vertex in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
+                let interface_cid_k = self
+                    .volume_elements
+                    .get_limit_cell_id(vol_element_global_id, k_vertex);
+
+                if interface_cid_k != INVALID_CELL_ID {
+                    count.incr_compartment(interface_cid_k);
+                }
+
+                if k_vertex >= 1 {
+                    match self
+                        .grid
+                        .as_ref()
+                        .unwrap()
+                        .are_cell_neighbor(interface_cid_0, interface_cid_k)
+                    {
+                        NeighborDirection::NotNeighbors => continue,
+                        neighbors => {
+                            let (id1, id2) =
+                                neighbors.ordered_pair(interface_cid_0, interface_cid_k);
+                            count.incr_interface(id1, id2);
+                        }
+                    }
+                }
+            }
+        }
+
+        count
+    }
+
+    // pub fn volume_element_per_compartment(&self) -> Vec<usize> {
+    //     let mut number_volume_element_per_zone = vec![0; self.n_zones];
+    //     for vol_element_global_id in 0..self.volume_elements.n_element() {
+    //         for i_cell_id in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
+    //             let cell_id = self
+    //                 .volume_elements
+    //                 .get_limit_cell_id(vol_element_global_id, i_cell_id);
+    //             number_volume_element_per_zone[cell_id] += 1;
+    //         }
+    //     }
+    //     number_volume_element_per_zone
+    // }
+
+    // pub fn volume_element_at_compartment_interface(&self) {}
+
     fn fill_detail(&mut self, geometry: &Arc<ensight_gold::Geometry>) -> (Vec<usize>, Vec<usize>) {
         let n_number_type = ensight_gold::types::VolumeElementTypes::number_of_types();
         let n_part = geometry.number_of_part();
@@ -74,7 +153,8 @@ impl CMGeometry {
             axis[cylindrical_index(CylindricalAxis::R)].min_range = 0.;
         }
 
-        axis.iter_mut().for_each(|ax| ax.step = (ax.max_range-ax.min_range)/(ax.n_range as f64));
+        axis.iter_mut()
+            .for_each(|ax| ax.step = (ax.max_range - ax.min_range) / (ax.n_range as f64));
 
         self.grid = Some(get_mesh(mesh_type, axis));
     }
@@ -102,12 +182,20 @@ impl CMGeometry {
 
             let unique_cids: BTreeSet<_> = (0..n_vertex)
                 .map(|k_vertex| {
-                    let vertex_global_id = self.volume_elements.get_vertex_from_vol_global_id(vol_element_global_id,k_vertex);
+                    let vertex_global_id = self
+                        .volume_elements
+                        .get_vertex_from_vol_global_id(vol_element_global_id, k_vertex);
                     // self.vertices.ve_id[vertex_global_id]
                     vertices_id[vertex_global_id]
                 })
                 .collect();
-            self.volume_elements.set_number_cid(vol_element_global_id,unique_cids.len());
+            self.volume_elements
+                .set_number_cid(vol_element_global_id, unique_cids.len());
+
+            for (index, c_id) in unique_cids.into_iter().enumerate() {
+                self.volume_elements
+                    .set_limit_cell_id(vol_element_global_id, index, c_id);
+            }
         }
     }
 
@@ -120,7 +208,7 @@ impl CMGeometry {
             n_zones: n_div.iter().product::<usize>(),
             vertices: Default::default(),
             volume_elements: Default::default(),
-            grid:None,
+            grid: None,
         };
 
         let (vertex_detail, velem_detail) = cm_geometry.fill_detail(&geometry);
@@ -146,7 +234,7 @@ impl CMGeometry {
         cm_geometry
     }
 
-    fn get_grid(&self)->Option<&dyn CompartmentMesh>{
+    fn get_grid(&self) -> Option<&dyn CompartmentMesh> {
         self.grid.as_deref()
     }
 }

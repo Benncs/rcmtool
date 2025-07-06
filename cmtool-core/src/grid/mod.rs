@@ -19,6 +19,25 @@ pub enum NeighborDirection {
     ZPlus = 6,
 }
 
+impl NeighborDirection
+{
+    pub const fn is_positive(self) -> bool {
+        matches!(self, NeighborDirection::XPlus | NeighborDirection::YPlus | NeighborDirection::ZPlus)
+    }
+
+    pub const fn is_negative(self) -> bool {
+        matches!(self, NeighborDirection::XMinus | NeighborDirection::YMinus | NeighborDirection::ZMinus)
+    }
+
+    pub fn ordered_pair<T: Copy>(self, a: T, b: T) -> (T, T) {
+        if self.is_positive() {
+            (a, b)
+        } else {
+            (b, a)
+        }
+    }
+}
+
 impl TryFrom<i32> for NeighborDirection {
     type Error = &'static str;
 

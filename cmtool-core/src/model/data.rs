@@ -33,6 +33,10 @@ impl VolumeElementData {
     pub fn set_number_cid(&mut self, global_id: usize, n_cid: usize) {
         self.nc_id[global_id] = n_cid;
     }
+    pub fn get_number_cid(&self, global_id: usize) ->usize{
+        self.nc_id[global_id]
+    }
+
 
     pub fn resize(&mut self, n_part: usize, n_velement: usize, velement_detail: &[usize]) {
         self.global_id
@@ -66,6 +70,16 @@ impl VolumeElementData {
 
     pub fn n_element(&self) -> usize {
         self.ids.len()
+    }
+
+    pub fn set_limit_cell_id(&mut self,global_id:usize,k_vertex:usize,val:usize)
+    {
+        self.limit_cell_id[global_id*C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM+k_vertex]=val;
+    }
+
+    pub fn get_limit_cell_id(&self,global_id:usize,k_vertex:usize)->usize
+    {
+        self.limit_cell_id[global_id*C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM+k_vertex]
     }
 
     pub fn set_global_id(
