@@ -3,14 +3,12 @@ use std::{collections::BTreeSet, sync::Arc};
 use crate::{
     ensight_gold::{self, types::ElementsType},
     grid::{
-        cylindrical_index, get_mesh, CompartmentMesh, CylindricalAxis, MeshType,
-        NeighborDirection,
+        cylindrical_index, get_mesh, CompartmentMesh, CylindricalAxis, MeshType, NeighborDirection,
     },
     model::{
         data::{VerticesData, VolumeElementData},
         CountVolumeElement,
-    }, utils::Coords3,
-};
+    }};
 
 pub struct CMGeometry {
     pub vertices: VerticesData,
@@ -21,7 +19,7 @@ pub struct CMGeometry {
 //Mutable
 impl CMGeometry {
     fn fill_detail(&mut self, geometry: &Arc<ensight_gold::Geometry>) -> (Vec<usize>, Vec<usize>) {
-        let n_number_type = ensight_gold::types::VolumeElementTypes::number_of_types();
+        let n_number_type = ensight_gold::types::VolumeElementTypes::NUMBER_OF_TYPES;
         let n_part = geometry.number_of_part();
         let mut vertex_detail = Vec::<usize>::with_capacity(n_part);
         let mut velem_detail = vec![0; n_part * n_number_type];
@@ -41,7 +39,7 @@ impl CMGeometry {
                         n_volume_elements_total += element.n_elements;
                         velem_detail[(i * n_number_type) + index_element] += element.n_elements;
                     }
-                    e => {
+                    _ => {
                         // panic!("TODO Not a volume element {:?}",e);
                         continue;
                     }
@@ -56,6 +54,7 @@ impl CMGeometry {
 
         (vertex_detail, velem_detail)
     }
+
     fn init_cm_grid(&mut self, n_div: [usize; 3], mesh_type: MeshType) {
         let mut axis: [crate::grid::AxisDescriptor; 3] = Default::default();
 
@@ -113,6 +112,7 @@ impl CMGeometry {
                     vertices_id[vertex_global_id]
                 })
                 .collect();
+            
             self.volume_elements
                 .set_number_cid(vol_element_global_id, unique_cids.len());
 
@@ -122,7 +122,6 @@ impl CMGeometry {
             }
         }
     }
-
 }
 
 impl CMGeometry {
@@ -132,7 +131,6 @@ impl CMGeometry {
 
     pub fn get_count_volume_element(&self) -> CountVolumeElement {
         let mut count = CountVolumeElement::new(self.n_zone());
-        const INVALID_CELL_ID: usize = 0;
         for vol_element_global_id in 0..self.volume_elements.n_element() {
             let interface_cid_0 = self
                 .volume_elements
@@ -166,24 +164,6 @@ impl CMGeometry {
         count
     }
 
-    // pub fn volume_element_per_compartment(&self) -> Vec<usize> {
-    //     let mut number_volume_element_per_zone = vec![0; self.n_zones];
-    //     for vol_element_global_id in 0..self.volume_elements.n_element() {
-    //         for i_cell_id in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
-    //             let cell_id = self
-    //                 .volume_elements
-    //                 .get_limit_cell_id(vol_element_global_id, i_cell_id);
-    //             number_volume_element_per_zone[cell_id] += 1;
-    //         }
-    //     }
-    //     number_volume_element_per_zone
-    // }
-
-    // pub fn volume_element_at_compartment_interface(&self) {}
-
-    fn compute_centroid(&self, volume_element_global_id: usize, n_vertex: usize) -> Coords3 {
-        todo!("centroid")
-    }
     pub fn init(
         n_div: [usize; 3],
         geometry: Arc<ensight_gold::Geometry>,
@@ -218,7 +198,7 @@ impl CMGeometry {
         cm_geometry
     }
 
-    fn get_grid(&self) -> Option<&dyn CompartmentMesh> {
+    pub fn get_grid(&self) -> Option<&dyn CompartmentMesh> {
         self.grid.as_deref()
     }
 }

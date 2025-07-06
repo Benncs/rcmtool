@@ -10,16 +10,17 @@ description = "Compartment Modelling Approach tool"
 documentation = ""
 
 
-[profile.release]
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
-lto = true
-panic = 'unwind'
+[profile.release-performance]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+strip = "none"
+panic = "unwind"
 incremental = false
-codegen-units = 16
-rpath = false
+opt-level = 3
+debug = 1
+overflow-checks = false
+
 
 [workspace.dependencies]
 cmtool-core = { version = "0.1.0", path = "./cmtool-core" }

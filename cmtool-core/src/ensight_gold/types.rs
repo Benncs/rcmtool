@@ -1,7 +1,5 @@
 use std::str::FromStr;
 
-use crate::utils::{tetra_volume, Coords3, Coords3Ext};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VolumeElementTypes {
     Tetra4,
@@ -25,9 +23,8 @@ pub enum VolumeElementTypes {
 //"tetra4", "tetra10", "pyramid5", "pyramid13", "penta6", "penta15", "hexa8", "hexa20"
 
 impl VolumeElementTypes {
-    pub const fn number_of_types() -> usize {
-        return 8; //G and non G type count for 1
-    }
+    pub const NUMBER_OF_TYPES:usize = 8;//G and non G type count for 1
+   
 
     pub fn to_index(&self) -> usize {
         match self {

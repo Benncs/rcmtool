@@ -57,7 +57,10 @@ impl std::fmt::Display for Geometry {
 }
 
 impl MeshElementType {
-    
+    pub fn get_vertex(&self,i_element:usize,i_vertex:usize)->usize
+    {
+        self.vertices[i_element*self.n_nodes+i_vertex]
+    }
 
     pub fn read(reader: &mut EnsightGoldReader, ignore_element_id: bool) -> std::io::Result<Self> {
         let element_type = reader.get_line_string()?;

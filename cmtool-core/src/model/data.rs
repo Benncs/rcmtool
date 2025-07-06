@@ -7,7 +7,7 @@ const C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM: usize = 20;
 #[derive(Default, Debug)]
 pub struct VolumeElementData {
     global_id: Vec<Vec<usize>>,
-    part_global_id: Vec<usize>,         // Part GID accessed via voGID
+    // part_global_id: Vec<usize>,         // Part GID accessed via voGID
     pub vtype: Vec<VolumeElementTypes>, // Volume element type accessed via voGID
     ids: Vec<usize>,                    // Volume element ID accessed via voGID
     vertices: Vec<usize>,               // List of vertices attached to volume element
@@ -42,7 +42,7 @@ impl VolumeElementData {
 
     pub fn resize(&mut self, n_part: usize, n_velement: usize, velement_detail: &[usize]) {
         self.global_id
-            .resize(n_part * VolumeElementTypes::number_of_types(), Vec::new());
+            .resize(n_part * VolumeElementTypes::NUMBER_OF_TYPES, Vec::new());
 
         for (vec, &new_len) in self.global_id.iter_mut().zip(velement_detail.iter()) {
             vec.resize(new_len, 0);
@@ -51,7 +51,7 @@ impl VolumeElementData {
         //     self.global_id[i].resize(velement_detail[i], 0);
         // }
 
-        self.part_global_id.resize(n_velement, 0);
+        // self.part_global_id.resize(n_velement, 0);
         // self.vtype.resize(n_velement,VolumeElementTypes::Hexa8);
         self.vtype = Vec::with_capacity(n_velement);
         self.ids.resize(n_velement, 0);
@@ -88,7 +88,7 @@ impl VolumeElementData {
         volume_element_id: usize,
         val: usize,
     ) {
-        self.global_id[VolumeElementTypes::number_of_types() * i_part + element_index]
+        self.global_id[VolumeElementTypes::NUMBER_OF_TYPES * i_part + element_index]
             [volume_element_id] = val;
     }
 
@@ -98,7 +98,7 @@ impl VolumeElementData {
         element_index: usize,
         volume_element_id: usize,
     ) -> usize {
-        self.global_id[VolumeElementTypes::number_of_types() * i_part + element_index]
+        self.global_id[VolumeElementTypes::NUMBER_OF_TYPES * i_part + element_index]
             [volume_element_id]
     }
 
@@ -110,6 +110,14 @@ impl VolumeElementData {
         self.vertices[vol_element_global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex]
     }
 
+    fn set_vertex_from_vol_global_id(
+        &mut self,
+        vol_element_global_id: usize,
+        k_vertex: usize,val:usize
+    )  {
+        self.vertices[vol_element_global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex]=val;
+    }
+
     pub fn fill_from_part(
         &mut self,
         part_it: (usize, &Part),
@@ -117,7 +125,7 @@ impl VolumeElementData {
         vertices: &VerticesData,
         ve_counter: &mut usize,
     ) {
-        const N_NUMBER_TYPE: usize = VolumeElementTypes::number_of_types();
+        const N_NUMBER_TYPE: usize = VolumeElementTypes::NUMBER_OF_TYPES;
         let (i_part, part) = part_it;
         for element in part.elements.iter() {
             match element.etype {
@@ -133,15 +141,17 @@ impl VolumeElementData {
 
                         self.set_global_id(i_part, var.to_index(), ve_id, ve_global_id);
 
-                        self.part_global_id[ve_global_id] = i_part;
+                        // self.part_global_id[ve_global_id] = i_part;
                         // self.vtype[ve_global_id] = var;
                         self.vtype.push(var);
                         self.ids[ve_global_id] = ve_id;
 
                         for k_vertex in 0..n_vertex {
-                            let vtx = element.vertices[ve_id * n_vertex + k_vertex];
-                            self.vertices[ve_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] =
-                                current_vertex_vegid[vtx - 1];
+                            // let vtx = element.vertices[ve_id * n_vertex + k_vertex];
+                            let vtx = element.get_vertex(ve_id, k_vertex);
+                            self.set_vertex_from_vol_global_id(ve_global_id,k_vertex,current_vertex_vegid[vtx-1]);
+                            // self.vertices[ve_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] =
+                            //     current_vertex_vegid[vtx - 1];
                         }
                     }
                 }
