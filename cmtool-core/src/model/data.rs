@@ -7,10 +7,10 @@ const C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM: usize = 20;
 #[derive(Default, Debug)]
 pub struct VolumeElementData {
     global_id: Vec<Vec<usize>>,
-    part_global_id: Vec<usize>,     // Part GID accessed via voGID
-    vtype: Vec<VolumeElementTypes>, // Volume element type accessed via voGID
-    ids: Vec<usize>,                // Volume element ID accessed via voGID
-    vertices: Vec<usize>,           // List of vertices attached to volume element
+    part_global_id: Vec<usize>,         // Part GID accessed via voGID
+    pub vtype: Vec<VolumeElementTypes>, // Volume element type accessed via voGID
+    ids: Vec<usize>,                    // Volume element ID accessed via voGID
+    vertices: Vec<usize>,               // List of vertices attached to volume element
     // xyz: Vec<f64>,                // Coordinates of center of volume element
     // raz: Vec<f64>,                // Additional coordinates or metadata
 
@@ -27,16 +27,18 @@ impl VolumeElementData {
         // } else {
         //     self.vtype[global_id].to_index()
         // }
-        ElementsType::VolumeElementType(self.vtype[global_id]).node_count().try_into().unwrap()
+        ElementsType::VolumeElementType(self.vtype[global_id])
+            .node_count()
+            .try_into()
+            .unwrap()
     }
 
     pub fn set_number_cid(&mut self, global_id: usize, n_cid: usize) {
         self.nc_id[global_id] = n_cid;
     }
-    pub fn get_number_cid(&self, global_id: usize) ->usize{
+    pub fn get_number_cid(&self, global_id: usize) -> usize {
         self.nc_id[global_id]
     }
-
 
     pub fn resize(&mut self, n_part: usize, n_velement: usize, velement_detail: &[usize]) {
         self.global_id
@@ -48,7 +50,6 @@ impl VolumeElementData {
         // for i in 0..self.global_id.len() {
         //     self.global_id[i].resize(velement_detail[i], 0);
         // }
-
 
         self.part_global_id.resize(n_velement, 0);
         // self.vtype.resize(n_velement,VolumeElementTypes::Hexa8);
@@ -72,14 +73,12 @@ impl VolumeElementData {
         self.ids.len()
     }
 
-    pub fn set_limit_cell_id(&mut self,global_id:usize,k_vertex:usize,val:usize)
-    {
-        self.limit_cell_id[global_id*C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM+k_vertex]=val;
+    pub fn set_limit_cell_id(&mut self, global_id: usize, k_vertex: usize, val: usize) {
+        self.limit_cell_id[global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] = val;
     }
 
-    pub fn get_limit_cell_id(&self,global_id:usize,k_vertex:usize)->usize
-    {
-        self.limit_cell_id[global_id*C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM+k_vertex]
+    pub fn get_limit_cell_id(&self, global_id: usize, k_vertex: usize) -> usize {
+        self.limit_cell_id[global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex]
     }
 
     pub fn set_global_id(
@@ -151,7 +150,6 @@ impl VolumeElementData {
                     continue;
                 }
             }
-            
         }
     }
 }
@@ -181,18 +179,22 @@ impl VerticesData {
             self.ve_id[vertex_global_identifier] = ve_id;
 
             let offset = (*vertex_counter) * 3;
-            let coords = part.get_vertex_coordinates_vec(ve_id);
-            self.xyz[offset] = coords[0];
-            self.xyz[offset + 1] = coords[1];
-            self.xyz[offset + 2] = coords[2];
+            self.xyz[offset..offset + 3].copy_from_slice(part.get_vertex_coordinates_slice(ve_id));
             *vertex_counter += 1;
         }
     }
     pub fn resize(&mut self, n_part: usize, n_vertices: usize, vertex_detail: &[usize]) {
         self.ve_gid.resize(n_part, Vec::new());
-        for i in 0..n_part {
-            self.ve_gid[i].resize(vertex_detail[i], 0);
-        }
+        // for i in 0..n_part {
+        //     self.ve_gid[i].resize(vertex_detail[i], 0);
+        // }
+
+        self.ve_gid.iter_mut().zip(vertex_detail).for_each(
+            |(ve,size)|
+            {
+                ve.resize(*size, 0);
+            }
+        );
 
         self.part_id.resize(n_vertices, 0);
         self.ve_id.resize(n_vertices, 0);

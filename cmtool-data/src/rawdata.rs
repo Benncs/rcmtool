@@ -107,6 +107,7 @@ impl Default for RawFlux {
 }
 
 impl From<f64> for RawScalar {
+    #[inline(always)]
     fn from(value: f64) -> Self {
         Self { value }
     }

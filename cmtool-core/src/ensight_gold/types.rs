@@ -1,5 +1,7 @@
 use std::str::FromStr;
 
+use crate::utils::{tetra_volume, Coords3, Coords3Ext};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VolumeElementTypes {
     Tetra4,

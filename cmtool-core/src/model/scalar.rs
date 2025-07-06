@@ -83,7 +83,17 @@ impl Index<usize> for Scalar {
     type Output = cmtool_data::ScalarValueType;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.value_in_vo[index]
+        #[cfg(debug_assertions)]
+        {
+            // Debug mode: safe indexing with bounds check
+            &self.value_in_vo[index]
+        }
+
+        #[cfg(not(debug_assertions))]
+        unsafe {
+            // Release mode: unchecked access (unsafe but fast)
+            self.value_in_vo.get_unchecked(index)
+        }
     }
 }
 

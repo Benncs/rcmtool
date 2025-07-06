@@ -3,94 +3,23 @@ use std::{collections::BTreeSet, sync::Arc};
 use crate::{
     ensight_gold::{self, types::ElementsType},
     grid::{
-        cylindrical_index, get_mesh, CompartmentMesh, Coords3, CylindricalAxis, MeshType,
+        cylindrical_index, get_mesh, CompartmentMesh, CylindricalAxis, MeshType,
         NeighborDirection,
     },
-    model::data::{VerticesData, VolumeElementData},
+    model::{
+        data::{VerticesData, VolumeElementData},
+        CountVolumeElement,
+    }, utils::Coords3,
 };
 
 pub struct CMGeometry {
-    n_zones: usize,
     pub vertices: VerticesData,
     pub volume_elements: VolumeElementData,
     grid: Option<Box<dyn CompartmentMesh>>,
 }
 
-pub struct CountVolumeElement {
-    pub per_compartment: Vec<usize>,
-    pub at_interface: Vec<usize>,
-}
-
-impl CountVolumeElement {
-    fn incr_compartment(&mut self, compartment_id: usize) {
-        self.per_compartment[compartment_id] += 1;
-    }
-    fn incr_interface(&mut self, compartment_id_0: usize, compartment_id_k: usize) {
-        self.at_interface[compartment_id_0 * self.per_compartment.len() + compartment_id_k] += 1;
-    }
-}
-
+//Mutable
 impl CMGeometry {
-    pub fn n_zone(&self) -> usize {
-        self.n_zones
-    }
-
-    pub fn get_count_volume_element(&self) -> CountVolumeElement {
-        let mut count = CountVolumeElement {
-            per_compartment: vec![0; self.n_zones],
-            at_interface: vec![0; self.n_zones * self.n_zones],
-        };
-        const INVALID_CELL_ID: usize = 0;
-        for vol_element_global_id in 0..self.volume_elements.n_element() {
-            let interface_cid_0 = self
-                .volume_elements
-                .get_limit_cell_id(vol_element_global_id, 0);
-
-            for k_vertex in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
-                let interface_cid_k = self
-                    .volume_elements
-                    .get_limit_cell_id(vol_element_global_id, k_vertex);
-
-                if interface_cid_k != INVALID_CELL_ID {
-                    count.incr_compartment(interface_cid_k);
-                }
-
-                if k_vertex >= 1 {
-                    match self
-                        .grid
-                        .as_ref()
-                        .unwrap()
-                        .are_cell_neighbor(interface_cid_0, interface_cid_k)
-                    {
-                        NeighborDirection::NotNeighbors => continue,
-                        neighbors => {
-                            let (id1, id2) =
-                                neighbors.ordered_pair(interface_cid_0, interface_cid_k);
-                            count.incr_interface(id1, id2);
-                        }
-                    }
-                }
-            }
-        }
-
-        count
-    }
-
-    // pub fn volume_element_per_compartment(&self) -> Vec<usize> {
-    //     let mut number_volume_element_per_zone = vec![0; self.n_zones];
-    //     for vol_element_global_id in 0..self.volume_elements.n_element() {
-    //         for i_cell_id in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
-    //             let cell_id = self
-    //                 .volume_elements
-    //                 .get_limit_cell_id(vol_element_global_id, i_cell_id);
-    //             number_volume_element_per_zone[cell_id] += 1;
-    //         }
-    //     }
-    //     number_volume_element_per_zone
-    // }
-
-    // pub fn volume_element_at_compartment_interface(&self) {}
-
     fn fill_detail(&mut self, geometry: &Arc<ensight_gold::Geometry>) -> (Vec<usize>, Vec<usize>) {
         let n_number_type = ensight_gold::types::VolumeElementTypes::number_of_types();
         let n_part = geometry.number_of_part();
@@ -127,7 +56,6 @@ impl CMGeometry {
 
         (vertex_detail, velem_detail)
     }
-
     fn init_cm_grid(&mut self, n_div: [usize; 3], mesh_type: MeshType) {
         let mut axis: [crate::grid::AxisDescriptor; 3] = Default::default();
 
@@ -157,10 +85,6 @@ impl CMGeometry {
             .for_each(|ax| ax.step = (ax.max_range - ax.min_range) / (ax.n_range as f64));
 
         self.grid = Some(get_mesh(mesh_type, axis));
-    }
-
-    fn compute_centroid(&self, volume_element_global_id: usize, n_vertex: usize) -> Coords3 {
-        todo!("centroid")
     }
 
     fn detect_compartment(&mut self, n_div: [usize; 3], mesh_type: MeshType) {
@@ -199,13 +123,73 @@ impl CMGeometry {
         }
     }
 
+}
+
+impl CMGeometry {
+    pub fn n_zone(&self) -> usize {
+        self.grid.as_ref().unwrap().number_cell()
+    }
+
+    pub fn get_count_volume_element(&self) -> CountVolumeElement {
+        let mut count = CountVolumeElement::new(self.n_zone());
+        const INVALID_CELL_ID: usize = 0;
+        for vol_element_global_id in 0..self.volume_elements.n_element() {
+            let interface_cid_0 = self
+                .volume_elements
+                .get_limit_cell_id(vol_element_global_id, 0);
+
+            for k_vertex in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
+                let interface_cid_k = self
+                    .volume_elements
+                    .get_limit_cell_id(vol_element_global_id, k_vertex);
+
+                count.incr_compartment(interface_cid_k);
+
+                if k_vertex >= 1 {
+                    match self
+                        .grid
+                        .as_ref()
+                        .unwrap()
+                        .are_cell_neighbor(interface_cid_0, interface_cid_k)
+                    {
+                        NeighborDirection::NotNeighbors => continue,
+                        neighbors => {
+                            let (id1, id2) =
+                                neighbors.ordered_pair(interface_cid_0, interface_cid_k);
+                            count.incr_interface(id1, id2);
+                        }
+                    }
+                }
+            }
+        }
+
+        count
+    }
+
+    // pub fn volume_element_per_compartment(&self) -> Vec<usize> {
+    //     let mut number_volume_element_per_zone = vec![0; self.n_zones];
+    //     for vol_element_global_id in 0..self.volume_elements.n_element() {
+    //         for i_cell_id in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
+    //             let cell_id = self
+    //                 .volume_elements
+    //                 .get_limit_cell_id(vol_element_global_id, i_cell_id);
+    //             number_volume_element_per_zone[cell_id] += 1;
+    //         }
+    //     }
+    //     number_volume_element_per_zone
+    // }
+
+    // pub fn volume_element_at_compartment_interface(&self) {}
+
+    fn compute_centroid(&self, volume_element_global_id: usize, n_vertex: usize) -> Coords3 {
+        todo!("centroid")
+    }
     pub fn init(
         n_div: [usize; 3],
         geometry: Arc<ensight_gold::Geometry>,
         mesh_type: crate::grid::MeshType,
     ) -> Self {
         let mut cm_geometry = Self {
-            n_zones: n_div.iter().product::<usize>(),
             vertices: Default::default(),
             volume_elements: Default::default(),
             grid: None,

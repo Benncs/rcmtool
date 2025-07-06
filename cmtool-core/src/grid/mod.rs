@@ -1,7 +1,9 @@
 use std::{fmt::Debug, marker::PhantomData};
 mod collections;
 use collections::*;
-pub use collections::{cylindrical_index, AxisDescriptor, Coords3, CylindricalAxis};
+pub use collections::{cylindrical_index, AxisDescriptor, CylindricalAxis};
+
+use crate::utils::{AxisPoints, Coords3};
 
 #[derive(PartialEq)]
 pub enum MeshType {

@@ -1,5 +1,3 @@
-pub type Coords3 = [f64; 3];
-pub type AxisPoints = [usize; 3];
 
 pub enum OrientedAxis {
     I = 0,
@@ -81,3 +79,5 @@ impl CoordAxis {
         Some(cell_id)
     }
 }
+
+
