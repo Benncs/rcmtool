@@ -61,7 +61,7 @@ impl CMHandle {
                 .map_err(|_| CoreError::Custom("Arc error".to_string()))?,
         ); //FIXME
 
-        println!("{:?}", eg_geometry);
+        println!("{}", eg_geometry);
 
         let cm_geometry = Arc::new(CMGeometry::init(n_div, eg_geometry.clone(), grid::MeshType::Cylindrical));
 

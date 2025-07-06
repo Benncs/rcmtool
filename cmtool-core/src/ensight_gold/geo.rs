@@ -27,9 +27,33 @@ pub struct Part {
     pub(crate) elements: Vec<MeshElementType>,
 }
 
+impl std::fmt::Display for Part {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Part #{}: {}", self.id, self.name)?;
+        writeln!(f, "  Number of vertices: {}", self.n_vertex)?;
+        writeln!(f, "  Vertex coordinates: {}",self.vertex_coordinates.len())?;
+        writeln!(f, "  Number of elements: {}", self.elements.len())?;
+       
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct Geometry {
     pub(crate) parts: Vec<Part>,
+}
+
+impl std::fmt::Display for Geometry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Geometry with {} parts", self.parts.len())?;
+        for p in &self.parts
+        {
+            writeln!(f, "{}", p)?;
+        }
+     
+       
+        Ok(())
+    }
 }
 
 impl MeshElementType {
@@ -66,7 +90,6 @@ impl MeshElementType {
                     max = cn;
                 }
             }
-            println!("{}", max);
             Ok(Self {
                 n_nodes,
                 n_elements,
@@ -154,9 +177,7 @@ impl Part {
             }
         }
 
-        println!("Loaded Part {}", id);
-        println!("n_nodes {}", n_nodes);
-
+    
         while let Ok(element) = MeshElementType::read(reader, ignore_element_id) {
             current_part.elements.push(element);
         }
@@ -196,7 +217,7 @@ impl Geometry {
         let element_id_choice = reader.get_line_string()?;
         let ignore_element_id = false; //TODO find in element_id_choice: assign
 
-        println!("{} {}", node_id_choice, element_id_choice);
+        // println!("{} {}", node_id_choice, element_id_choice);
 
         let buf = reader.get_line_string()?;
         if buf.contains("extents") {
