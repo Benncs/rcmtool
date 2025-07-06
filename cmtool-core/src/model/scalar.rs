@@ -3,7 +3,7 @@ use std::ops::Index;
 use crate::{
     ensight_gold::{
         self,
-        types::{ElementsType, VolumeElementTypes},
+        types::ElementsType,
     },
     model::CMGeometry,
 };

@@ -1,4 +1,3 @@
-use std::{fmt::Debug, marker::PhantomData};
 mod collections;
 use collections::*;
 pub use collections::{cylindrical_index, AxisDescriptor, CylindricalAxis};
@@ -82,8 +81,8 @@ pub trait CompartmentMeshManip {
     fn cell_points(&self, cell_1d: usize) -> AxisPoints;
 }
 
-pub trait CompartmentMesh:  CompartmentMeshAccessor + CompartmentMeshManip {}
-impl<T: CompartmentMeshAccessor + CompartmentMeshManip> CompartmentMesh for T {}
+pub trait CompartmentMesh: Send+Sync+ CompartmentMeshAccessor + CompartmentMeshManip {}
+impl<T: CompartmentMeshAccessor + CompartmentMeshManip +Send+Sync+> CompartmentMesh for T {}
 
 pub struct CylindricalMarker;
 pub struct RectangularMarker;

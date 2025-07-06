@@ -107,7 +107,7 @@ impl Case {
                 let mut case = Case {
                     geometry_file_path: String::new(),
                     paths: vec![],
-                    root: root,
+                    root,
                 };
                 let fd = File::open(path)?;
                 let mut buffer = BufReader::new(fd);

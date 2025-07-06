@@ -8,16 +8,29 @@ use std::path::PathBuf;
 
 pub struct FileBuffer<const N: usize>([u8; N]);
 
-impl<const N: usize> FileBuffer<N> {
-    pub fn to_string(&self) -> String {
+// impl<const N: usize> FileBuffer<N> {
+//     pub fn to_string(&self) -> String {
+//         let trimmed = match self.0.iter().position(|&b| b == 0) {
+//             Some(pos) => &self.0[..pos],
+//             None => &self.0[..],
+//         };
+
+//         String::from_utf8_lossy(trimmed).into_owned()
+//     }
+// }
+
+impl<const N: usize> std::fmt::Display for FileBuffer<N>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let trimmed = match self.0.iter().position(|&b| b == 0) {
             Some(pos) => &self.0[..pos],
             None => &self.0[..],
         };
 
-        String::from_utf8_lossy(trimmed).into_owned()
+        writeln!(f,"{}",String::from_utf8_lossy(trimmed).into_owned())
     }
 }
+
 
 pub struct Reader<const N: usize> {
     filepath:PathBuf,
@@ -45,7 +58,7 @@ impl<const N: usize> Reader<N> {
         }
         Ok(())
     }
-    pub fn checK_eof(&mut self) -> std::io::Result<bool> {
+    pub fn check_eof(&mut self) -> std::io::Result<bool> {
         let buffer = self.reader.fill_buf()?; //Fill_buff does not consum, keep current file position
         if buffer.is_empty() {
             Ok(true) // EOF

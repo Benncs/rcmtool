@@ -1,6 +1,6 @@
 use crate::ensight_gold::types::{ElementsType, VolumeElementTypes};
 
-const number_of_axis: usize = 3;
+const NUMBER_OF_AXIS: usize = 3;
 
 #[inline(always)]
 pub fn linear_index_2d_matrix_row_major(i_coord: usize, i_axis: usize, n_col: usize) -> usize {
@@ -8,12 +8,12 @@ pub fn linear_index_2d_matrix_row_major(i_coord: usize, i_axis: usize, n_col: us
 }
 #[inline(always)]
 pub fn linear_index_coordinates_matrix(i_coord: usize, i_axis: usize) -> usize {
-    linear_index_2d_matrix_row_major(i_coord, i_axis, number_of_axis)
+    linear_index_2d_matrix_row_major(i_coord, i_axis, NUMBER_OF_AXIS)
 }
 
 
-pub type Coords3 = [f64; 3];
-pub type AxisPoints = [usize; 3];
+pub type Coords3 = [f64; NUMBER_OF_AXIS];
+pub type AxisPoints = [usize; NUMBER_OF_AXIS];
 
 
 

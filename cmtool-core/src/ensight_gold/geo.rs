@@ -1,6 +1,5 @@
 use crate::{
-    ensight_gold::{reader::EnsightGoldReader, types::ElementsType, Reader},
-    grid, utils,
+    ensight_gold::{reader::EnsightGoldReader, types::ElementsType, Reader}, utils,
 };
 use std::{
     io::{Error, ErrorKind},
@@ -241,7 +240,7 @@ impl Geometry {
             parts.push(part);
         }
 
-        if reader.checK_eof()? {
+        if reader.check_eof()? {
             Ok(Self { parts })
         } else {
             Err(std::io::Error::new(

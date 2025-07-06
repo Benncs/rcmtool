@@ -70,19 +70,19 @@ impl CMModel {
                 // let tmp = self.geometry
                 //     .volume_elements
                 //     .get_limit_cell_id(volume_element_global_id, k_c);
-
-                for k_vertex in 0..n_vertex {
+                for (k_vertex, local_vertex) in local_vertices.iter_mut().enumerate()
+                {
                     let vertex_global_id = self
                         .geometry
                         .volume_elements
                         .get_vertex_from_vol_global_id(volume_element_global_id, k_vertex);
-
-                    local_vertices[k_vertex] = self
+                    *local_vertex = self
                         .geometry
                         .vertices
                         .get_slice_xyz(vertex_global_id)
                         .to_owned();
                 }
+
                 let volume = compute_volume(&local_vertices, vtype).unwrap() / (ncid as f64);
                 v_tot += volume;
             }

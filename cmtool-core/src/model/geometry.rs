@@ -16,6 +16,8 @@ pub struct CMGeometry {
     grid: Option<Box<dyn CompartmentMesh>>,
 }
 
+
+
 //Mutable
 impl CMGeometry {
     fn fill_detail(&mut self, geometry: &Arc<ensight_gold::Geometry>) -> (Vec<usize>, Vec<usize>) {
@@ -112,7 +114,7 @@ impl CMGeometry {
                     vertices_id[vertex_global_id]
                 })
                 .collect();
-            
+
             self.volume_elements
                 .set_number_cid(vol_element_global_id, unique_cids.len());
 

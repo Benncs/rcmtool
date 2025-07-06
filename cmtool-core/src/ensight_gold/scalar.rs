@@ -3,7 +3,7 @@ use std::{io::ErrorKind, path::Path, str::FromStr, sync::Arc};
 use crate::ensight_gold::{
     geo::Geometry,
     reader::EnsightGoldReader,
-    types::{ElementsType, VolumeElementTypes},
+    types::ElementsType,
     Reader,
 };
 
@@ -86,7 +86,7 @@ impl ScalarField {
             }
             reader.ignore_line()?; //description
         }
-        if reader.checK_eof()? {
+        if reader.check_eof()? {
             Ok(scalar)
         } else {
             Err(std::io::Error::new(
@@ -133,7 +133,7 @@ impl ScalarField {
                 }
             }
         }
-        if reader.checK_eof()? {
+        if reader.check_eof()? {
             Ok(scalar)
         } else {
             Err(std::io::Error::new(
