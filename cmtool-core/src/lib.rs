@@ -74,6 +74,8 @@ impl CMHandle {
             eg_geometry,
             cm_geometry
         })
+
+        
     }
 
     pub fn dump_volume(&self) {
@@ -82,6 +84,11 @@ impl CMHandle {
         todo!()
     }
     pub fn dump_scalar(&self, path: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
+
+
+        // println!("{:?}",self.model.get_real_volume());
+
+        // println!("{}",self.model.get_real_volume().into_iter().sum::<f64>());
 
         let s = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path)?;
 

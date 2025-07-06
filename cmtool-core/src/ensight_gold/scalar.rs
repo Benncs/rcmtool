@@ -52,8 +52,8 @@ impl ScalarField {
         Self::read(&geometry, &mut reader)
     }
 
-    pub fn get_value(&self, id_part: usize, i_mesh_element_type: usize, mesh_cell: usize) -> f32 {
-        self.data[id_part][i_mesh_element_type][mesh_cell]
+    pub fn get_value(&self, i_part: usize, i_mesh_element_type: usize, mesh_cell: usize) -> f32 {
+        self.data[i_part][i_mesh_element_type][mesh_cell]
     }
 
     fn per_node_read(geometry: &Geometry, reader: &mut EnsightGoldReader) -> std::io::Result<Self> {

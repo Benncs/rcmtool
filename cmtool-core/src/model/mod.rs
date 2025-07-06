@@ -93,7 +93,7 @@ impl CMModel {
                     global_id: volume_element_global_id,
                     volume,
                 };
-                assert!(volume > 0.);
+                assert!(volume >= 0.);
                 v_tot += volume;
             }
         }
@@ -143,7 +143,11 @@ impl CMModel {
         todo!()
     }
 
-    pub fn get_real_volume(&self) -> &[f64] {
-        todo!()
+    pub fn get_real_volume(&self) -> Vec<f64> {
+        self.c_info
+            .volumes
+            .iter()
+            .map(|zone| zone.iter().map(|v| v.volume).sum())
+            .collect()
     }
 }

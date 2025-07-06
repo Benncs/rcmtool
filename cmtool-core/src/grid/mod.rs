@@ -20,14 +20,19 @@ pub enum NeighborDirection {
     ZPlus = 6,
 }
 
-impl NeighborDirection
-{
+impl NeighborDirection {
     pub const fn is_positive(self) -> bool {
-        matches!(self, NeighborDirection::XPlus | NeighborDirection::YPlus | NeighborDirection::ZPlus)
+        matches!(
+            self,
+            NeighborDirection::XPlus | NeighborDirection::YPlus | NeighborDirection::ZPlus
+        )
     }
 
     pub const fn is_negative(self) -> bool {
-        matches!(self, NeighborDirection::XMinus | NeighborDirection::YMinus | NeighborDirection::ZMinus)
+        matches!(
+            self,
+            NeighborDirection::XMinus | NeighborDirection::YMinus | NeighborDirection::ZMinus
+        )
     }
 
     pub fn ordered_pair<T: Copy>(self, a: T, b: T) -> (T, T) {
@@ -81,12 +86,11 @@ pub trait CompartmentMeshManip {
     fn cell_points(&self, cell_1d: usize) -> AxisPoints;
 }
 
-pub trait CompartmentMesh: Send+Sync+ CompartmentMeshAccessor + CompartmentMeshManip {}
-impl<T: CompartmentMeshAccessor + CompartmentMeshManip +Send+Sync+> CompartmentMesh for T {}
+pub trait CompartmentMesh: Send + Sync + CompartmentMeshAccessor + CompartmentMeshManip {}
+impl<T: CompartmentMeshAccessor + CompartmentMeshManip + Send + Sync> CompartmentMesh for T {}
 
 pub struct CylindricalMarker;
 pub struct RectangularMarker;
-
 
 pub struct BaseCompartmentMesh<T> {
     axes: [CoordAxis; 3],
@@ -94,12 +98,13 @@ pub struct BaseCompartmentMesh<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T> BaseCompartmentMesh<T>
-{
-    fn new(descriptors:[AxisDescriptor;3])->Self
-    {
-        let axes: [CoordAxis; 3] = descriptors.map(CoordAxis::from); 
-        let n_cells = axes.iter().map(|ax| ax.descriptor.n_range).product::<usize>();
+impl<T> BaseCompartmentMesh<T> {
+    fn new(descriptors: [AxisDescriptor; 3]) -> Self {
+        let axes: [CoordAxis; 3] = descriptors.map(CoordAxis::from);
+        let n_cells = axes
+            .iter()
+            .map(|ax| ax.descriptor.n_range)
+            .product::<usize>();
         Self {
             axes,
             n_cells,
@@ -140,7 +145,6 @@ impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
 
 pub type MeshCylindrical = BaseCompartmentMesh<CylindricalMarker>;
 pub type MeshRectangular = BaseCompartmentMesh<RectangularMarker>;
-
 
 impl CompartmentMeshManip for MeshCylindrical {
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
@@ -216,7 +220,12 @@ impl CompartmentMeshManip for MeshCylindrical {
             cumulative_product *= axe.descriptor.n_range;
         }
 
-        
+        // for i in (0..self.axes.len()).rev() {
+        //     let axe = &self.axes[i];
+        //     let current_index = axe.index_from_edge_value(coords[i])?;
+        //     mesh_id += current_index * cumulative_product;
+        //     cumulative_product *= axe.descriptor.n_range;
+        // }
 
         Some(mesh_id)
     }
@@ -240,10 +249,12 @@ impl CompartmentMeshManip for MeshCylindrical {
     }
 }
 
-pub fn get_mesh(meshtype: MeshType,ax_descriptor:[AxisDescriptor;3]) -> Box<dyn CompartmentMesh> {
+pub fn get_mesh(
+    meshtype: MeshType,
+    ax_descriptor: [AxisDescriptor; 3],
+) -> Box<dyn CompartmentMesh> {
     match meshtype {
         MeshType::Cylindrical => Box::new(MeshCylindrical::new(ax_descriptor)),
         MeshType::MeshRectangular => unimplemented!("Manip for Rectangular impl"),
     }
 }
-

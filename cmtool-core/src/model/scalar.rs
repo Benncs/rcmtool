@@ -22,7 +22,7 @@ impl Scalar {
             vec![0.; geometry.volume_elements.n_element()];
         // for k_part
 
-        for (k_part, part) in eg_geometry.parts.iter().enumerate() {
+        for (i_part, part) in eg_geometry.parts.iter().enumerate() {
             for (i_e, element) in part.elements.iter().enumerate() {
                 match element.etype {
                     ElementsType::VolumeElementType(vetype) => {
@@ -32,12 +32,12 @@ impl Scalar {
 
                         for volume_element_id in 0..element.n_elements {
                             let volume_element_global_id = geometry.volume_elements.get_global_id(
-                                k_part,
+                                i_part,
                                 element_index,
                                 volume_element_id,
                             );
                             value_in_vo[volume_element_global_id] =
-                                eg_scalar.get_value(k_part, i_e, volume_element_id).into();
+                                eg_scalar.get_value(i_part, i_e, volume_element_id).into();
                         }
                     }
                     _ => {
