@@ -33,6 +33,8 @@ pub struct Geometry {
 }
 
 impl MeshElementType {
+    
+
     pub fn read(reader: &mut EnsightGoldReader, ignore_element_id: bool) -> std::io::Result<Self> {
         let element_type = reader.get_line_string()?;
 
@@ -176,6 +178,10 @@ impl Geometry {
     pub fn get_part_by_id(&self, id: u32) -> Option<&Part> {
         self.parts.iter().find(|&p| p.id == id)
     }
+
+    // pub fn get_part_position(&self, part:&Part) -> Option<usize> {
+    //     self.parts.iter().position(|p| p.id == part.id)
+    // }
 
     pub fn read(reader: &mut EnsightGoldReader) -> std::io::Result<Self> {
         //SKIP

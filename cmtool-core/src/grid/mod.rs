@@ -195,6 +195,9 @@ impl CompartmentMeshManip for MeshCylindrical {
             mesh_id += current_index * cumulative_product;
             cumulative_product *= axe.descriptor.n_range;
         }
+
+        
+
         Some(mesh_id)
     }
 

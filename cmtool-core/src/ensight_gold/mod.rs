@@ -17,7 +17,7 @@ pub use geo::Part;
 pub struct VariableInfo {
     var_type: String,
     name: String,
-    filepath: String,
+    pub filepath: String,
 }
 
 impl VariableInfo {

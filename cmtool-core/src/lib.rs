@@ -38,6 +38,8 @@ pub enum CoreError {
 pub struct CMHandle {
     model: model::CMModel,
     root_result: String,
+    eg_geometry: Arc<ensight_gold::Geometry>,
+    cm_geometry: Arc<CMGeometry>,
 }
 
 impl CMHandle {
@@ -61,14 +63,16 @@ impl CMHandle {
 
         println!("{:?}", eg_geometry);
 
-        let cm_geometry = CMGeometry::init(n_div, eg_geometry.clone(),grid::MeshType::Cylindrical);
+        let cm_geometry = Arc::new(CMGeometry::init(n_div, eg_geometry.clone(), grid::MeshType::Cylindrical));
 
         // let fullpath = format!("{}/wall_cart.scl1", root);
         // let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))?;
 
         Ok(Self {
-            model: CMModel::init(cm_geometry),
+            model: CMModel::init(cm_geometry.clone()),
             root_result: String::from("./test"),
+            eg_geometry,
+            cm_geometry
         })
     }
 
@@ -77,14 +81,16 @@ impl CMHandle {
 
         todo!()
     }
-    pub fn dump_scalar(&self) -> Result<(), CoreError> {
+    pub fn dump_scalar(&self, path: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
         let n_zone = 10;
 
-        let scalar = Scalar::new();
+        let s = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path)?;
+
+        let scalar = Scalar::new(s,&self.cm_geometry,&self.eg_geometry);
+        
         let scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
 
-        let path = "todo!()";
-        scalar_data.write_raw(path)?;
+        scalar_data.write_raw("test.scraw")?;
 
         Ok(())
     }

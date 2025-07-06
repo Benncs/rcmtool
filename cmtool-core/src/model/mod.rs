@@ -19,7 +19,7 @@ use data::*;
 mod geometry;
 use geometry::*;
 pub struct CMModel {
-    geometry: CMGeometry,
+    geometry: Arc<CMGeometry>,
 }
 
 pub use geometry::CMGeometry;
@@ -27,7 +27,7 @@ pub use geometry::CMGeometry;
 impl CMModel {}
 
 impl CMModel {
-    pub fn init(geometry: CMGeometry) -> Self {
+    pub fn init(geometry: Arc<CMGeometry>) -> Self {
         Self { geometry }
     }
 

@@ -5,9 +5,10 @@ use crate::{ensight_gold::{self, types::ElementsType}, grid::{cylindrical_index,
 
 pub struct CMGeometry {
     n_zones: usize,
-    vertices: VerticesData,
-    volume_elements: VolumeElementData,
+    pub vertices: VerticesData,
+    pub volume_elements: VolumeElementData,
     grid:Option<Box<dyn CompartmentMesh>>,
+  
 }
 
 impl CMGeometry {
@@ -25,10 +26,12 @@ impl CMGeometry {
 
             for element in &part.elements {
                 match element.etype {
-                    ElementsType::VolumeElementType(_) => {
-                        let n_nodes = element.etype.node_count() as usize;
+                    ElementsType::VolumeElementType(e) => {
+                        // let n_nodes = element.etype.node_count() as usize;
+
+                        let index_element = e.to_index();
                         n_volume_elements_total += element.n_elements;
-                        velem_detail[(i * n_number_type) + n_nodes] += element.n_elements;
+                        velem_detail[(i * n_number_type) + index_element] += element.n_elements;
                     }
                     e => {
                         // panic!("TODO Not a volume element {:?}",e);
@@ -83,12 +86,14 @@ impl CMGeometry {
     fn detect_compartment(&mut self, n_div: [usize; 3], mesh_type: MeshType) {
         self.init_cm_grid(n_div, mesh_type);
 
-        // let vertices_id: Vec<_> = (0..self.vertices.n_vertex())
-        //     .map(|global_id| {
-        //         grid.cell_from_coordinates(self.vertices.get_slice_xyz(global_id))
-        //             .unwrap()
-        //     })
-        //     .collect();
+        let grid = self.grid.as_ref().unwrap();
+
+        let vertices_id: Vec<_> = (0..self.vertices.n_vertex())
+            .map(|global_id| {
+                grid.cell_from_coordinates(self.vertices.get_slice_xyz(global_id))
+                    .unwrap()
+            })
+            .collect();
 
         for vol_element_global_id in 0..self.volume_elements.n_element() {
             let n_vertex = self
@@ -98,7 +103,8 @@ impl CMGeometry {
             let unique_cids: BTreeSet<_> = (0..n_vertex)
                 .map(|k_vertex| {
                     let vertex_global_id = self.volume_elements.get_vertex_from_vol_global_id(vol_element_global_id,k_vertex);
-                    self.vertices.ve_id[vertex_global_id]
+                    // self.vertices.ve_id[vertex_global_id]
+                    vertices_id[vertex_global_id]
                 })
                 .collect();
             self.volume_elements.set_number_cid(vol_element_global_id,unique_cids.len());

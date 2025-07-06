@@ -22,11 +22,12 @@ pub struct VolumeElementData {
 
 impl VolumeElementData {
     pub fn get_vertex_per_element(&self, global_id: usize) -> usize {
-        if self.vtype.len() <= global_id {
-            return 0;
-        } else {
-            self.vtype[global_id].to_index()
-        }
+        // if self.vtype.len() <= global_id {
+        //     return 0;
+        // } else {
+        //     self.vtype[global_id].to_index()
+        // }
+        ElementsType::VolumeElementType(self.vtype[global_id]).node_count().try_into().unwrap()
     }
 
     pub fn set_number_cid(&mut self, global_id: usize, n_cid: usize) {
@@ -36,9 +37,14 @@ impl VolumeElementData {
     pub fn resize(&mut self, n_part: usize, n_velement: usize, velement_detail: &[usize]) {
         self.global_id
             .resize(n_part * VolumeElementTypes::number_of_types(), Vec::new());
-        for i in 0..self.global_id.len() {
-            self.global_id[i].resize(velement_detail[i], 0);
+
+        for (vec, &new_len) in self.global_id.iter_mut().zip(velement_detail.iter()) {
+            vec.resize(new_len, 0);
         }
+        // for i in 0..self.global_id.len() {
+        //     self.global_id[i].resize(velement_detail[i], 0);
+        // }
+
 
         self.part_global_id.resize(n_velement, 0);
         // self.vtype.resize(n_velement,VolumeElementTypes::Hexa8);
@@ -62,8 +68,25 @@ impl VolumeElementData {
         self.ids.len()
     }
 
-    pub fn set_global_id(&mut self, i_part: usize, element_index: usize, ve_id: usize, val: usize) {
-        self.global_id[VolumeElementTypes::number_of_types() * i_part + element_index][ve_id] = val;
+    pub fn set_global_id(
+        &mut self,
+        i_part: usize,
+        element_index: usize,
+        volume_element_id: usize,
+        val: usize,
+    ) {
+        self.global_id[VolumeElementTypes::number_of_types() * i_part + element_index]
+            [volume_element_id] = val;
+    }
+
+    pub fn get_global_id(
+        &self,
+        i_part: usize,
+        element_index: usize,
+        volume_element_id: usize,
+    ) -> usize {
+        self.global_id[VolumeElementTypes::number_of_types() * i_part + element_index]
+            [volume_element_id]
     }
 
     pub fn get_vertex_from_vol_global_id(
@@ -71,7 +94,7 @@ impl VolumeElementData {
         vol_element_global_id: usize,
         k_vertex: usize,
     ) -> usize {
-        vol_element_global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex
+        self.vertices[vol_element_global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex]
     }
 
     pub fn fill_from_part(
@@ -81,20 +104,21 @@ impl VolumeElementData {
         vertices: &VerticesData,
         ve_counter: &mut usize,
     ) {
-        let n_number_type = VolumeElementTypes::number_of_types();
+        const N_NUMBER_TYPE: usize = VolumeElementTypes::number_of_types();
         let (i_part, part) = part_it;
-        for (i, element) in part.elements.iter().enumerate() {
+        for element in part.elements.iter() {
             match element.etype {
                 ElementsType::VolumeElementType(var) => {
                     let n_vertex = element.etype.node_count() as usize;
-                    let n_volume_element = velem_detail[(i * n_number_type) + var.to_index()];
+                    let n_volume_element = velem_detail[(i_part * N_NUMBER_TYPE) + var.to_index()];
 
                     let current_vertex_vegid = &vertices.ve_gid[i_part];
 
                     for ve_id in 0..n_volume_element {
                         let ve_global_id = *ve_counter;
+                        *ve_counter += 1;
 
-                        self.set_global_id(i_part, n_vertex, ve_id, ve_global_id);
+                        self.set_global_id(i_part, var.to_index(), ve_id, ve_global_id);
 
                         self.part_global_id[ve_global_id] = i_part;
                         // self.vtype[ve_global_id] = var;
@@ -113,7 +137,7 @@ impl VolumeElementData {
                     continue;
                 }
             }
-            *ve_counter += 1;
+            
         }
     }
 }

@@ -23,7 +23,7 @@ pub enum VolumeElementTypes {
 //"tetra4", "tetra10", "pyramid5", "pyramid13", "penta6", "penta15", "hexa8", "hexa20"
 
 impl VolumeElementTypes {
-    pub fn number_of_types() -> usize {
+    pub const fn number_of_types() -> usize {
         return 8; //G and non G type count for 1
     }
 
