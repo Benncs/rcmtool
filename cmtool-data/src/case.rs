@@ -24,6 +24,12 @@ impl CMCase {
         let rel = self.paths.get(&stype)?;
         Some(Path::new(root).join(rel).to_str()?.to_string())
     }
+    pub fn prepend_path(mut self, prep: &str) -> Self {
+        for (_key, path) in self.paths.iter_mut() {
+            *path = format!("{}/{}", prep, path);
+        }
+        self
+    }
 }
 
 pub trait CMCaseReader {

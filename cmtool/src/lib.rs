@@ -286,14 +286,8 @@ impl Generator {
         let mut case = CMCase::default();
         // case.n_div = n_div;
 
-        let liquid_connection = match connections {
-            Some(ref c) => Some(c[0].clone()),
-            None => None,
-        };
-        let gas_connection = match connections {
-            Some(ref c) => Some(c[1].clone()),
-            None => None,
-        };
+        let liquid_connection = connections.as_ref().map(|c| c[0].clone());
+        let gas_connection = connections.as_ref().map(|c| c[1].clone());
 
         let phase = Self::merge_phase(liquid_phase, liquid_connection)?;
         Self::write_phase(&path, &mut case, phase)?;
@@ -304,8 +298,7 @@ impl Generator {
         }
 
         CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
-        let _ =
-            cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)));
+        cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)))?;
         Ok(())
     }
 
@@ -395,14 +388,8 @@ impl Generator {
             })
             .collect();
 
-        let liquid_connection = match connections {
-            Some(ref c) => Some(c[0].clone()),
-            None => None,
-        };
-        let gas_connection = match connections {
-            Some(ref c) => Some(c[1].clone()),
-            None => None,
-        };
+        let liquid_connection = connections.as_ref().map(|c| c[0].clone());
+        let gas_connection = connections.as_ref().map(|c| c[1].clone());
 
         let phase = Self::merge_phase(liquid_phases, liquid_connection)?;
         Self::write_phase(&path, &mut case, phase)?;
