@@ -124,6 +124,18 @@ impl RawDataScalar {
     }
 }
 
+impl From<Vec<f64>> for RawDataScalar
+{
+    fn from(value: Vec<f64>) -> Self {
+        Self {
+            header: ScalarFileHeader {
+                n_zone: value.len().try_into().unwrap(),
+            },
+            values: value.into_iter().map(|i| i.into()).collect(),
+        }
+    }
+}
+
 impl RawDataFlux {
     pub fn new(n_zone: usize, n_fluxes: usize) -> Self {
         Self {

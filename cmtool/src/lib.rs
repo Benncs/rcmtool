@@ -152,13 +152,18 @@ impl Generator {
 
         let cp = if gas { PhaseCM::Gas } else { PhaseCM::Liquid };
         let mut phase = RawPhase::new(n_compartment, n_flow, cp);
+        
+        //n_flow != n_compartment, need to set volume separately 
+        phase.volume = RawDataScalar::from(vec![compartment_volume;n_compartment]);//Scalar values are not preallo
 
+
+
+        
         for (current_index, flow) in phase.flow.fluxes.iter_mut().enumerate() {
             flow.id_source = current_index as u32;
             flow.id_target = (current_index + 1) as u32;
             flow.flux_source_target = flow_source_target;
             flow.flux_target_source = flow_target_source;
-            phase.volume.values.push(compartment_volume.into());
         }
 
         if let Some(s) = dest {
