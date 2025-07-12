@@ -210,7 +210,8 @@ impl CMHandle {
         let vector = Vector::new(v, &self.cm_geometry, &self.eg_geometry);
         let flow_data = self.model.export_flux_through_limits(vector)?;
 
-                todo!("dump vector");
+        flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
+        Ok(())
 
     }
 

@@ -1,5 +1,5 @@
 mod collections;
-use std::{default, f64};
+use std::{cell, default, f64};
 
 use collections::*;
 pub use collections::{cylindrical_index, AxisDescriptor, CylindricalAxis};
@@ -161,6 +161,9 @@ pub type MeshRectangular = BaseCompartmentMesh<RectangularMarker>;
 
 impl CompartmentMeshManip for MeshCylindrical {
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
+
+      
+
         let indices_points_cell1 = self.cell_points(cell1_id);
         let indices_points_cell2 = self.cell_points(cell2_id);
 
@@ -169,6 +172,7 @@ impl CompartmentMeshManip for MeshCylindrical {
             .iter()
             .zip(indices_points_cell2)
             .map(|(i_p_c_1, i_p_c_2)| {
+                
                 let di = *i_p_c_1 as i64 - i_p_c_2 as i64;
                 if i64::abs(di) > i64::abs(max_diff) {
                     max_diff = di;
@@ -258,6 +262,14 @@ impl CompartmentMeshManip for MeshCylindrical {
             *current_point = p_coeff_up % array_size;
             p_coeff_up /= array_size;
         }
+
+        // for i in (0..self.axes.len()).rev() {
+        //     let axe = &self.axes[i];
+        //     let array_size = axe.descriptor.n_range;
+        //     axis_points[i] = p_coeff_up % array_size;
+        //     p_coeff_up /= array_size;
+        // }
+
 
         axis_points
     }

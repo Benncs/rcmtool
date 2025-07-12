@@ -8,7 +8,8 @@ use crate::{
     model::{
         data::{VerticesData, VolumeElementData},
         CountVolumeElement,
-    }};
+    },
+};
 
 pub struct CMGeometry {
     pub vertices: VerticesData,
@@ -16,8 +17,6 @@ pub struct CMGeometry {
     grid: Option<Box<dyn CompartmentMesh>>,
     pub mesh_type: crate::grid::MeshType,
 }
-
-
 
 //Mutable
 impl CMGeometry {
@@ -131,17 +130,17 @@ impl CMGeometry {
     pub fn n_zone(&self) -> usize {
         self.grid.as_ref().unwrap().number_cell()
     }
-    
 
     pub fn get_count_volume_element(&self) -> CountVolumeElement {
         let mut count = CountVolumeElement::new(self.n_zone());
+        let mut tmp_constructor_kelem = Vec::new();
         for vol_element_global_id in 0..self.volume_elements.n_element() {
             let interface_cid_0 = self
                 .volume_elements
                 .get_list_compartment_id(vol_element_global_id, 0);
-            
 
             for k_vertex in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
+                tmp_constructor_kelem.push(vol_element_global_id);
                 let interface_cid_k = self
                     .volume_elements
                     .get_list_compartment_id(vol_element_global_id, k_vertex);
@@ -155,11 +154,21 @@ impl CMGeometry {
                         .unwrap()
                         .are_cell_neighbor(interface_cid_0, interface_cid_k)
                     {
-                        NeighborDirection::NotNeighbors => continue,
+                        NeighborDirection::NotNeighbors => {
+                            //NOP                            
+                        },
                         neighbors => {
                             let (id1, id2) =
                                 neighbors.ordered_pair(interface_cid_0, interface_cid_k);
+
                             count.incr_interface(id1, id2);
+                            
+                            count.set_kelem(
+                                interface_cid_0,
+                                interface_cid_k,
+                                &tmp_constructor_kelem,
+                            );
+                            tmp_constructor_kelem.clear();
                         }
                     }
                 }
@@ -177,7 +186,7 @@ impl CMGeometry {
             vertices: Default::default(),
             volume_elements: Default::default(),
             grid: None,
-            mesh_type
+            mesh_type,
         };
 
         let (vertex_detail, velem_detail) = cm_geometry.fill_detail(&geometry);
