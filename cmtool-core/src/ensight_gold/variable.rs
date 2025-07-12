@@ -36,7 +36,10 @@ impl<T:VarTypeReader> PerElementVariable<T> {
         
         }
     }
-
+    pub fn get_name(&self)->&str
+    {
+        &self.name
+    }
     pub fn init(geometry: Arc<Geometry>, path: impl AsRef<Path>) -> std::io::Result<Self> {
         let mut reader = Reader::new(path)?;
         Self::read(&geometry, &mut reader)

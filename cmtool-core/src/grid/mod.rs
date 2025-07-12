@@ -1,17 +1,18 @@
 mod collections;
-use std::f64;
+use std::{default, f64};
 
 use collections::*;
 pub use collections::{cylindrical_index, AxisDescriptor, CylindricalAxis};
 
 use crate::utils::{AxisPoints, Coords3, Coords3Ext};
 
-#[derive(PartialEq,Clone, Copy)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum MeshType {
     Cylindrical,
     MeshRectangular,
 }
 
+#[derive(Debug)]
 pub enum NeighborDirection {
     NotNeighbors = 0,
     XMinus = 1,
@@ -42,6 +43,15 @@ impl NeighborDirection {
             (a, b)
         } else {
             (b, a)
+        }
+    }
+
+    pub fn to_coord_index(&self) -> Option<usize> {
+        match self {
+            Self::XMinus | Self::XPlus => Some(0),
+            Self::YMinus | Self::YPlus => Some(1),
+            Self::ZMinus | Self::ZPlus => Some(2),
+            Self::NotNeighbors => None,
         }
     }
 }
@@ -100,14 +110,9 @@ pub struct BaseCompartmentMesh<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-
-
 impl<T> BaseCompartmentMesh<T> {
     fn new(descriptors: [AxisDescriptor; 3]) -> Self {
         let axes: [CoordAxis; 3] = descriptors.map(CoordAxis::from);
-
-       
-        
 
         let n_cells = axes
             .iter()
@@ -180,6 +185,14 @@ impl CompartmentMeshManip for MeshCylindrical {
         let theta_cell2 = indices_points_cell2[cylindrical_index(CylindricalAxis::Theta)];
         let r_cell1 = indices_points_cell1[cylindrical_index(CylindricalAxis::R)];
         let r_cell2 = indices_points_cell2[cylindrical_index(CylindricalAxis::R)];
+        
+        //TODO impove this, namely order or condiions
+        if max_diff.abs() > 1 {
+            return NeighborDirection::NotNeighbors;
+        }
+        if diff.iter().filter(|&&i| i.abs() > 1).count() > 1 {
+            return NeighborDirection::NotNeighbors;
+        }
 
         if theta_cell1 == theta_cell2 {
             if r_cell1 == 0 && r_cell2 == rmax {
@@ -188,14 +201,6 @@ impl CompartmentMeshManip for MeshCylindrical {
             if r_cell1 == rmax && r_cell2 == 0 {
                 return NeighborDirection::YPlus;
             }
-        }
-
-        if max_diff.abs() > 1 {
-            return NeighborDirection::NotNeighbors;
-        }
-
-        if diff.iter().filter(|&&i| i.abs() > 1).count() > 1 {
-            return NeighborDirection::NotNeighbors;
         }
 
         for (i, cd) in diff.iter().enumerate() {
@@ -264,11 +269,11 @@ pub fn get_mesh(
 ) -> Box<dyn CompartmentMesh> {
     match meshtype {
         MeshType::Cylindrical => {
-            ax_descriptor[0].min_range= 0.;
-            ax_descriptor[1].min_range= - std::f64::consts::PI;
-            ax_descriptor[1].max_range= std::f64::consts::PI;
+            ax_descriptor[0].min_range = 0.;
+            ax_descriptor[1].min_range = -std::f64::consts::PI;
+            ax_descriptor[1].max_range = std::f64::consts::PI;
             Box::new(MeshCylindrical::new(ax_descriptor))
-        },
+        }
         MeshType::MeshRectangular => unimplemented!("Manip for Rectangular impl"),
     }
 }

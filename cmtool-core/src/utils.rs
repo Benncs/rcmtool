@@ -83,6 +83,110 @@ impl Coords3Ext for Coords3 {
     }
 }
 
+fn tetra_area(
+    a: Coords3,
+    b: Coords3,
+    c: Coords3,
+    d: Coords3,
+    value_on_ax: f64,
+    axe_index: usize,
+) -> f64 {
+    let mut intersections = Vec::new();
+
+    // Add vertices that lie exactly on the plane
+    for &pt in &[a, b, c, d] {
+        if (pt[axe_index] - value_on_ax).abs() < 1e-10 {
+            intersections.push(pt);
+        }
+    }
+
+    // All tetrahedron edges
+    let edges = [(a, b), (a, c), (a, d), (b, c), (b, d), (c, d)];
+
+    for (start, end) in edges.iter() {
+        if let Some(intersect) = intersect_line_plane(*start, *end, axe_index, value_on_ax) {
+            intersections.push(intersect);
+        }
+    }
+
+    if intersections.len() < 3 {
+        return 0.0; // Not enough points to form a polygon
+    }
+
+    // Project and sort the intersection polygon
+    let projected = project_and_sort_polygon(&intersections, axe_index);
+
+    calculate_polygon_area(&projected)
+}
+
+fn intersect_line_plane(
+    a: Coords3,
+    b: Coords3,
+    axe_index: usize,
+    value_on_ax: f64,
+) -> Option<Coords3> {
+    let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    let denom = ab[axe_index];
+
+    if denom.abs() < 1e-10 {
+        return None; // Parallel to plane
+    }
+
+    let t = (value_on_ax - a[axe_index]) / denom;
+
+    if (0.0..=1.0).contains(&t) {
+        Some([a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]])
+    } else {
+        None
+    }
+}
+
+/// Project 3D points onto the slicing plane and sort them counter-clockwise
+fn project_and_sort_polygon(points: &[Coords3], axe_index: usize) -> Vec<[f64; 2]> {
+    // Determine which 2D plane to project onto
+    let (i1, i2) = match axe_index {
+        0 => (1, 2), // yz-plane
+        1 => (0, 2), // xz-plane
+        2 => (0, 1), // xy-plane
+        _ => panic!("Invalid axis index"),
+    };
+
+    let mut projected: Vec<[f64; 2]> = points.iter().map(|p| [p[i1], p[i2]]).collect();
+
+    // Sort the projected points counter-clockwise
+    let centroid = {
+        let (mut sx, mut sy) = (0.0, 0.0);
+        for p in &projected {
+            sx += p[0];
+            sy += p[1];
+        }
+        [sx / projected.len() as f64, sy / projected.len() as f64]
+    };
+
+    projected.sort_by(|a, b| {
+        let angle_a = (a[1] - centroid[1]).atan2(a[0] - centroid[0]);
+        let angle_b = (b[1] - centroid[1]).atan2(b[0] - centroid[0]);
+        angle_a.partial_cmp(&angle_b).unwrap()
+    });
+
+    projected
+}
+
+fn calculate_polygon_area(points: &[[f64; 2]]) -> f64 {
+    if points.len() < 3 {
+        return 0.0;
+    }
+
+    let mut area = 0.0;
+    let n = points.len();
+    for i in 0..n {
+        let j = (i + 1) % n;
+        area += points[i][0] * points[j][1];
+        area -= points[j][0] * points[i][1];
+    }
+    area.abs() / 2.0
+}
+
 /// Computes the signed volume of a tetrahedron defined by four 3D points.
 ///
 /// # Arguments
@@ -143,6 +247,31 @@ impl VolumeElementTypes {
     }
 }
 
+//Local vertices in xyz coordinates is mandatory
+pub fn compute_intersection_area(
+    local_vertices: &[Coords3],
+    elem_type: VolumeElementTypes,
+    value_on_ax: f64,
+    axe_index: usize,
+) -> Option<f64> {
+    let tetra_indices = elem_type.tetra_subdivisions();
+    if local_vertices.len() != ElementsType::VolumeElementType(elem_type).node_count() as usize {
+        return None;
+    }
+    let area = tetra_indices
+        .iter()
+        .map(|&[i0, i1, i2, i3]| {
+            let a = local_vertices[i0];
+            let b = local_vertices[i1];
+            let c = local_vertices[i2];
+            let d = local_vertices[i3];
+            tetra_area(a, b, c, d, value_on_ax, axe_index)
+        })
+        .sum();
+
+    Some(area)
+}
+
 /// Computes the total volume of a given volume element by summing the
 /// volumes of its tetrahedral subdivisions.
 ///
@@ -180,6 +309,44 @@ pub fn compute_volume(local_vertices: &[Coords3], elem_type: VolumeElementTypes)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_tetrahedron_intersection_area() {
+        // Define a simple tetrahedron with one vertex on each axis
+        let a = [0.0, 0.0, 0.0];
+        let b = [1.0, 0.0, 0.0];
+        let c = [0.0, 1.0, 0.0];
+        let d = [0.0, 0.0, 1.0];
+
+        // Define the slicing plane z = 0.5
+        let value_on_ax = 0.5;
+        let axe_index = 2; // z-axis
+
+        // Calculate the intersection area
+        let area = tetra_area(a, b, c, d, value_on_ax, axe_index);
+
+        // Manually compute the triangle formed by slicing at z = 0.5
+        // The intersection points are:
+        // - a to d: [0, 0, 0] to [0, 0, 1] → [0, 0, 0.5]
+        // - b to d: [1, 0, 0] to [0, 0, 1] → [0.5, 0, 0.5]
+        // - c to d: [0, 1, 0] to [0, 0, 1] → [0, 0.5, 0.5]
+        //
+        // Projecting these onto the XY plane:
+        // [0.0, 0.0], [0.5, 0.0], [0.0, 0.5]
+        //
+        // Shoelace formula:
+        // Area = 0.5 * |(x1*y2 + x2*y3 + x3*y1) - (x2*y1 + x3*y2 + x1*y3)|
+        // Area = 0.5 * |(0*0 + 0.5*0.5 + 0*0) - (0.5*0 + 0*0.5 + 0*0.5)| = 0.125
+
+        let expected_area = 0.125;
+
+        assert!(
+            (area - expected_area).abs() < 1e-10,
+            "Expected area {}, got {}",
+            expected_area,
+            area
+        );
+    }
 
     #[test]
     fn unit_tetrahedron_volume() {

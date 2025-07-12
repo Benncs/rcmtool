@@ -10,6 +10,7 @@ use crate::{
 
 pub struct Scalar {
     value_in_vo: Vec<cmtool_data::ScalarValueType>,
+    pub name:String,
 }
 
 impl Scalar {
@@ -75,7 +76,7 @@ impl Scalar {
         //     }
         // }
 
-        Self { value_in_vo }
+        Self { value_in_vo ,name:eg_scalar.get_name().to_string()}
     }
 }
 

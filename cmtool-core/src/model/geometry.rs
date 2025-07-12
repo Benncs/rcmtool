@@ -131,6 +131,7 @@ impl CMGeometry {
     pub fn n_zone(&self) -> usize {
         self.grid.as_ref().unwrap().number_cell()
     }
+    
 
     pub fn get_count_volume_element(&self) -> CountVolumeElement {
         let mut count = CountVolumeElement::new(self.n_zone());
@@ -164,7 +165,6 @@ impl CMGeometry {
                 }
             }
         }
-
         count
     }
 

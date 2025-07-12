@@ -11,11 +11,22 @@ pub enum CylindricalAxis {
     Z = 2,
 }
 
+#[inline(always)]
 pub const fn cylindrical_index(axis: CylindricalAxis) -> usize {
     match axis {
         CylindricalAxis::R => 0,
         CylindricalAxis::Theta => 1,
         CylindricalAxis::Z => 2,
+    }
+}
+
+#[inline(always)]
+pub const fn index_to_oriented(axis: usize) -> OrientedAxis {
+    match axis {
+        0 => OrientedAxis::I,
+        1 => OrientedAxis::J,
+        2 => OrientedAxis::K,
+        _ => panic!("index_to_oriented needs index between 0 and 3")
     }
 }
 

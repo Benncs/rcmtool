@@ -30,7 +30,6 @@ fn main() {
     )
     .unwrap();
     
-    println!("{:?}",stem);
     let root_dir = args.out.unwrap_or(format!("{}/../out/", env!("CARGO_MANIFEST_DIR")));
     
     std::fs::create_dir_all(&root_dir).unwrap();

@@ -1,9 +1,9 @@
 use crate::{
     ensight_gold::types::VolumeElementTypes,
     grid::MeshType,
-    model::compartments::{
-        AInterfacesInfo, CompartmentInfo, CountVolumeElement, ElementVolumeInfo, InterfaceArea,
-        InterfaceFlow, InterfaceInfo,
+    model::{
+        compartments::{CompartmentInfo, CountVolumeElement, ElementVolumeInfo},
+        interfaces::{AInterfacesInfo, InterfaceFlow, InterfaceInfo},
     },
     utils::{self, compute_volume},
     CoreError,
@@ -13,9 +13,9 @@ mod data;
 use cmtool_data::{RawDataFlux, RawDataScalar};
 mod compartments;
 mod geometry;
+mod interfaces;
 mod scalar;
 mod vectors;
-
 pub use scalar::Scalar;
 pub use vectors::Vector;
 
@@ -41,7 +41,7 @@ impl CMModel {
                 geometry.n_zone()
             )
         }
-
+        let interface_count_raw = volume_element_count.at_interface.clone();
         // let n_interfaces = volume_element_count.n_interfaces();
 
         let (c_info, interfaces) = volume_element_count.into_reduce();
@@ -51,77 +51,11 @@ impl CMModel {
             interfaces,
         };
 
-        model.fill_c_info();
+        model.c_info.fill(&model.geometry);
+
+        model.interfaces.fill(&model.geometry, &interface_count_raw);
 
         model
-    }
-
-    fn fill_interfaces(&mut self) {
-        let geometry = self.geometry.as_ref();
-        let n_zones = geometry.n_zone();
-        let mut interface_counter = 0;
-        for source_id in 0..n_zones {
-            for target_id in 0..n_zones {
-                // let index = source_id*n_zones+target_id;
-                let interface_id = interface_counter;
-                interface_counter += 1;
-                self.interfaces.info[interface_id] = InterfaceInfo {
-                    source_id,
-                    target_id,
-                    global_id: interface_id,
-                };
-            }
-        }
-    }
-
-    fn fill_c_info(&mut self) {
-        let mut v_tot = 0.;
-        let mut local_vertices = Vec::new();
-
-        let geometry = self.geometry.as_ref();
-
-        let mut tmp_count_k_element: Vec<usize> = vec![0; self.geometry.n_zone()];
-
-        for volume_element_global_id in 0..self.geometry.volume_elements.n_element() {
-            let n_compartment_in_velem = geometry
-                .volume_elements
-                .get_number_cid(volume_element_global_id);
-
-            let n_vertex = geometry
-                .volume_elements
-                .get_vertex_per_element(volume_element_global_id);
-
-            let vtype: VolumeElementTypes =
-                geometry.volume_elements.vtype[volume_element_global_id];
-
-            local_vertices.clear();
-            local_vertices.resize(n_vertex, Default::default());
-            for i_compartment_in_velem in 0..n_compartment_in_velem {
-                let compartment_id = geometry
-                    .volume_elements
-                    .get_list_compartment_id(volume_element_global_id, i_compartment_in_velem);
-
-                let k_element = tmp_count_k_element[compartment_id];
-                tmp_count_k_element[compartment_id] += 1;
-
-                for (k_vertex, local_vertex) in local_vertices.iter_mut().enumerate() {
-                    let vertex_global_id = geometry
-                        .volume_elements
-                        .get_vertex_from_vol_global_id(volume_element_global_id, k_vertex);
-                    *local_vertex = geometry.vertices.get_slice_xyz(vertex_global_id).to_owned();
-                }
-
-                let volume = compute_volume(&local_vertices, vtype).unwrap()
-                    / (n_compartment_in_velem as f64);
-                self.c_info.volumes[compartment_id][k_element] = ElementVolumeInfo {
-                    global_id: volume_element_global_id,
-                    volume,
-                };
-                assert!(volume >= 0.);
-                v_tot += volume;
-            }
-        }
-        println!("{}", v_tot);
     }
 
     fn compute_flux_through_limits() -> Vec<f64> {
@@ -142,25 +76,36 @@ impl CMModel {
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
 
         for (i_interface, flow) in flows.iter_mut().enumerate() {
-            let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
-                let centroid = [0., 0., 0.];
-                utils::vector_cartesian_to_cylindrical(vector.get_slice_xyz(i_interface), centroid)
-            } else {
-                vector.get_slice_xyz(i_interface).to_owned()
-            };
+            let axis = self.interfaces.axis[i_interface];
+            let current_interface_area = &self.interfaces.area[i_interface];
 
-            let InterfaceArea { area, axis } = &self.interfaces.area[i_interface];
-            let f = coords[*axis] * area;
+            for (global_id, area) in self
+                .interfaces
+                .n_facet
+                .iter()
+                .zip(current_interface_area)
+            {
+                let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
+                    let centroid = [0., 0., 0.];
+                    utils::vector_cartesian_to_cylindrical(
+                        vector.get_slice_xyz(*global_id),
+                        centroid,
+                    )
+                } else {
+                    vector.get_slice_xyz(*global_id).to_owned()
+                };
 
-            match f > 0. {
-                true => flow.source_flow += f,
-                false => flow.target_flow += f.abs(),
+                let f = coords[axis] * area;
+
+                match f > 0. {
+                    true => flow.source_flow += f,
+                    false => flow.target_flow += f.abs(),
+                }
             }
         }
 
         for (i_interface, rd) in flux_field.fluxes.iter_mut().enumerate() {
             let InterfaceInfo {
-                global_id: _,
                 source_id,
                 target_id,
             } = self.interfaces.info[i_interface];
@@ -187,10 +132,7 @@ impl CMModel {
         &self,
         scalar: Scalar,
     ) -> Result<cmtool_data::RawDataScalar, CoreError> {
-        println!(
-            "Creating scalar with {} compartment",
-            self.geometry.n_zone()
-        );
+        println!("Creating scalar {}", scalar.name.trim(),);
         let mut scalar_field = RawDataScalar::new(self.geometry.n_zone());
 
         scalar_field.values = vec![(0.).into(); self.geometry.n_zone()];

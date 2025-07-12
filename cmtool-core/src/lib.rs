@@ -208,10 +208,10 @@ impl CMHandle {
 
         let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
         let vector = Vector::new(v, &self.cm_geometry, &self.eg_geometry);
-        todo!("dump vector");
         let flow_data = self.model.export_flux_through_limits(vector)?;
 
-        todo!()
+                todo!("dump vector");
+
     }
 
     pub fn dump_vector_from_scalar(&self) {

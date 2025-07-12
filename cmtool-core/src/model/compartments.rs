@@ -1,5 +1,7 @@
 use std::{iter::Sum, ops::Add};
 
+use crate::{ensight_gold::types::VolumeElementTypes, model::{interfaces::AInterfacesInfo, CMGeometry}, utils::compute_volume};
+
 #[derive(Default, Clone, Copy)]
 pub struct ElementVolumeInfo {
     pub global_id: usize,
@@ -32,70 +34,60 @@ impl CompartmentInfo {
             volumes,
         }
     }
-}
 
-#[derive(Default, Clone)]
-pub struct InterfaceInfo {
-    pub source_id: usize,
-    pub target_id: usize,
-    pub global_id: usize,
-}
+    pub fn fill(&mut self,geometry:&CMGeometry) {
+        let mut v_tot = 0.;
+        let mut local_vertices = Vec::new();
 
-#[derive(Clone)]
-pub struct InterfaceFlow {
-    pub source_flow: f64,
-    pub target_flow: f64,
-}
 
-impl Add for InterfaceFlow {
-    type Output = Self;
+        let mut tmp_count_k_element: Vec<usize> = vec![0; geometry.n_zone()];
 
-    fn add(self, other: Self) -> Self {
-        InterfaceFlow {
-            source_flow: self.source_flow + other.source_flow,
-            target_flow: self.target_flow + other.target_flow,
+        for volume_element_global_id in 0..geometry.volume_elements.n_element() {
+            let n_compartment_in_velem = geometry
+                .volume_elements
+                .get_number_cid(volume_element_global_id);
+
+            let n_vertex = geometry
+                .volume_elements
+                .get_vertex_per_element(volume_element_global_id);
+
+            let vtype: VolumeElementTypes =
+                geometry.volume_elements.vtype[volume_element_global_id];
+
+            local_vertices.clear();
+            local_vertices.resize(n_vertex, Default::default());
+            for i_compartment_in_velem in 0..n_compartment_in_velem {
+                let compartment_id = geometry
+                    .volume_elements
+                    .get_list_compartment_id(volume_element_global_id, i_compartment_in_velem);
+
+                let k_element = tmp_count_k_element[compartment_id];
+                tmp_count_k_element[compartment_id] += 1;
+
+                for (k_vertex, local_vertex) in local_vertices.iter_mut().enumerate() {
+                    let vertex_global_id = geometry
+                        .volume_elements
+                        .get_vertex_from_vol_global_id(volume_element_global_id, k_vertex);
+                    *local_vertex = geometry.vertices.get_slice_xyz(vertex_global_id).to_owned();
+                }
+
+                let volume = compute_volume(&local_vertices, vtype).unwrap()
+                    / (n_compartment_in_velem as f64);
+                self.volumes[compartment_id][k_element] = ElementVolumeInfo {
+                    global_id: volume_element_global_id,
+                    volume,
+                };
+                assert!(volume >= 0.);
+                v_tot += volume;
+            }
         }
+        println!("{}", v_tot);
     }
 }
 
-impl Sum for InterfaceFlow {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self::default(), Add::add)
-    }
-}
 
-impl Default for InterfaceFlow {
-    fn default() -> Self {
-        InterfaceFlow {
-            source_flow: 0.0,
-            target_flow: 0.0,
-        }
-    }
-}
 
-#[derive(Default, Clone)]
-pub struct InterfaceArea {
-    pub area:f64,
-    pub axis: usize,
-}
 
-pub struct AInterfacesInfo {
-    pub n_facet: Vec<usize>,
-    pub info: Vec<InterfaceInfo>,
-    pub area:Vec<InterfaceArea>
-}
-
-impl AInterfacesInfo {
-    fn new(at_interface: Vec<usize>) -> Self {
-        let n_interfaces = at_interface.len();
-
-        Self {
-            n_facet: at_interface,
-            info: vec![Default::default(); n_interfaces],
-            area:vec![Default::default(); n_interfaces],
-        }
-    }
-}
 
 pub struct CountVolumeElement {
     pub per_compartment: Vec<usize>,
