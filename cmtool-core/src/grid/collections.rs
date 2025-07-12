@@ -44,6 +44,16 @@ pub struct AxisDescriptor {
     pub step: f64,
 }
 
+impl AxisDescriptor
+{
+    pub fn new(min_range: f64,
+    max_range: f64,
+    n_range: usize)->Self
+    {
+        Self{min_range,max_range,n_range,step:0.}
+    }
+}
+
 pub struct CoordAxis {
     pub edges: Vec<f64>,
     pub centers: Vec<f64>,

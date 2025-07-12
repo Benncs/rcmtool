@@ -212,11 +212,23 @@ impl CMHandle {
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
-
     }
 
-    pub fn dump_vector_from_scalar(&self) {
-        todo!()
+    pub fn dump_vector_from_scalar(
+        &self,
+        res_name: impl AsRef<std::path::Path>,
+        path_i: impl AsRef<std::path::Path>,
+        path_j: impl AsRef<std::path::Path>,
+        path_k: impl AsRef<std::path::Path>,
+    ) -> Result<(), CoreError> {
+        let s = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path_i)?;
+        let sj = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path_j)?;
+        let sk = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path_k)?;
+        let vector = Vector::from_scalar([s, sj, sk], &self.cm_geometry, &self.eg_geometry)?;
+        let flow_data = self.model.export_flux_through_limits(vector)?;
+
+        flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
+        Ok(())
     }
 
     pub fn export_geometry_compartments(&self) {

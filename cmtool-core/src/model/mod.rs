@@ -23,7 +23,7 @@ pub struct CMModel {
     geometry: Arc<CMGeometry>,
     c_info: CompartmentInfo,
     interfaces: AInterfacesInfo,
-    global_id_from_interface:Vec<Vec<usize>>
+    global_id_from_interface: Vec<Vec<usize>>,
 }
 
 pub use geometry::CMGeometry;
@@ -45,16 +45,20 @@ impl CMModel {
         let interface_count_raw = volume_element_count.at_interface.clone();
         // let n_interfaces = volume_element_count.n_interfaces();
 
-        let (c_info, interfaces,global_id_from_interface) = volume_element_count.into_reduce();
+        let (c_info, interfaces, global_id_from_interface) = volume_element_count.into_reduce();
         let mut model = Self {
             geometry,
             c_info,
             interfaces,
-            global_id_from_interface
+            global_id_from_interface,
         };
         model.c_info.fill(&model.geometry);
 
-        model.interfaces.fill(&model.geometry, &interface_count_raw,&model.global_id_from_interface);
+        model.interfaces.fill(
+            &model.geometry,
+            &interface_count_raw,
+            &model.global_id_from_interface,
+        );
 
         model
     }
@@ -77,14 +81,10 @@ impl CMModel {
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
 
         for (i_interface, flow) in flows.iter_mut().enumerate() {
-            let axis = self.interfaces.axis[i_interface];
+            let axis: usize = self.interfaces.axis[i_interface];
             let current_interface_area = &self.interfaces.area[i_interface];
             let curent_inteface_element = &self.global_id_from_interface[i_interface];
-            for (global_id, area) in 
-                curent_inteface_element
-                .iter()
-                .zip(current_interface_area)
-            {
+            for (global_id, area) in curent_inteface_element.iter().zip(current_interface_area) {
                 let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
                     let centroid = [0., 0., 0.];
                     utils::vector_cartesian_to_cylindrical(

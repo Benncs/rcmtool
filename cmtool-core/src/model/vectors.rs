@@ -3,6 +3,7 @@ use std::ops::Index;
 use crate::{
     ensight_gold::{self, types::ElementsType},
     model::CMGeometry,
+    CoreError,
 };
 
 pub struct Vector {
@@ -16,11 +17,25 @@ impl Vector {
             .try_into()
             .expect("Slice with exactly 3 elements")
     }
-
-    pub(crate) fn new(
-        eg_vector: ensight_gold::vectors::VectorField,
+    pub(crate) fn from_scalar(
+        scalars: [ensight_gold::scalar::ScalarField; 3],
         geometry: &CMGeometry,
         eg_geometry: &ensight_gold::Geometry,
+    ) -> Result<Self, CoreError> {
+        let functor = |i_part, i_e, volume_element_id| {
+            [
+                scalars[0].get_value(i_part, i_e, volume_element_id) as f64,
+                scalars[1].get_value(i_part, i_e, volume_element_id) as f64,
+                scalars[2].get_value(i_part, i_e, volume_element_id) as f64,
+            ]
+        };
+        Ok(Self::from_xyz(geometry, eg_geometry, functor))
+    }
+
+    fn from_xyz(
+        geometry: &CMGeometry,
+        eg_geometry: &ensight_gold::Geometry,
+        f: impl Fn(usize, usize, usize) -> [f64; 3],
     ) -> Self {
         let mut value_in_vo: Vec<cmtool_data::ScalarValueType> =
             vec![0.; 3 * geometry.volume_elements.n_element()];
@@ -39,7 +54,7 @@ impl Vector {
                                 volume_element_id,
                             );
                             let offset = 3 * volume_element_global_id;
-                            value_in_vo[offset..offset + 3].copy_from_slice(&eg_vector.get_xyz(
+                            value_in_vo[offset..offset + 3].copy_from_slice(&f(
                                 i_part,
                                 i_e,
                                 volume_element_id,
@@ -54,33 +69,19 @@ impl Vector {
             }
         }
 
-        // for (k_part, part_id) in eg_scalar.part_id.iter().enumerate() {
-        //     if let Some(part) = eg_geometry.get_part_by_id(*part_id) {
-        //         for (i_e, element) in part.elements.iter().enumerate() {
-        //             match element.etype {
-        //                 ElementsType::VolumeElementType(vetype) => {
-        //                     //Unwrap never fails because "get_part_by_id" has already identified part
-        //                     let i_part = eg_geometry.get_part_position(*part_id).unwrap();
-        //                     let element_index = vetype.to_index();
-
-        //                     for volume_element_id in 0..element.n_elements {
-        //                         let volume_element_global_id =
-        //                             geometry.volume_elements.get_global_id(
-        //                                 i_part,
-        //                                 element_index,
-        //                                 volume_element_id,
-        //                             );
-        //                         value_in_vo[volume_element_global_id] =
-        //                             eg_scalar.get_value(k_part, i_e, volume_element_id).into();
-        //                     }
-        //                 }
-        //                 _ => unimplemented!("Not volumic element type"),
-        //             }
-        //         }
-        //     }
-        // }
-
         Self { value_in_vo }
+    }
+
+    ////
+
+    pub(crate) fn new(
+        eg_vector: ensight_gold::vectors::VectorField,
+        geometry: &CMGeometry,
+        eg_geometry: &ensight_gold::Geometry,
+    ) -> Self {
+        let functor =
+            |i_part, i_e, volume_element_id| eg_vector.get_xyz(i_part, i_e, volume_element_id);
+        Self::from_xyz(geometry, eg_geometry, functor)
     }
 }
 
