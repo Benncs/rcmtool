@@ -6,7 +6,7 @@ pub use collections::{cylindrical_index, AxisDescriptor, CylindricalAxis};
 
 use crate::utils::{AxisPoints, Coords3, Coords3Ext};
 
-#[derive(PartialEq)]
+#[derive(PartialEq,Clone, Copy)]
 pub enum MeshType {
     Cylindrical,
     MeshRectangular,

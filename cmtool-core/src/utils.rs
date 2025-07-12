@@ -23,6 +23,20 @@ pub trait Coords3Ext {
     fn cartesian_to_cylindrical(&self) -> Self;
 }
 
+pub fn vector_cartesian_to_cylindrical(
+    [vx, vy, vz]: &Coords3,
+    [_r, theta, _z]: Coords3,
+) -> Coords3 {
+    let cos_theta = theta.cos();
+    let sin_theta = theta.sin();
+
+    [
+        vx * cos_theta + vy * sin_theta,
+        -vx * sin_theta + vy * cos_theta,
+        *vz,
+    ]
+}
+
 impl Coords3Ext for Coords3 {
     fn sub(&self, other: &Self) -> Self {
         [self[0] - other[0], self[1] - other[1], self[2] - other[2]]

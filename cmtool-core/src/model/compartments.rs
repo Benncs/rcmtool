@@ -1,3 +1,5 @@
+use std::{iter::Sum, ops::Add};
+
 #[derive(Default, Clone, Copy)]
 pub struct ElementVolumeInfo {
     pub global_id: usize,
@@ -39,9 +41,48 @@ pub struct InterfaceInfo {
     pub global_id: usize,
 }
 
+#[derive(Clone)]
+pub struct InterfaceFlow {
+    pub source_flow: f64,
+    pub target_flow: f64,
+}
+
+impl Add for InterfaceFlow {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        InterfaceFlow {
+            source_flow: self.source_flow + other.source_flow,
+            target_flow: self.target_flow + other.target_flow,
+        }
+    }
+}
+
+impl Sum for InterfaceFlow {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::default(), Add::add)
+    }
+}
+
+impl Default for InterfaceFlow {
+    fn default() -> Self {
+        InterfaceFlow {
+            source_flow: 0.0,
+            target_flow: 0.0,
+        }
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct InterfaceArea {
+    pub area:f64,
+    pub axis: usize,
+}
+
 pub struct AInterfacesInfo {
     pub n_facet: Vec<usize>,
     pub info: Vec<InterfaceInfo>,
+    pub area:Vec<InterfaceArea>
 }
 
 impl AInterfacesInfo {
@@ -51,6 +92,7 @@ impl AInterfacesInfo {
         Self {
             n_facet: at_interface,
             info: vec![Default::default(); n_interfaces],
+            area:vec![Default::default(); n_interfaces],
         }
     }
 }

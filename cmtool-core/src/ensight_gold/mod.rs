@@ -3,15 +3,17 @@ use std::{
     fmt::Debug,
     fs::File,
     io::{BufRead, BufReader},
-    path::Path,
+    path::Path, sync::Arc,
 };
 mod geo;
 pub mod types;
 pub use crate::{ensight_gold::reader::Reader, utils};
 pub mod scalar;
-
+pub mod vectors;
 pub use geo::Geometry;
 pub use geo::Part;
+pub mod variable;
+
 
 #[derive(Clone, Copy)]
 pub enum VariableType
@@ -20,17 +22,14 @@ pub enum VariableType
     Vector
 }
 
-// impl From<String> for VariableType
-// {
-//     fn from(value: String) -> Self {
-//         match value
-//         {
-//             "scalar"=>VariableType::Scalar,
-//             "vector"=>VariableType::Vector,
-//             _ => 
-//         }
-//     }
-// }
+
+
+pub trait RawField:Sized
+{
+    fn init(geometry: Arc<Geometry>, path: impl AsRef<Path>) -> std::io::Result<Self> ;
+
+    
+}
 
 impl TryInto<VariableType> for String
 {
@@ -39,8 +38,8 @@ impl TryInto<VariableType> for String
     fn try_into(self) -> Result<VariableType, Self::Error> {
         match self
         {
-            val if val == "scalar".to_owned()=>Ok(VariableType::Scalar),
-            val if val == "vector".to_owned()=>Ok(VariableType::Vector),
+            val if val == *"scalar"=>Ok(VariableType::Scalar),
+            val if val == *"vector"=>Ok(VariableType::Vector),
             _ => Err(())
         }
     }

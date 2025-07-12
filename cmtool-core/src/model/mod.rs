@@ -1,10 +1,11 @@
 use crate::{
     ensight_gold::types::VolumeElementTypes,
-    model::{
-        compartments::{AInterfacesInfo, CompartmentInfo, CountVolumeElement, ElementVolumeInfo, InterfaceInfo},
-        scalar::Scalar,
+    grid::MeshType,
+    model::compartments::{
+        AInterfacesInfo, CompartmentInfo, CountVolumeElement, ElementVolumeInfo, InterfaceArea,
+        InterfaceFlow, InterfaceInfo,
     },
-    utils::compute_volume,
+    utils::{self, compute_volume},
     CoreError,
 };
 use std::sync::Arc;
@@ -12,7 +13,12 @@ mod data;
 use cmtool_data::{RawDataFlux, RawDataScalar};
 mod compartments;
 mod geometry;
-pub mod scalar;
+mod scalar;
+mod vectors;
+
+pub use scalar::Scalar;
+pub use vectors::Vector;
+
 pub struct CMModel {
     geometry: Arc<CMGeometry>,
     c_info: CompartmentInfo,
@@ -51,18 +57,19 @@ impl CMModel {
     }
 
     fn fill_interfaces(&mut self) {
-
         let geometry = self.geometry.as_ref();
         let n_zones = geometry.n_zone();
         let mut interface_counter = 0;
-        for source_id in 0..n_zones
-        {
-            for target_id in 0..n_zones
-            {
+        for source_id in 0..n_zones {
+            for target_id in 0..n_zones {
                 // let index = source_id*n_zones+target_id;
                 let interface_id = interface_counter;
-                interface_counter+=1;
-                self.interfaces.info[interface_id]=InterfaceInfo{source_id,target_id,global_id:interface_id};
+                interface_counter += 1;
+                self.interfaces.info[interface_id] = InterfaceInfo {
+                    source_id,
+                    target_id,
+                    global_id: interface_id,
+                };
             }
         }
     }
@@ -125,18 +132,48 @@ impl CMModel {
         todo!()
     }
 
-    pub fn export_flux_through_limits(&self) -> Result<cmtool_data::RawDataFlux, CoreError> {
-
+    pub fn export_flux_through_limits(
+        &self,
+        vector: Vector,
+    ) -> Result<cmtool_data::RawDataFlux, CoreError> {
         let n_fluxes = self.interfaces.n_facet.len();
-        let mut flux_field = RawDataFlux::new(self.geometry.n_zone(),n_fluxes);
+        let mut flux_field = RawDataFlux::new(self.geometry.n_zone(), n_fluxes);
 
-        for (i_interface,rd) in flux_field.fluxes.iter_mut().enumerate()
-        {
-            let InterfaceInfo{global_id,source_id,target_id} = self.interfaces.info[i_interface];
+        let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
+
+        for (i_interface, flow) in flows.iter_mut().enumerate() {
+            let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
+                let centroid = [0., 0., 0.];
+                utils::vector_cartesian_to_cylindrical(vector.get_slice_xyz(i_interface), centroid)
+            } else {
+                vector.get_slice_xyz(i_interface).to_owned()
+            };
+
+            let InterfaceArea { area, axis } = &self.interfaces.area[i_interface];
+            let f = coords[*axis] * area;
+
+            match f > 0. {
+                true => flow.source_flow += f,
+                false => flow.target_flow += f.abs(),
+            }
+        }
+
+        for (i_interface, rd) in flux_field.fluxes.iter_mut().enumerate() {
+            let InterfaceInfo {
+                global_id: _,
+                source_id,
+                target_id,
+            } = self.interfaces.info[i_interface];
+
             rd.id_source = source_id as u32;
             rd.id_target = target_id as u32;
-            rd.flux_source_target =0.;
-            rd.flux_target_source =0.;
+
+            let InterfaceFlow {
+                source_flow,
+                target_flow,
+            } = &flows[i_interface];
+            rd.flux_source_target = *source_flow;
+            rd.flux_target_source = *target_flow;
         }
 
         Ok(flux_field)

@@ -14,6 +14,7 @@ pub struct CMGeometry {
     pub vertices: VerticesData,
     pub volume_elements: VolumeElementData,
     grid: Option<Box<dyn CompartmentMesh>>,
+    pub mesh_type: crate::grid::MeshType,
 }
 
 
@@ -176,6 +177,7 @@ impl CMGeometry {
             vertices: Default::default(),
             volume_elements: Default::default(),
             grid: None,
+            mesh_type
         };
 
         let (vertex_detail, velem_detail) = cm_geometry.fill_detail(&geometry);

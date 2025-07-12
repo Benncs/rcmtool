@@ -7,8 +7,8 @@ use std::{
 use cmtool_data::RawData;
 
 use crate::{
-    ensight_gold::VariableInfo,
-    model::{scalar::Scalar, CMGeometry, CMModel},
+    ensight_gold::{RawField, VariableInfo},
+    model::{CMGeometry, CMModel, Scalar, Vector},
 };
 
 pub mod ensight_gold;
@@ -146,7 +146,10 @@ impl CMHandle {
                     // }));
                 }
                 ensight_gold::VariableType::Vector => {
-                    // unimplemented!("vector")
+                    self.dump_vector(
+                        resolve_path(&root_export, &v.name),
+                        resolve_path(&root_input, &v.filepath),
+                    )?;
                 }
             }
         }
@@ -195,11 +198,18 @@ impl CMHandle {
         )
     }
 
-    pub fn dump_vector(&self) -> Result<(), CoreError> {
+    pub fn dump_vector(
+        &self,
+        res_name: impl AsRef<std::path::Path>,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<(), CoreError> {
         let n_zone = 10;
         let n_flux = 20;
 
-        let flow_data  = self.model.export_flux_through_limits()?;
+        let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
+        let vector = Vector::new(v, &self.cm_geometry, &self.eg_geometry);
+        todo!("dump vector");
+        let flow_data = self.model.export_flux_through_limits(vector)?;
 
         todo!()
     }

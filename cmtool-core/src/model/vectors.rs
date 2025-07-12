@@ -1,33 +1,35 @@
 use std::ops::Index;
 
 use crate::{
-    ensight_gold::{
-        self,
-        types::ElementsType,
-    },
+    ensight_gold::{self, types::ElementsType},
     model::CMGeometry,
 };
 
-pub struct Scalar {
+pub struct Vector {
     value_in_vo: Vec<cmtool_data::ScalarValueType>,
 }
 
-impl Scalar {
+impl Vector {
+    pub fn get_slice_xyz(&self, global_id: usize) -> &[f64; 3] {
+        let offset = global_id * 3;
+        self.value_in_vo[offset..offset + 3]
+            .try_into()
+            .expect("Slice with exactly 3 elements")
+    }
+
     pub(crate) fn new(
-        eg_scalar: ensight_gold::scalar::ScalarField,
+        eg_vector: ensight_gold::vectors::VectorField,
         geometry: &CMGeometry,
         eg_geometry: &ensight_gold::Geometry,
     ) -> Self {
         let mut value_in_vo: Vec<cmtool_data::ScalarValueType> =
-            vec![0.; geometry.volume_elements.n_element()];
-        // for k_part
-
+            vec![0.; 3 * geometry.volume_elements.n_element()];
         for (i_part, part) in eg_geometry.parts.iter().enumerate() {
             for (i_e, element) in part.elements.iter().enumerate() {
                 match element.etype {
                     ElementsType::VolumeElementType(vetype) => {
                         //Unwrap never fails because "get_part_by_id" has already identified part
-                        
+
                         let element_index = vetype.to_index();
 
                         for volume_element_id in 0..element.n_elements {
@@ -36,15 +38,18 @@ impl Scalar {
                                 element_index,
                                 volume_element_id,
                             );
-                            value_in_vo[volume_element_global_id] =
-                                eg_scalar.get_value(i_part, i_e, volume_element_id).into();
+                            let offset = 3 * volume_element_global_id;
+                            value_in_vo[offset..offset + 3].copy_from_slice(&eg_vector.get_xyz(
+                                i_part,
+                                i_e,
+                                volume_element_id,
+                            ));
                         }
                     }
                     _ => {
                         continue;
                         // unimplemented!("Not volumic element type")
-                        }
-                        
+                    }
                 }
             }
         }
@@ -79,7 +84,7 @@ impl Scalar {
     }
 }
 
-impl Index<usize> for Scalar {
+impl Index<usize> for Vector {
     type Output = cmtool_data::ScalarValueType;
 
     fn index(&self, index: usize) -> &Self::Output {
