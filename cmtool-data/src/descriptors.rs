@@ -25,13 +25,13 @@ impl PhaseCM {
     }
 }
 
-impl Into<String> for PhaseCM
+impl From<PhaseCM> for String
 {
-    fn into(self)->String
+    fn from(val: PhaseCM)->Self
     {
-       match self{
-            Self::Liquid => String::from("liquid"),
-            Self::Gas => String::from("gas")
+       match val{
+            PhaseCM::Liquid => String::from("liquid"),
+            PhaseCM::Gas => String::from("gas")
         } 
     }
 }

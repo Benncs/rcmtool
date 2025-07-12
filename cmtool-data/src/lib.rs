@@ -11,17 +11,35 @@ use std::io;
 
 use thiserror::Error;
 
+/// Errors that can occur during data operations.
+///
+/// This enum encapsulates various error conditions that might arise during
+/// data reading, writing, and serialization operations.
 #[derive(Error, Debug)]
 pub enum DataError {
-    #[error("Error writing/reading file: {0}")]
+    /// I/O error variant that occurs during file reading or writing operations.
+    ///
+    /// # Arguments
+    ///
+    /// * `source` - The underlying IO error that triggered this error.
+    #[error("I/O error occurred while handling the file: {0}")]
     IO(#[from] io::Error),
 
-    #[error("Error SerDe")]
+    /// Serialization or deserialization error variant.
+    ///
+    /// This error occurs when there is a failure during the serialization
+    /// or deserialization of data.
+    #[error("Serialization/Deserialization error occurred")]
     Serde,
 
-    #[error("unknown data store error")]
+    /// An unexpected or unknown error occurred during data operations.
+    ///
+    /// This variant serves as a catch-all for errors not explicitly covered
+    /// by other variants.
+    #[error("An unknown error occurred during data operation")]
     Unknown,
 }
+
 
 #[inline(always)]
 fn linear_index_row_major(_n_row: usize, n_col: usize, i: usize, j: usize) -> usize {

@@ -1,65 +1,130 @@
+use crate::descriptors::{CMExportType, PhaseCM};
+use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
 };
-
-use serde::{Deserialize, Serialize};
-
-use crate::descriptors::{CMExportType, PhaseCM};
-
 pub type ScalarValueType = f64;
-
 use crate::DataError;
 
+// A trait for reading and writing raw data to and from storage.
 pub trait RawData: Sized {
-    fn read_raw(path: impl AsRef<std::path::Path>) -> Option<Self>;
+    /// Attempts to read raw data from a specified path and instantiate an object.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A reference to a path from which to read the raw data. It can be any type
+    ///   that implements `AsRef<Path>`, such as `String` or `Path`.
+    ///
+    /// # Returns
+    ///
+    /// Returns an `Option<Self>`, which will be `Some(Self)` if reading and parsing are successful,
+    /// or `None` if an error occurs or the data is not available.
+    fn read_raw(path: impl AsRef<Path>) -> Option<Self>;
+
+    /// Attempts to write the raw data to a specified path.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - The instance of the type implementing `RawData`.
+    /// * `path` - A string slice specifying the path where the raw data will be written.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result<(), DataError>`, indicating success with `Ok(())` or an error
+    /// of type `DataError` if writing fails.
     fn write_raw(&self, path: &str) -> Result<(), DataError>;
 }
 
+/// Represents the header of a flux file.
+///
+/// This header contains metadata about the flux data stored in the file,
+/// including the number of zones and the number of flux interactions.
 #[repr(C)]
 #[derive(Deserialize, Serialize, Clone, Copy, Default)]
 pub struct FluxFileHeader {
+    /// The number of zones in the flux file data.
     pub n_zone: u32,
+    /// The number of flux interactions in the file.
     pub n_fluxes: u32,
 }
 
-#[repr(C)]
-#[derive(Deserialize, Serialize, Clone, Copy, Default)]
-pub struct ScalarFileHeader {
-    pub n_zone: u32,
-}
-
+/// Represents a single raw flux interaction.
+///
+/// This struct is used to store individual flux interactions between a source and a target,
+/// including the flux values in both directions.
 #[repr(C)]
 #[derive(Deserialize, Serialize, Clone, Copy)]
 pub struct RawFlux {
+    /// The identifier for the source in the flux interaction.
     pub id_source: u32,
+    /// The identifier for the target in the flux interaction.
     pub id_target: u32,
+    /// The flux value from the source to the target.
     pub flux_source_target: f64,
+    /// The flux value from the target to the source.
     pub flux_target_source: f64,
 }
 
-#[repr(C)]
-#[derive(Deserialize, Serialize, Clone, Copy)]
-pub struct RawScalar {
-    pub value: f64,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-pub struct RawDataScalar {
-    pub header: ScalarFileHeader,
-    pub values: Vec<RawScalar>,
-}
+/// Represents a collection of raw flux data along with its header.
+///
+/// The `RawDataFlux` struct combines metadata about the flux data (via `FluxFileHeader`)
+/// with a vector of `RawFlux` instances, representing the actual flux interactions.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct RawDataFlux {
+    /// The header containing metadata about the flux data.
     pub header: FluxFileHeader,
+    /// A vector of `RawFlux` interactions, representing the actual flux data.
     pub fluxes: Vec<RawFlux>,
 }
 
+/// Represents the header of a scalar file.
+///
+/// This header contains metadata about the scalar data stored in the file.
+#[repr(C)]
+#[derive(Deserialize, Serialize, Clone, Copy, Default)]
+pub struct ScalarFileHeader {
+    /// The number of zones in the scalar file data.
+    pub n_zone: u32,
+}
+
+/// Represents a single raw scalar value.
+///
+/// This struct is used to store individual floating-point scalar values.
+#[repr(C)]
+#[derive(Deserialize, Serialize, Clone, Copy)]
+pub struct RawScalar {
+    /// The scalar value stored as a floating-point number.
+    pub value: f64,
+}
+
+/// Represents a collection of raw scalar data along with its header.
+///
+/// The `RawDataScalar` struct combines metadata about the data (via `ScalarFileHeader`)
+/// with a vector of `RawScalar` instances, representing the actual scalar values.
+#[derive(Deserialize, Serialize, Clone)]
+pub struct RawDataScalar {
+    /// The header containing metadata about the scalar data.
+    pub header: ScalarFileHeader,
+    /// A vector of `RawScalar` values, representing the actual scalar data.
+    pub values: Vec<RawScalar>,
+}
+
+/// Represents a phase in a multi-phase process or system.
+///
+/// The `RawPhase` struct is likely used to capture the state or characteristics
+/// of a specific phase, including flow data, volume information, and an identifier
+/// for the phase itself.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct RawPhase {
+    /// Flow data associated with this phase.
     pub flow: RawDataFlux,
+
+    /// Volume data associated with this phase.
     pub volume: RawDataScalar,
+
+    /// Identifier for this phase.
     pub identifier: PhaseCM,
 }
 
@@ -124,8 +189,7 @@ impl RawDataScalar {
     }
 }
 
-impl From<Vec<f64>> for RawDataScalar
-{
+impl From<Vec<f64>> for RawDataScalar {
     fn from(value: Vec<f64>) -> Self {
         Self {
             header: ScalarFileHeader {

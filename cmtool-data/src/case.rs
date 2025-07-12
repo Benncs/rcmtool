@@ -3,6 +3,17 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufReader, Read, Write};
 use std::{collections::HashMap, fs, path::Path};
 
+/// Represents a case configuration for a computational model analysis.
+///
+/// Each `CMCase` contains information about the number of divisions, a description of the case,
+/// the time spent per flow map, and paths to exported data based on different types.
+///
+/// # Fields
+///
+/// * `n_div` - An array of three unsigned integers representing the number of divisions in each dimension.
+/// * `description` - A string describing the case configuration.
+/// * `time_per_flow_map` - A floating-point value representing the time per flow map in seconds.
+/// * `paths` - A map from export types to file paths where the data can be accessed.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CMCase {
     pub n_div: [u32; 3],
@@ -32,15 +43,46 @@ impl CMCase {
     }
 }
 
+/// A trait for reading a `CMCase` from a specified path.
+///
+/// Implement this trait for types that are capable of reading a case configuration
+/// from disk or another storage medium.
 pub trait CMCaseReader {
+    /// Reads a `CMCase` from the given path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A reference to the `Path` from which to read the case configuration.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` with a `CMCase` on success or a `DataError` on failure.
     fn read_case(path: &Path) -> Result<CMCase, DataError>;
 }
 
+/// A trait for writing a `CMCase` to a specified path.
+///
+/// Implement this trait for types that are capable of writing a case configuration
+/// to disk or another storage medium.
 pub trait CMCaseWriter {
+    /// Writes a `CMCase` to the given path.
+    ///
+    /// # Arguments
+    ///
+    /// * `case` - The `CMCase` instance to write.
+    /// * `path` - A reference to the `Path` where the case configuration should be written.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` indicating success or a `DataError` on failure.
     fn write_case(case: CMCase, path: &Path) -> Result<(), DataError>;
 }
-
+/// A type responsible for reading and writing `CMCase` instances to/from JSON files.
 pub struct CMCaseJson;
+
+/// A type responsible for reading and writing `CMCase` instances C comparible (binary) files.
+pub struct CCMCaseInfo;
+
 
 impl CMCaseReader for CMCaseJson {
     fn read_case(path: &Path) -> Result<CMCase, DataError> {
@@ -62,8 +104,6 @@ impl CMCaseWriter for CMCaseJson {
         Ok(())
     }
 }
-
-pub struct CCMCaseInfo;
 
 impl CMCaseReader for CCMCaseInfo {
     fn read_case(path: &Path) -> Result<CMCase, DataError> {
@@ -233,7 +273,7 @@ mod test {
             paths: HashMap::new(),
         };
 
-        T::write_case(case, path).map_err(|_| ());
+        T::write_case(case, path).map_err(|_| ())?;
         let read_case = T::read_case(path).map_err(|_| ())?;
         assert!(read_case.n_div == [4, 5, 1]);
         assert!(read_case.description == *"Test");

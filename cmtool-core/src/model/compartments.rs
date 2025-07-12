@@ -1,9 +1,7 @@
-
-#[derive(Default,Clone, Copy)]
-pub struct ElementVolumeInfo
-{
-    pub global_id:usize,
-    pub volume:f64,
+#[derive(Default, Clone, Copy)]
+pub struct ElementVolumeInfo {
+    pub global_id: usize,
+    pub volume: f64,
 }
 
 pub struct CompartmentInfo {
@@ -17,9 +15,14 @@ impl CompartmentInfo {
 
         let mut volumes = vec![Vec::new(); size];
 
-        for i in 0..size
-        {
-            volumes[i].resize(per_compartment[i], ElementVolumeInfo { global_id: 0, volume:0. });
+        for i in 0..size {
+            volumes[i].resize(
+                per_compartment[i],
+                ElementVolumeInfo {
+                    global_id: 0,
+                    volume: 0.,
+                },
+            );
         }
 
         Self {
@@ -29,14 +32,25 @@ impl CompartmentInfo {
     }
 }
 
-pub struct InterfacesInfo {
-    n_facet: Vec<usize>,
+#[derive(Default, Clone)]
+pub struct InterfaceInfo {
+    pub source_id: usize,
+    pub target_id: usize,
+    pub global_id: usize,
 }
 
-impl InterfacesInfo {
+pub struct AInterfacesInfo {
+    pub n_facet: Vec<usize>,
+    pub info: Vec<InterfaceInfo>,
+}
+
+impl AInterfacesInfo {
     fn new(at_interface: Vec<usize>) -> Self {
+        let n_interfaces = at_interface.len();
+
         Self {
             n_facet: at_interface,
+            info: vec![Default::default(); n_interfaces],
         }
     }
 }
@@ -56,7 +70,7 @@ impl CountVolumeElement {
         }
     }
 
-    pub fn into_reduce(self) -> (CompartmentInfo, InterfacesInfo) {
+    pub fn into_reduce(self) -> (CompartmentInfo, AInterfacesInfo) {
         let at_interface: Vec<usize> = self.at_interface.into_iter().filter(|&v| v > 0).collect();
         let per_compartment: Vec<usize> = self
             .per_compartment
@@ -66,7 +80,7 @@ impl CountVolumeElement {
 
         (
             CompartmentInfo::new(per_compartment),
-            InterfacesInfo::new(at_interface),
+            AInterfacesInfo::new(at_interface),
         )
     }
 

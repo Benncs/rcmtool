@@ -1,7 +1,7 @@
 use crate::{
     ensight_gold::types::VolumeElementTypes,
     model::{
-        compartments::{CompartmentInfo, CountVolumeElement, ElementVolumeInfo, InterfacesInfo},
+        compartments::{AInterfacesInfo, CompartmentInfo, CountVolumeElement, ElementVolumeInfo, InterfaceInfo},
         scalar::Scalar,
     },
     utils::compute_volume,
@@ -9,14 +9,14 @@ use crate::{
 };
 use std::sync::Arc;
 mod data;
-use cmtool_data::RawDataScalar;
+use cmtool_data::{RawDataFlux, RawDataScalar};
 mod compartments;
 mod geometry;
 pub mod scalar;
 pub struct CMModel {
     geometry: Arc<CMGeometry>,
     c_info: CompartmentInfo,
-    interfaces: InterfacesInfo,
+    interfaces: AInterfacesInfo,
 }
 
 pub use geometry::CMGeometry;
@@ -45,12 +45,29 @@ impl CMModel {
             interfaces,
         };
 
-        model.fill();
+        model.fill_c_info();
 
         model
     }
 
-    fn fill(&mut self) {
+    fn fill_interfaces(&mut self) {
+
+        let geometry = self.geometry.as_ref();
+        let n_zones = geometry.n_zone();
+        let mut interface_counter = 0;
+        for source_id in 0..n_zones
+        {
+            for target_id in 0..n_zones
+            {
+                // let index = source_id*n_zones+target_id;
+                let interface_id = interface_counter;
+                interface_counter+=1;
+                self.interfaces.info[interface_id]=InterfaceInfo{source_id,target_id,global_id:interface_id};
+            }
+        }
+    }
+
+    fn fill_c_info(&mut self) {
         let mut v_tot = 0.;
         let mut local_vertices = Vec::new();
 
@@ -108,8 +125,21 @@ impl CMModel {
         todo!()
     }
 
-    pub fn export_flux_through_limits(&self, flow: &mut cmtool_data::RawDataFlux) {
-        todo!()
+    pub fn export_flux_through_limits(&self) -> Result<cmtool_data::RawDataFlux, CoreError> {
+
+        let n_fluxes = self.interfaces.n_facet.len();
+        let mut flux_field = RawDataFlux::new(self.geometry.n_zone(),n_fluxes);
+
+        for (i_interface,rd) in flux_field.fluxes.iter_mut().enumerate()
+        {
+            let InterfaceInfo{global_id,source_id,target_id} = self.interfaces.info[i_interface];
+            rd.id_source = source_id as u32;
+            rd.id_target = target_id as u32;
+            rd.flux_source_target =0.;
+            rd.flux_target_source =0.;
+        }
+
+        Ok(flux_field)
     }
 
     // pub fn export_volume_integral_per_zone(&self,scalar:&mut cmtool_data::RawDataScalar) {
@@ -128,7 +158,9 @@ impl CMModel {
 
         scalar_field.values = vec![(0.).into(); self.geometry.n_zone()];
 
-        for (volumes_i, field) in self.c_info.volumes.iter().zip(&mut scalar_field.values) {
+        let iterator = self.c_info.volumes.iter().zip(&mut scalar_field.values);
+
+        for (volumes_i, field) in iterator {
             field.value = volumes_i
                 .iter()
                 .fold(0.0, |acc, ElementVolumeInfo { global_id, volume }| {

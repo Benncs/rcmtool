@@ -43,7 +43,7 @@ pub enum CoreError {
 }
 
 pub struct CMHandle {
-    model: model::CMModel,
+    model: Arc<model::CMModel>,
     root_result: String,
     eg_geometry: Arc<ensight_gold::Geometry>,
     cm_geometry: Arc<CMGeometry>,
@@ -87,7 +87,7 @@ impl CMHandle {
         // let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))?;
 
         Ok(Self {
-            model: CMModel::init(cm_geometry.clone()),
+            model: Arc::new(CMModel::init(cm_geometry.clone())),
             root_result: String::from("./test"),
             eg_geometry,
             cm_geometry,
@@ -108,19 +108,75 @@ impl CMHandle {
     ) -> Result<(), CoreError> {
         std::fs::create_dir(&root_export)?;
 
+        // let mut handles = Vec::new();
         for v in vars.iter() {
+            // let res_name = resolve_path(&root_export, &v.name)
+            //     .as_ref()
+            //     .to_str()
+            //     .unwrap()
+            //     .to_owned();
+
+            // let path = resolve_path(&root_input, &v.filepath)
+            //     .as_ref()
+            //     .to_str()
+            //     .unwrap()
+            //     .to_owned();
+            // let eg_geometry_clone = self.eg_geometry.clone();
+            // let cm_geometry_clone = self.cm_geometry.clone();
+            // let model_clone = self.model.clone();
             match v.get_type() {
                 ensight_gold::VariableType::Scalar => {
                     self.dump_scalar(
                         resolve_path(&root_export, &v.name),
                         resolve_path(&root_input, &v.filepath),
                     )?;
+
+                    // let eg_geometry_clone = self.eg_geometry.clone();
+                    // let cm_geometry_clone = self.cm_geometry.clone();
+                    // let model_clone = self.model.clone();
+
+                    // handles.push(std::thread::spawn(move || {
+                    //     Self::ts_dump_scalar(
+                    //         res_name,
+                    //         path,
+                    //         eg_geometry_clone,
+                    //         cm_geometry_clone,
+                    //         model_clone,
+                    //     )
+                    // }));
                 }
                 ensight_gold::VariableType::Vector => {
-                    unimplemented!("vector")
+                    // unimplemented!("vector")
                 }
             }
         }
+
+        // for i in handles
+        // {
+        //     match i.join() {
+        //                 Ok(Ok(_)) => println!("Thread executed successfully"),
+        //                 Ok(Err(e)) => println!("Thread failed with error: {:?}", e),
+        //                 Err(e) => println!("Thread panicked: {:?}", e),
+        //             }
+        // }
+
+        Ok(())
+    }
+
+    fn ts_dump_scalar(
+        res_name: impl AsRef<std::path::Path>,
+        path: impl AsRef<std::path::Path>,
+        eg_geometry: Arc<ensight_gold::Geometry>,
+        cm_geometry: Arc<CMGeometry>,
+        model: Arc<model::CMModel>,
+    ) -> Result<(), CoreError> {
+        let s = ensight_gold::scalar::ScalarField::init(eg_geometry.clone(), path)?;
+
+        let scalar = Scalar::new(s, &cm_geometry, &eg_geometry);
+
+        let scalar_data = model.export_volume_integral_per_zone(scalar)?;
+
+        scalar_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
 
         Ok(())
     }
@@ -130,27 +186,20 @@ impl CMHandle {
         res_name: impl AsRef<std::path::Path>,
         path: impl AsRef<std::path::Path>,
     ) -> Result<(), CoreError> {
-        // println!("{:?}",self.model.get_real_volume());
-
-        // println!("{}",self.model.get_real_volume().into_iter().sum::<f64>());
-
-        let s = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path)?;
-
-        let scalar = Scalar::new(s, &self.cm_geometry, &self.eg_geometry);
-
-        let scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
-
-        scalar_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
-
-        Ok(())
+        Self::ts_dump_scalar(
+            res_name,
+            path,
+            self.eg_geometry.clone(),
+            self.cm_geometry.clone(),
+            self.model.clone(),
+        )
     }
 
     pub fn dump_vector(&self) -> Result<(), CoreError> {
         let n_zone = 10;
         let n_flux = 20;
-        let mut flow_data = cmtool_data::RawDataFlux::new(n_zone, n_flux);
 
-        self.model.export_flux_through_limits(&mut flow_data);
+        let flow_data  = self.model.export_flux_through_limits()?;
 
         todo!()
     }
