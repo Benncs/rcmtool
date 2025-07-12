@@ -82,8 +82,8 @@ impl CMGeometry {
             axis[cylindrical_index(CylindricalAxis::R)].min_range = 0.;
         }
 
-        axis.iter_mut()
-            .for_each(|ax| ax.step = (ax.max_range - ax.min_range) / (ax.n_range as f64));
+        // axis.iter_mut()
+        //     .for_each(|ax| ax.step = (ax.max_range - ax.min_range) / (ax.n_range as f64));
 
         self.grid = Some(get_mesh(mesh_type, axis));
     }
@@ -137,6 +137,7 @@ impl CMGeometry {
             let interface_cid_0 = self
                 .volume_elements
                 .get_list_compartment_id(vol_element_global_id, 0);
+            
 
             for k_vertex in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
                 let interface_cid_k = self

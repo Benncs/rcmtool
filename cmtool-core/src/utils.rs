@@ -11,21 +11,49 @@ pub fn linear_index_coordinates_matrix(i_coord: usize, i_axis: usize) -> usize {
     linear_index_2d_matrix_row_major(i_coord, i_axis, NUMBER_OF_AXIS)
 }
 
-
 pub type Coords3 = [f64; NUMBER_OF_AXIS];
 pub type AxisPoints = [usize; NUMBER_OF_AXIS];
-
-
 
 pub trait Coords3Ext {
     fn sub(&self, other: &Self) -> Self;
     fn cross(&self, other: &Self) -> Self;
     fn dot(&self, other: &Self) -> f64;
+
+    fn cylindrical_to_cartesian(&self) -> Self;
+    fn cartesian_to_cylindrical(&self) -> Self;
 }
 
 impl Coords3Ext for Coords3 {
     fn sub(&self, other: &Self) -> Self {
         [self[0] - other[0], self[1] - other[1], self[2] - other[2]]
+    }
+    fn cylindrical_to_cartesian(&self) -> Self {
+        [self[0] * self[1].cos(), self[0] * self[1].sin(), self[2]]
+    }
+
+    fn cartesian_to_cylindrical(&self) -> Self {
+        // let r = f64::sqrt(self[0]*self[0]+self[1]*self[1]);
+        // let theta = if(self[0]>=0. && r>0.)
+        // {
+        //     f64::acos(self[0]/r)
+        // }
+        // else if(self[0]<0. && r>0.)
+        // {
+        //     -f64::acos(self[0]/r)
+        // }
+        // else if( r==0.)
+        // {
+        //     0.
+        // }
+        // else {
+        //     panic!("Unable to compute cartesian")
+        // };
+
+        // [r,theta,self[2]]
+
+        let r = f64::sqrt(self[0] * self[0] + self[1] * self[1]);
+        let theta = self[1].atan2(self[0]); // handles all cases
+        [r, theta, self[2]]
     }
 
     fn cross(&self, other: &Self) -> Self {
@@ -40,7 +68,6 @@ impl Coords3Ext for Coords3 {
         self[0] * other[0] + self[1] * other[1] + self[2] * other[2]
     }
 }
-
 
 /// Computes the signed volume of a tetrahedron defined by four 3D points.
 ///
@@ -76,19 +103,10 @@ impl VolumeElementTypes {
     /// where each group defines one tetrahedron.
     fn tetra_subdivisions(&self) -> &'static [[usize; 4]] {
         match self {
-            Self::Tetra4|Self::GTetra4 => &[
-                [0, 1, 2, 3],
-            ],
-            Self::Pyramid5|Self::GPyramid5 => &[
-                [0, 1, 3, 4],
-                [1, 2, 3, 4],
-            ],
-            Self::Penta6| Self::GPenta6 => &[
-                [0, 1, 2, 3],
-                [1, 2, 3, 4],
-                [2, 3, 4, 5],
-            ],
-            Self::Hexa8|Self::GHexa8 => &[
+            Self::Tetra4 | Self::GTetra4 => &[[0, 1, 2, 3]],
+            Self::Pyramid5 | Self::GPyramid5 => &[[0, 1, 3, 4], [1, 2, 3, 4]],
+            Self::Penta6 | Self::GPenta6 => &[[0, 1, 2, 3], [1, 2, 3, 4], [2, 3, 4, 5]],
+            Self::Hexa8 | Self::GHexa8 => &[
                 [0, 1, 3, 4],
                 [1, 3, 4, 5],
                 [3, 4, 5, 7],
@@ -96,19 +114,10 @@ impl VolumeElementTypes {
                 [3, 1, 6, 7],
                 [1, 6, 7, 5],
             ],
-            Self::Tetra10|Self::GTetra10 => &[
-                [0, 1, 2, 3],
-            ],
-            Self::Pyramid13|Self::GPyramid13 => &[
-                [0, 1, 3, 4],
-                [1, 2, 3, 4],
-            ],
-            Self::Penta15|Self::GPenta15 => &[
-                [0, 1, 2, 3],
-                [1, 2, 3, 4],
-                [2, 3, 4, 5],
-            ],
-            Self::Hexa20|Self::GHexa20 => &[
+            Self::Tetra10 | Self::GTetra10 => &[[0, 1, 2, 3]],
+            Self::Pyramid13 | Self::GPyramid13 => &[[0, 1, 3, 4], [1, 2, 3, 4]],
+            Self::Penta15 | Self::GPenta15 => &[[0, 1, 2, 3], [1, 2, 3, 4], [2, 3, 4, 5]],
+            Self::Hexa20 | Self::GHexa20 => &[
                 [0, 1, 3, 4],
                 [1, 3, 4, 5],
                 [3, 4, 5, 7],
@@ -116,7 +125,6 @@ impl VolumeElementTypes {
                 [3, 1, 6, 7],
                 [1, 6, 7, 5],
             ],
-            
         }
     }
 }
@@ -137,24 +145,23 @@ impl VolumeElementTypes {
 pub fn compute_volume(local_vertices: &[Coords3], elem_type: VolumeElementTypes) -> Option<f64> {
     let tetra_indices = elem_type.tetra_subdivisions();
 
-    if local_vertices.len()!=ElementsType::VolumeElementType(elem_type).node_count() as usize
-    {
+    if local_vertices.len() != ElementsType::VolumeElementType(elem_type).node_count() as usize {
         return None;
     }
 
-
-    let vol = tetra_indices.iter().map(|&[i0, i1, i2, i3]| {
-        let a = local_vertices[i0];
-        let b = local_vertices[i1];
-        let c = local_vertices[i2];
-        let d = local_vertices[i3];
-        tetra_volume(a, b, c, d)
-    }).sum();
+    let vol = tetra_indices
+        .iter()
+        .map(|&[i0, i1, i2, i3]| {
+            let a = local_vertices[i0];
+            let b = local_vertices[i1];
+            let c = local_vertices[i2];
+            let d = local_vertices[i3];
+            tetra_volume(a, b, c, d)
+        })
+        .sum();
 
     Some(vol)
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -187,7 +194,11 @@ mod tests {
         let volume = compute_volume(&vertices, VolumeElementTypes::Hexa8);
         assert!(volume.is_some());
         let volume = volume.unwrap();
-        assert!((volume - 1.0).abs() < 1e-10, "Expected volume ≈ 1.0, got {}", volume);
+        assert!(
+            (volume - 1.0).abs() < 1e-10,
+            "Expected volume ≈ 1.0, got {}",
+            volume
+        );
     }
 
     #[test]

@@ -41,10 +41,12 @@ pub struct CoordAxis {
 }
 
 impl From<AxisDescriptor> for CoordAxis {
-    fn from(descriptor: AxisDescriptor) -> Self {
+    fn from(mut descriptor: AxisDescriptor) -> Self {
         const STEP_OFFSET: f64 = 0.5;
         let mut edges = Vec::with_capacity(descriptor.n_range + 1);
         let mut centers = Vec::with_capacity(descriptor.n_range);
+
+        descriptor.step =  (descriptor.max_range - descriptor.min_range) / (descriptor.n_range as f64);
 
         let mut i_point = 0;
         while i_point < descriptor.n_range {
@@ -68,8 +70,8 @@ impl From<AxisDescriptor> for CoordAxis {
 impl CoordAxis {
     pub fn index_from_edge_value(&self, axis_value: f64) -> Option<usize> {
         let mut cell_id = 0;
-        let n_point = self.edges.len();
-        while cell_id < n_point && self.edges[cell_id + 1] < axis_value {
+        let n_point = self.descriptor.n_range;
+        while (cell_id < n_point )&& (self.edges[cell_id + 1] < axis_value) {
             cell_id += 1;
         }
         if cell_id == n_point {

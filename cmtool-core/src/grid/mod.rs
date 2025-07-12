@@ -1,8 +1,10 @@
 mod collections;
+use std::f64;
+
 use collections::*;
 pub use collections::{cylindrical_index, AxisDescriptor, CylindricalAxis};
 
-use crate::utils::{AxisPoints, Coords3};
+use crate::utils::{AxisPoints, Coords3, Coords3Ext};
 
 #[derive(PartialEq)]
 pub enum MeshType {
@@ -98,9 +100,15 @@ pub struct BaseCompartmentMesh<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
+
+
 impl<T> BaseCompartmentMesh<T> {
     fn new(descriptors: [AxisDescriptor; 3]) -> Self {
         let axes: [CoordAxis; 3] = descriptors.map(CoordAxis::from);
+
+       
+        
+
         let n_cells = axes
             .iter()
             .map(|ax| ax.descriptor.n_range)
@@ -213,19 +221,20 @@ impl CompartmentMeshManip for MeshCylindrical {
     fn cell_from_coordinates(&self, coords: &Coords3) -> Option<usize> {
         let mut mesh_id = 0;
         let mut cumulative_product = 1;
+        let cylindrical_coords = coords.cartesian_to_cylindrical();
 
-        for (i, axe) in self.axes.as_ref().iter().enumerate() {
-            let current_index = axe.index_from_edge_value(coords[i])?;
-            mesh_id += current_index * cumulative_product;
-            cumulative_product *= axe.descriptor.n_range;
-        }
-
-        // for i in (0..self.axes.len()).rev() {
-        //     let axe = &self.axes[i];
-        //     let current_index = axe.index_from_edge_value(coords[i])?;
+        // for (i, axe) in self.axes.as_ref().iter().enumerate() {
+        //     let current_index = axe.index_from_edge_value(cylindrical_coords[i])?;
         //     mesh_id += current_index * cumulative_product;
         //     cumulative_product *= axe.descriptor.n_range;
         // }
+
+        for i in (0..self.axes.len()).rev() {
+            let axe = &self.axes[i];
+            let current_index = axe.index_from_edge_value(cylindrical_coords[i])?;
+            mesh_id += current_index * cumulative_product;
+            cumulative_product *= axe.descriptor.n_range;
+        }
 
         Some(mesh_id)
     }
@@ -251,10 +260,15 @@ impl CompartmentMeshManip for MeshCylindrical {
 
 pub fn get_mesh(
     meshtype: MeshType,
-    ax_descriptor: [AxisDescriptor; 3],
+    mut ax_descriptor: [AxisDescriptor; 3],
 ) -> Box<dyn CompartmentMesh> {
     match meshtype {
-        MeshType::Cylindrical => Box::new(MeshCylindrical::new(ax_descriptor)),
+        MeshType::Cylindrical => {
+            ax_descriptor[0].min_range= 0.;
+            ax_descriptor[1].min_range= - std::f64::consts::PI;
+            ax_descriptor[1].max_range= std::f64::consts::PI;
+            Box::new(MeshCylindrical::new(ax_descriptor))
+        },
         MeshType::MeshRectangular => unimplemented!("Manip for Rectangular impl"),
     }
 }
