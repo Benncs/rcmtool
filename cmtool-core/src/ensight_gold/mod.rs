@@ -13,21 +13,63 @@ pub mod scalar;
 pub use geo::Geometry;
 pub use geo::Part;
 
+#[derive(Clone, Copy)]
+pub enum VariableType
+{
+    Scalar,
+    Vector
+}
+
+// impl From<String> for VariableType
+// {
+//     fn from(value: String) -> Self {
+//         match value
+//         {
+//             "scalar"=>VariableType::Scalar,
+//             "vector"=>VariableType::Vector,
+//             _ => 
+//         }
+//     }
+// }
+
+impl TryInto<VariableType> for String
+{
+    type Error=();
+
+    fn try_into(self) -> Result<VariableType, Self::Error> {
+        match self
+        {
+            val if val == "scalar".to_owned()=>Ok(VariableType::Scalar),
+            val if val == "vector".to_owned()=>Ok(VariableType::Vector),
+            _ => Err(())
+        }
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct VariableInfo {
     var_type: String,
-    name: String,
+    pub name: String,
     pub filepath: String,
 }
 
 impl VariableInfo {
+
+    pub fn get_type(&self)->VariableType
+    {
+        self.var_type.clone().try_into().unwrap()
+    }
+
     fn read(line: &str) -> std::io::Result<Self> {
         let mut tokens = line.split_whitespace();
         let mut var_info = VariableInfo::default();
+        
 
         if let Some(var_type) = tokens.next() {
             var_info.var_type = var_type.to_string();
         }
+
+        
 
         if var_info.var_type == "scalar" || var_info.var_type == "vector" {
             tokens.next().expect("Error reading case"); // Skip "per"

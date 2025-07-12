@@ -140,7 +140,7 @@ impl CMModel {
     }
 
     pub fn compartments_volumes(&self) -> Vec<f64> {
-        todo!()
+        todo!("grid compartment calculation")
     }
 
     pub fn get_real_volume(&self) -> Vec<f64> {

@@ -1,8 +1,15 @@
-use std::{path::Path, sync::Arc};
+use std::{
+    mem::uninitialized,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use cmtool_data::RawData;
 
-use crate::model::{scalar::Scalar, CMGeometry, CMModel};
+use crate::{
+    ensight_gold::VariableInfo,
+    model::{scalar::Scalar, CMGeometry, CMModel},
+};
 
 pub mod ensight_gold;
 pub mod grid;
@@ -42,6 +49,13 @@ pub struct CMHandle {
     cm_geometry: Arc<CMGeometry>,
 }
 
+fn resolve_path(
+    root: &impl AsRef<std::path::Path>,
+    relative_path: &str,
+) -> impl AsRef<std::path::Path> {
+    std::path::PathBuf::from(root.as_ref()).join(relative_path)
+}
+
 impl CMHandle {
     pub fn init(
         n_div: [usize; 3],
@@ -63,7 +77,11 @@ impl CMHandle {
 
         println!("{}", eg_geometry);
 
-        let cm_geometry = Arc::new(CMGeometry::init(n_div, eg_geometry.clone(), grid::MeshType::Cylindrical));
+        let cm_geometry = Arc::new(CMGeometry::init(
+            n_div,
+            eg_geometry.clone(),
+            grid::MeshType::Cylindrical,
+        ));
 
         // let fullpath = format!("{}/wall_cart.scl1", root);
         // let s = ensight_gold::scalar::ScalarField::init(eg_geometry, Path::new(&fullpath.clone()))?;
@@ -72,10 +90,8 @@ impl CMHandle {
             model: CMModel::init(cm_geometry.clone()),
             root_result: String::from("./test"),
             eg_geometry,
-            cm_geometry
+            cm_geometry,
         })
-
-        
     }
 
     pub fn dump_volume(&self) {
@@ -83,20 +99,48 @@ impl CMHandle {
 
         todo!()
     }
-    pub fn dump_scalar(&self, path: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
 
+    pub fn dump_all(
+        &self,
+        root_export: impl AsRef<std::path::Path>,
+        root_input: impl AsRef<std::path::Path>,
+        vars: &[ensight_gold::VariableInfo],
+    ) -> Result<(), CoreError> {
+        std::fs::create_dir(&root_export)?;
 
+        for v in vars.iter() {
+            match v.get_type() {
+                ensight_gold::VariableType::Scalar => {
+                    self.dump_scalar(
+                        resolve_path(&root_export, &v.name),
+                        resolve_path(&root_input, &v.filepath),
+                    )?;
+                }
+                ensight_gold::VariableType::Vector => {
+                    unimplemented!("vector")
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn dump_scalar(
+        &self,
+        res_name: impl AsRef<std::path::Path>,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<(), CoreError> {
         // println!("{:?}",self.model.get_real_volume());
 
         // println!("{}",self.model.get_real_volume().into_iter().sum::<f64>());
 
         let s = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path)?;
 
-        let scalar = Scalar::new(s,&self.cm_geometry,&self.eg_geometry);
-        
+        let scalar = Scalar::new(s, &self.cm_geometry, &self.eg_geometry);
+
         let scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
 
-        scalar_data.write_raw("test.scraw")?;
+        scalar_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
 
         Ok(())
     }
