@@ -1,6 +1,5 @@
+use crate::coordinates::*;
 use crate::ensight_gold::types::{ElementsType, VolumeElementTypes};
-
-const NUMBER_OF_AXIS: usize = 3;
 
 #[inline(always)]
 pub fn linear_index_2d_matrix_row_major(i_coord: usize, i_axis: usize, n_col: usize) -> usize {
@@ -11,17 +10,7 @@ pub fn linear_index_coordinates_matrix(i_coord: usize, i_axis: usize) -> usize {
     linear_index_2d_matrix_row_major(i_coord, i_axis, NUMBER_OF_AXIS)
 }
 
-pub type Coords3 = [f64; NUMBER_OF_AXIS];
 pub type AxisPoints = [usize; NUMBER_OF_AXIS];
-
-pub trait Coords3Ext {
-    fn sub(&self, other: &Self) -> Self;
-    fn cross(&self, other: &Self) -> Self;
-    fn dot(&self, other: &Self) -> f64;
-
-    fn cylindrical_to_cartesian(&self) -> Self;
-    fn cartesian_to_cylindrical(&self) -> Self;
-}
 
 pub fn vector_cartesian_to_cylindrical(
     [vx, vy, vz]: &Coords3,
@@ -35,52 +24,6 @@ pub fn vector_cartesian_to_cylindrical(
         -vx * sin_theta + vy * cos_theta,
         *vz,
     ]
-}
-
-impl Coords3Ext for Coords3 {
-    fn sub(&self, other: &Self) -> Self {
-        [self[0] - other[0], self[1] - other[1], self[2] - other[2]]
-    }
-    fn cylindrical_to_cartesian(&self) -> Self {
-        [self[0] * self[1].cos(), self[0] * self[1].sin(), self[2]]
-    }
-
-    fn cartesian_to_cylindrical(&self) -> Self {
-        // let r = f64::sqrt(self[0]*self[0]+self[1]*self[1]);
-        // let theta = if(self[0]>=0. && r>0.)
-        // {
-        //     f64::acos(self[0]/r)
-        // }
-        // else if(self[0]<0. && r>0.)
-        // {
-        //     -f64::acos(self[0]/r)
-        // }
-        // else if( r==0.)
-        // {
-        //     0.
-        // }
-        // else {
-        //     panic!("Unable to compute cartesian")
-        // };
-
-        // [r,theta,self[2]]
-
-        let r = f64::sqrt(self[0] * self[0] + self[1] * self[1]);
-        let theta = self[1].atan2(self[0]); // handles all cases
-        [r, theta, self[2]]
-    }
-
-    fn cross(&self, other: &Self) -> Self {
-        [
-            self[1] * other[2] - self[2] * other[1],
-            self[2] * other[0] - self[0] * other[2],
-            self[0] * other[1] - self[1] * other[0],
-        ]
-    }
-
-    fn dot(&self, other: &Self) -> f64 {
-        self[0] * other[0] + self[1] * other[1] + self[2] * other[2]
-    }
 }
 
 fn tetra_area(
@@ -198,7 +141,12 @@ fn calculate_polygon_area(points: &[[f64; 2]]) -> f64 {
 /// The absolute value of the mixed product divided by 6, which gives the
 /// volume of the tetrahedron.
 ///
-fn tetra_volume(a: Coords3, b: Coords3, c: Coords3, d: Coords3) -> f64 {
+fn tetra_volume(
+    CartesianCoordinates(a): CartesianCoordinates,
+    CartesianCoordinates(b): CartesianCoordinates,
+    CartesianCoordinates(c): CartesianCoordinates,
+    CartesianCoordinates(d): CartesianCoordinates,
+) -> f64 {
     let ab = b.sub(&a);
     let ac = c.sub(&a);
     let ad = d.sub(&a);
@@ -285,7 +233,10 @@ pub fn compute_intersection_area(
 /// An `Option<f64>` containing the total volume if the input is valid.
 /// Returns `None` if the number of vertices does not match the element type.
 ///
-pub fn compute_volume(local_vertices: &[Coords3], elem_type: VolumeElementTypes) -> Option<f64> {
+pub fn compute_volume(
+    local_vertices: &[CartesianCoordinates],
+    elem_type: VolumeElementTypes,
+) -> Option<f64> {
     let tetra_indices = elem_type.tetra_subdivisions();
 
     if local_vertices.len() != ElementsType::VolumeElementType(elem_type).node_count() as usize {
@@ -350,10 +301,10 @@ mod tests {
 
     #[test]
     fn unit_tetrahedron_volume() {
-        let a = [0.0, 0.0, 0.0];
-        let b = [1.0, 0.0, 0.0];
-        let c = [0.0, 1.0, 0.0];
-        let d = [0.0, 0.0, 1.0];
+        let a = CartesianCoordinates([0.0, 0.0, 0.0]);
+        let b = CartesianCoordinates([1.0, 0.0, 0.0]);
+        let c = CartesianCoordinates([0.0, 1.0, 0.0]);
+        let d = CartesianCoordinates([0.0, 0.0, 1.0]);
 
         let vol = tetra_volume(a, b, c, d);
         assert!((vol - 1.0 / 6.0).abs() < 1e-10);
@@ -361,7 +312,7 @@ mod tests {
 
     #[test]
     fn hexa8_unit_cube_volume() {
-        let vertices: Vec<[f64; 3]> = vec![
+        let vertices: Vec<CartesianCoordinates> = vec![
             [0.0, 0.0, 0.0], // 0
             [1.0, 0.0, 0.0], // 1
             [1.0, 1.0, 0.0], // 2
@@ -370,7 +321,10 @@ mod tests {
             [1.0, 0.0, 1.0], // 5
             [1.0, 1.0, 1.0], // 6
             [0.0, 1.0, 1.0], // 7
-        ];
+        ]
+        .into_iter()
+        .map(CartesianCoordinates)
+        .collect();
 
         let volume = compute_volume(&vertices, VolumeElementTypes::Hexa8);
         assert!(volume.is_some());
@@ -387,7 +341,7 @@ mod tests {
         let size = 2.0;
         let offset = 3.0;
 
-        let vertices: Vec<[f64; 3]> = vec![
+        let vertices: Vec<CartesianCoordinates> = vec![
             [offset, offset, offset],
             [offset + size, offset, offset],
             [offset + size, offset + size, offset],
@@ -396,7 +350,10 @@ mod tests {
             [offset + size, offset, offset + size],
             [offset + size, offset + size, offset + size],
             [offset, offset + size, offset + size],
-        ];
+        ]
+        .into_iter()
+        .map(CartesianCoordinates)
+        .collect();
 
         let volume = compute_volume(&vertices, VolumeElementTypes::Hexa8);
         assert!(volume.is_some());

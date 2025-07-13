@@ -26,15 +26,11 @@ pub const fn index_to_oriented(axis: usize) -> OrientedAxis {
         0 => OrientedAxis::I,
         1 => OrientedAxis::J,
         2 => OrientedAxis::K,
-        _ => panic!("index_to_oriented needs index between 0 and 3")
+        _ => panic!("index_to_oriented needs index between 0 and 3"),
     }
 }
 
-enum ProjectCoordinates {
-    CartesianToCyclindrical,
-    CyclindricalToCartesian,
-    None,
-}
+
 
 #[derive(Default)]
 pub struct AxisDescriptor {
@@ -44,13 +40,14 @@ pub struct AxisDescriptor {
     pub step: f64,
 }
 
-impl AxisDescriptor
-{
-    pub fn new(min_range: f64,
-    max_range: f64,
-    n_range: usize)->Self
-    {
-        Self{min_range,max_range,n_range,step:0.}
+impl AxisDescriptor {
+    pub fn new(min_range: f64, max_range: f64, n_range: usize) -> Self {
+        Self {
+            min_range,
+            max_range,
+            n_range,
+            step: 0.,
+        }
     }
 }
 
@@ -67,7 +64,8 @@ impl From<AxisDescriptor> for CoordAxis {
         let mut edges = Vec::with_capacity(descriptor.n_range + 1);
         let mut centers = Vec::with_capacity(descriptor.n_range);
 
-        descriptor.step =  (descriptor.max_range - descriptor.min_range) / (descriptor.n_range as f64);
+        descriptor.step =
+            (descriptor.max_range - descriptor.min_range) / (descriptor.n_range as f64);
 
         let mut i_point = 0;
         while i_point < descriptor.n_range {
@@ -92,7 +90,7 @@ impl CoordAxis {
     pub fn index_from_edge_value(&self, axis_value: f64) -> Option<usize> {
         let mut cell_id = 0;
         let n_point = self.descriptor.n_range;
-        while (cell_id < n_point )&& (self.edges[cell_id + 1] < axis_value) {
+        while (cell_id < n_point) && (self.edges[cell_id + 1] < axis_value) {
             cell_id += 1;
         }
         if cell_id == n_point {
@@ -102,5 +100,3 @@ impl CoordAxis {
         Some(cell_id)
     }
 }
-
-

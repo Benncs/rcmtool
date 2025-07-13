@@ -4,7 +4,9 @@ use std::{cell, default, f64};
 use collections::*;
 pub use collections::{cylindrical_index, AxisDescriptor, CylindricalAxis};
 
-use crate::utils::{AxisPoints, Coords3, Coords3Ext};
+use crate::utils::{AxisPoints};
+use crate::coordinates::*;
+
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum MeshType {
@@ -343,31 +345,64 @@ mod test {
     }
 
     #[test]
+    fn t_identification() {
+        let mesh = ref_mesh_cyclindrical();
+
+        let assert_id = |a: Coords3, expect: usize| {
+            let aa = a.cylindrical_to_cartesian();
+
+            let id1 = mesh
+                .cell_from_coordinates(&aa)
+                .expect("Test neighbors: coordinates for cell a are outside the mesh.");
+
+            assert!(
+                id1 == expect,
+                "Assertion failed: expected {:?}, got {:?}",
+                expect,
+                id1
+            );
+        };
+
+        assert_id([0., -std::f64::consts::PI, 0.], 0);
+
+        assert_id([0., -std::f64::consts::PI, max_ax3], number_point_ax3 - 1);
+        let theta = -std::f64::consts::PI + mesh.mesh_step_axis(1) * 1.1;
+        //R!=0 because with cartesian conversion is x=rcos(theta) if theta changes but no r its the same compartment
+        assert_id([0.01, theta, 0.], number_point_ax3);
+        //-1 because we consider cell ID for 0 to n-1
+        assert_id(
+            [max_ax1, std::f64::consts::PI, max_ax3],
+            (number_point_ax3 * number_point_ax1 * number_point_ax2) - 1,
+        );
+    }
+
+    #[test]
     fn t_neighbors() {
         use NeighborDirection::*;
 
         let mesh = ref_mesh_cyclindrical();
 
-        let assert_neighbors = |a: Coords3, b: Coords3, expected: NeighborDirection| {
+        let assert_neighbors =
+            |a: CylindricalCoordinates, b: CylindricalCoordinates, expected: NeighborDirection| {
+                let CartesianCoordinates(aa) = a.into();
 
-            let aa = a.cylindrical_to_cartesian();
-            let bb = b.cylindrical_to_cartesian();
+                let CartesianCoordinates(bb) = b.into();
 
-            let id1 = mesh
-                .cell_from_coordinates(&aa)
-                .expect("Test neighbors: coordinates for cell a are outside the mesh.");
-            let id2 = mesh
-                .cell_from_coordinates(&bb)
-                .expect("Test neighbors: coordinates for cell b are outside the mesh.");
+                let id1 = mesh
+                    .cell_from_coordinates(&aa)
+                    .expect("Test neighbors: coordinates for cell a are outside the mesh.");
+                let id2 = mesh
+                    .cell_from_coordinates(&bb)
+                    .expect("Test neighbors: coordinates for cell b are outside the mesh.");
 
-            let neighbors = mesh.are_cell_neighbor(id1, id2);
-            assert!(
-                neighbors == expected,
-                "Assertion failed: expected {:?}, got {:?}",
-                expected,
-                neighbors
-            );
-        };
+                let neighbors = mesh.are_cell_neighbor(id1, id2);
+                assert!(
+                    neighbors == expected,
+                    "Assertion failed: expected {:?}, got {:?}",
+                    expected,
+                    neighbors
+                );
+            };
 
         // Fixed coordinates and offsets for testing
         let fix_i = 2.2;
@@ -381,56 +416,56 @@ mod test {
 
         // Testing in X direction
         assert_neighbors(
-            [fix_i, fix_j, fix_k],
-            [fix_i + offset_i, fix_j, fix_k],
+            CylindricalCoordinates([fix_i, fix_j, fix_k]),
+            CylindricalCoordinates([fix_i + offset_i, fix_j, fix_k]),
             XPlus,
         );
         assert_neighbors(
-            [fix_i + offset_i, fix_j, fix_k],
-            [fix_i, fix_j, fix_k],
+            CylindricalCoordinates([fix_i + offset_i, fix_j, fix_k]),
+            CylindricalCoordinates([fix_i, fix_j, fix_k]),
             XMinus,
         );
 
         // Testing in Y direction
         assert_neighbors(
-            [fix_i, fix_j + offset_j, fix_k],
-            [fix_i, fix_j, fix_k],
+            CylindricalCoordinates([fix_i, fix_j + offset_j, fix_k]),
+            CylindricalCoordinates([fix_i, fix_j, fix_k]),
             YMinus,
         );
         assert_neighbors(
-            [fix_i, fix_j, fix_k],
-            [fix_i, fix_j + offset_j, fix_k],
+            CylindricalCoordinates([fix_i, fix_j, fix_k]),
+            CylindricalCoordinates([fix_i, fix_j + offset_j, fix_k]),
             YPlus,
         );
 
         // Testing in Z direction
         assert_neighbors(
-            [fix_i, fix_j, fix_k + offset_k],
-            [fix_i, fix_j, fix_k],
+            CylindricalCoordinates([fix_i, fix_j, fix_k + offset_k]),
+            CylindricalCoordinates([fix_i, fix_j, fix_k]),
             ZMinus,
         );
         assert_neighbors(
-            [fix_i, fix_j, fix_k],
-            [fix_i, fix_j, fix_k + offset_k],
+            CylindricalCoordinates([fix_i, fix_j, fix_k]),
+            CylindricalCoordinates([fix_i, fix_j, fix_k + offset_k]),
             ZPlus,
         );
 
         // Testing non-neighbor cases
         assert_neighbors(
-            [0., fix_j, fix_k + offset_k],
-            [fix_i, fix_j, fix_k],
+            CylindricalCoordinates([0., fix_j, fix_k + offset_k]),
+            CylindricalCoordinates([fix_i, fix_j, fix_k]),
             NotNeighbors,
         );
         assert_neighbors(
-            [fix_i, fix_j, fix_k],
-            [0., fix_j, fix_k + offset_k],
+            CylindricalCoordinates([fix_i, fix_j, fix_k]),
+            CylindricalCoordinates([0., fix_j, fix_k + offset_k]),
             NotNeighbors,
         );
-        let little_offset = mesh.mesh_step_axis(0)*1.005;
+        let little_offset = mesh.mesh_step_axis(0) * 1.005;
         let c1: f64 = mesh.get_cell_edge(0, 2);
         assert_neighbors(
-            [c1, fix_j, fix_k],
-            [c1+little_offset, fix_j, fix_k],
+            CylindricalCoordinates([c1, fix_j, fix_k]),
+            CylindricalCoordinates([c1 + little_offset, fix_j, fix_k]),
             NotNeighbors,
         );
     }

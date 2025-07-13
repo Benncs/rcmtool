@@ -15,6 +15,7 @@ pub mod ensight_gold;
 pub mod grid;
 pub mod model;
 pub mod utils;
+pub mod coordinates;
 pub enum ExportType {
     EnsightGold,
 }

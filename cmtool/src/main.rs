@@ -16,16 +16,16 @@ fn main() {
     // )
     // .unwrap();
 
-    let args = GenArgs::parse();
+    // let args = GenArgs::parse();
 
-    // let args = GenArgs {
-    //     case_path: "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.encas"
-    //         .to_string(),
-    //     n_i: 3,
-    //     n_j: 3,
-    //     n_k: 3,
-    //     out: None,
-    // };
+    let args = GenArgs {
+        case_path: "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.encas"
+            .to_string(),
+        n_i: 3,
+        n_j: 3,
+        n_k: 3,
+        out: None,
+    };
 
     let stem = Path::new(&args.case_path)
         .file_stem() // Gets "mycase" as OsStr

@@ -3,8 +3,10 @@ use std::{iter::Sum, ops::Add};
 use crate::{
     ensight_gold::types::ElementsType,
     model::{geometry, CMGeometry},
-    utils::{compute_intersection_area, Coords3},
+    utils::{compute_intersection_area},
 };
+use crate::coordinates::*;
+
 
 #[derive(Default, Clone)]
 pub struct InterfaceInfo {

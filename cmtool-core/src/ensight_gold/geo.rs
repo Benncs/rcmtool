@@ -6,6 +6,7 @@ use std::{
     path::Path,
     str::FromStr,
 };
+use crate::coordinates::*;
 
 const MAXIMAL_NUMBER_OF_MESH_ELEMENT_TYPE: usize = 20;
 const MAXIMAL_NUMBER_OF_PART: usize = 20;
@@ -119,7 +120,7 @@ impl Part {
         self.vertex_coordinates[utils::linear_index_coordinates_matrix(k_vertex, k_xyz)]
     }
 
-    pub fn get_vertex_coordinates_vec(&self, k_vertex: usize) -> utils::Coords3 {
+    pub fn get_vertex_coordinates_vec(&self, k_vertex: usize) -> Coords3 {
         // [
         //     self.vertex_coordinates[utils::linear_index_coordinates_matrix(k_vertex, 0)],
         //     self.vertex_coordinates[utils::linear_index_coordinates_matrix(k_vertex, 1)],
@@ -133,7 +134,7 @@ impl Part {
         ]
     }
 
-    pub fn get_vertex_coordinates_slice(&self, k_vertex: usize) -> &utils::Coords3 {
+    pub fn get_vertex_coordinates_slice(&self, k_vertex: usize) -> &Coords3 {
       
         let offset = k_vertex * 3;
         self.vertex_coordinates[offset..offset+3].try_into().expect("Part slice vertex")
