@@ -2,11 +2,10 @@ mod collections;
 use std::{cell, default, f64};
 
 use collections::*;
-pub use collections::{cylindrical_index, AxisDescriptor, CylindricalAxis};
+pub use collections::{AxisDescriptor, CylindricalAxis, cylindrical_index};
 
-use crate::utils::{AxisPoints};
 use crate::coordinates::*;
-
+use crate::utils::AxisPoints;
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum MeshType {
@@ -14,7 +13,7 @@ pub enum MeshType {
     MeshRectangular,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum NeighborDirection {
     NotNeighbors = 0,
     XMinus = 1,
@@ -41,11 +40,7 @@ impl NeighborDirection {
     }
 
     pub fn ordered_pair<T: Copy>(self, a: T, b: T) -> (T, T) {
-        if self.is_positive() {
-            (a, b)
-        } else {
-            (b, a)
-        }
+        if self.is_positive() { (a, b) } else { (b, a) }
     }
 
     pub fn to_coord_index(&self) -> Option<usize> {
@@ -163,58 +158,48 @@ pub type MeshRectangular = BaseCompartmentMesh<RectangularMarker>;
 
 impl CompartmentMeshManip for MeshCylindrical {
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
-        let indices_points_cell1 = self.cell_points(cell1_id);
-        let indices_points_cell2 = self.cell_points(cell2_id);
+        let [r1, theta1, z1] = self.cell_points(cell1_id);
+        let [r2, theta2, z2] = self.cell_points(cell2_id);
 
-        let mut max_diff = 0;
-        let diff: Vec<i64> = indices_points_cell1
-            .iter()
-            .zip(indices_points_cell2)
-            .map(|(i_p_c_1, i_p_c_2)| {
-                let di = *i_p_c_1 as i64 - i_p_c_2 as i64;
-                if i64::abs(di) > i64::abs(max_diff) {
-                    max_diff = di;
-                }
-                di
-            })
-            .collect();
+        let theta_divs = self.axes[1].descriptor.n_range as isize;
 
-        let rmax = self.axes[cylindrical_index(CylindricalAxis::R)]
-            .descriptor
-            .n_range;
+        let r1 = r1 as isize;
+        let r2 = r2 as isize;
+        let z1 = z1 as isize;
+        let z2 = z2 as isize;
+        let t1 = theta1 as isize;
+        let t2 = theta2 as isize;
 
-        let theta_cell1 = indices_points_cell1[cylindrical_index(CylindricalAxis::Theta)];
-        let theta_cell2 = indices_points_cell2[cylindrical_index(CylindricalAxis::Theta)];
-        let r_cell1 = indices_points_cell1[cylindrical_index(CylindricalAxis::R)];
-        let r_cell2 = indices_points_cell2[cylindrical_index(CylindricalAxis::R)];
+        let dr = r2 - r1;
+        let dz = z2 - z1;
 
-        //TODO impove this, namely order or condiions
-        if max_diff.abs() > 1 {
+        let delta_theta = (t2 - t1 + theta_divs) % theta_divs;
+
+        let dtheta: isize = if delta_theta == 1 {
+            1
+        } else if delta_theta == theta_divs - 1 {
+            -1
+        } else if delta_theta == 0 {
+            0
+        } else {
+            2 
+        };
+
+        let distance = dr.abs() + dtheta.abs() + dz.abs();
+
+        if distance != 1 {
             return NeighborDirection::NotNeighbors;
         }
-        if diff.iter().filter(|&&i| i.abs() > 1).count() > 1 {
-            return NeighborDirection::NotNeighbors;
-        }
 
-        if theta_cell1 == theta_cell2 {
-            if r_cell1 == 0 && r_cell2 == rmax {
-                return NeighborDirection::YMinus;
-            }
-            if r_cell1 == rmax && r_cell2 == 0 {
-                return NeighborDirection::YPlus;
-            }
+        match (dr, dtheta, dz) {
+            (1, 0, 0) => NeighborDirection::XPlus,
+            (-1, 0, 0) => NeighborDirection::XMinus,
+            (0, 1, 0) => NeighborDirection::YPlus,
+            (0, -1, 0) => NeighborDirection::YMinus,
+            (0, 0, 1) => NeighborDirection::ZPlus,
+            (0, 0, -1) => NeighborDirection::ZMinus,
+            _ => NeighborDirection::NotNeighbors, 
         }
-
-        for (i, cd) in diff.iter().enumerate() {
-            if *cd == 1 {
-                return NeighborDirection::try_from((i as i32) * 2 + 1).unwrap();
-            }
-            if *cd == -1 {
-                return NeighborDirection::try_from((i as i32) * 2 + 2).unwrap();
-            }
-        }
-
-        NeighborDirection::NotNeighbors
     }
 
     fn cell_surface(&self, _cell_id: usize) -> f64 {

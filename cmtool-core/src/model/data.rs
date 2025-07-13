@@ -33,6 +33,19 @@ impl VolumeElementData {
             .unwrap()
     }
 
+    pub fn get_element_and_nvertex(&self, global_id: usize) -> (VolumeElementTypes,usize) {
+        // if self.vtype.len() <= global_id {
+        //     return 0;
+        // } else {
+        //     self.vtype[global_id].to_index()
+        // }
+        let element = self.vtype[global_id];
+        (element,ElementsType::VolumeElementType(element)
+            .node_count()
+            .try_into()
+            .unwrap())
+    }
+
     pub fn set_number_cid(&mut self, global_id: usize, n_cid: usize) {
         self.nc_id[global_id] = n_cid;
     }

@@ -23,7 +23,6 @@ pub struct CMModel {
     geometry: Arc<CMGeometry>,
     c_info: CompartmentInfo,
     interfaces: AInterfacesInfo,
-    global_id_from_interface: Vec<Vec<usize>>,
 }
 
 pub use geometry::CMGeometry;
@@ -31,7 +30,7 @@ pub use geometry::CMGeometry;
 impl CMModel {
     pub fn init(geometry: Arc<CMGeometry>) -> Self {
         println!("Init model with {} compartment", geometry.n_zone());
-        let volume_element_count = geometry.get_count_volume_element();
+        let volume_element_count = geometry.get_count_volume_element_first_pass();
 
         let n_zone_with_volume_element = volume_element_count.n_zone_with_volume_element();
 
@@ -45,19 +44,19 @@ impl CMModel {
         let interface_count_raw = volume_element_count.at_interface.clone();
         // let n_interfaces = volume_element_count.n_interfaces();
 
-        let (c_info, interfaces, global_id_from_interface) = volume_element_count.into_reduce();
+        let (c_info, interfaces) = volume_element_count.into_reduce();
+
+
         let mut model = Self {
             geometry,
             c_info,
             interfaces,
-            global_id_from_interface,
         };
         model.c_info.fill(&model.geometry);
 
         model.interfaces.fill(
             &model.geometry,
             &interface_count_raw,
-            &model.global_id_from_interface,
         );
 
         model
@@ -83,7 +82,8 @@ impl CMModel {
         for (i_interface, flow) in flows.iter_mut().enumerate() {
             let axis: usize = self.interfaces.axis[i_interface];
             let current_interface_area = &self.interfaces.area[i_interface];
-            let curent_inteface_element = &self.global_id_from_interface[i_interface];
+            let curent_inteface_element = &self.interfaces.global_id_from_interface[i_interface];
+
             for (global_id, area) in curent_inteface_element.iter().zip(current_interface_area) {
                 let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
                     let centroid = [0., 0., 0.];

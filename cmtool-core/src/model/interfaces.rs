@@ -1,12 +1,11 @@
 use std::{iter::Sum, ops::Add};
 
+use crate::coordinates::*;
 use crate::{
     ensight_gold::types::ElementsType,
-    model::{geometry, CMGeometry},
-    utils::{compute_intersection_area},
+    model::{CMGeometry, geometry},
+    utils::compute_intersection_area,
 };
-use crate::coordinates::*;
-
 
 #[derive(Default, Clone)]
 pub struct InterfaceInfo {
@@ -25,6 +24,8 @@ pub struct AInterfacesInfo {
     pub info: Vec<InterfaceInfo>,
     pub area: Vec<Vec<f64>>,
     pub axis: Vec<usize>,
+    pub global_id_from_interface: Vec<Vec<usize>>,
+    pub center_coordinates: Vec<f64>,
 }
 
 impl AInterfacesInfo {
@@ -36,6 +37,8 @@ impl AInterfacesInfo {
             info: vec![Default::default(); n_interfaces],
             area: vec![Default::default(); n_interfaces],
             axis: vec![Default::default(); n_interfaces],
+            global_id_from_interface: vec![Default::default(); n_interfaces],
+            center_coordinates: vec![0.; n_interfaces * 3 * 2], //Extent geometry
         }
     }
 }
@@ -67,12 +70,7 @@ impl Default for InterfaceFlow {
 }
 
 impl AInterfacesInfo {
-    pub fn fill(
-        &mut self,
-        geometry: &CMGeometry,
-        interface_count_raw: &[usize],
-        global_id_from_interface: &[Vec<usize>],
-    ) {
+    pub fn fill(&mut self, geometry: &CMGeometry, interface_count_raw: &[usize]) {
         let grid = geometry.get_grid().unwrap();
         let n_zones = geometry.n_zone();
         let mut interface_counter = 0;
@@ -94,15 +92,19 @@ impl AInterfacesInfo {
                 };
                 interfaces_id_from_cells[source_id * n_zones + target_id] = interface_id;
                 interfaces_id_from_cells[target_id * n_zones + source_id] = interface_id;
+                let neighbors = grid.are_cell_neighbor(source_id, target_id);
 
-                self.axis[interface_id] = grid
-                    .are_cell_neighbor(source_id, target_id)
+                self.axis[interface_id] = neighbors
                     .to_coord_index()
                     .expect("Unwrap because we already know they are neighbors");
             }
         }
-
+        let global_id_from_interface = &self.fill_second_pass(geometry);
         self.fill_area(geometry, global_id_from_interface);
+    }
+
+    fn fill_second_pass(&mut self, geometry: &CMGeometry) -> Vec<Vec<usize>> {
+        todo!()
     }
 
     fn fill_area(&mut self, geometry: &CMGeometry, global_id_from_interface: &[Vec<usize>]) {
@@ -113,18 +115,16 @@ impl AInterfacesInfo {
 
         let mut local_vertices: Vec<Coords3> = Vec::new();
 
-        for (interface_id, n_elem) in self.n_facet.iter().enumerate() {
-            for i_element in 0..*n_elem {
-                let axis_index = self.axis[interface_id];
-                let point_on_axe = 0.;
+        for (interface_id, cn_facet) in self.n_facet.iter().enumerate() {
+            for i_facet in 0..*cn_facet {
+                let value_on_ax = 0.; //TODO
 
-                let volume_element_global_id = global_id_from_interface[interface_id][i_element]; //m_dbLimit_lvelem[interface][n_elem]
+                let volume_element_global_id = global_id_from_interface[interface_id][i_facet]; //m_dbLimit_lvelem[interface][n_elem]
 
-                let element = geometry.volume_elements.vtype[volume_element_global_id];
-                let n_vertex = geometry
+                let (elem_type, n_vertex) = geometry
                     .volume_elements
-                    .get_vertex_per_element(volume_element_global_id);
-                local_vertices.clear();
+                    .get_element_and_nvertex(volume_element_global_id);
+
                 local_vertices.resize(n_vertex, Default::default());
 
                 for (k_vertex, local_vertex) in local_vertices.iter_mut().enumerate() {
@@ -133,10 +133,14 @@ impl AInterfacesInfo {
                         .get_vertex_from_vol_global_id(volume_element_global_id, k_vertex);
                     *local_vertex = geometry.vertices.get_slice_xyz(vertex_global_id).to_owned();
                 }
-                let area =
-                    compute_intersection_area(&local_vertices, element, point_on_axe, axis_index)
-                        .expect("Area between element");
-                self.area[interface_id][i_element] += area;
+
+                self.area[interface_id][i_facet] += compute_intersection_area(
+                    &local_vertices,
+                    elem_type,
+                    value_on_ax,
+                    self.axis[interface_id],
+                )
+                .expect("Area between element");
             }
         }
     }

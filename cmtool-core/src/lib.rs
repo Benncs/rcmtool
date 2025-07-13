@@ -1,6 +1,5 @@
 use std::{
-    mem::uninitialized,
-    path::{Path, PathBuf},
+    path::{Path},
     sync::Arc,
 };
 

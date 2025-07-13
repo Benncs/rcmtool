@@ -94,7 +94,6 @@ impl CompartmentInfo {
 pub struct CountVolumeElement {
     pub per_compartment: Vec<usize>,
     pub at_interface: Vec<usize>,
-    pub global_id_from_interface: Vec<Vec<usize>>,
 }
 
 impl CountVolumeElement {
@@ -104,23 +103,18 @@ impl CountVolumeElement {
             //Each compartment can technically have one interface with each other
             //Ahead of time, allocate more than needed. be resized later
             at_interface: vec![0; n_zone * n_zone],
-            global_id_from_interface: vec![Vec::new(); n_zone * n_zone],
         }
     }
 
-    pub fn into_reduce(self) -> (CompartmentInfo, AInterfacesInfo, Vec<Vec<usize>>) {
-        let filtered: Vec<(usize, Vec<usize>)> = self
-            .at_interface
-            .iter()
-            .zip(self.global_id_from_interface.iter())
-            .filter(|(&at, _)| at > 0)
-            .map(|(&at, global)| (at, global.clone()))
+    pub fn into_reduce(self) -> (CompartmentInfo, AInterfacesInfo) {
+        
+
+        let at_interface: Vec<usize> = self.at_interface
+            .into_iter()
+            .filter(|&v| v != 0)
             .collect();
 
-        let at_interface: Vec<usize> = filtered.iter().map(|(at, _)| *at).collect();
-
-        let global_id_from_interface: Vec<Vec<usize>> =
-            filtered.into_iter().map(|(_, global)| global).collect();
+      
 
         let per_compartment: Vec<usize> = self
             .per_compartment
@@ -131,7 +125,6 @@ impl CountVolumeElement {
         (
             CompartmentInfo::new(per_compartment),
             AInterfacesInfo::new(at_interface),
-            global_id_from_interface,
         )
     }
 
@@ -167,16 +160,7 @@ impl CountVolumeElement {
     pub fn incr_interface(&mut self, compartment_id_0: usize, compartment_id_k: usize) {
         self.at_interface[compartment_id_0 * self.per_compartment.len() + compartment_id_k] += 1;
     }
-    pub fn set_kelem(
-        &mut self,
-        compartment_id_0: usize,
-        compartment_id_k: usize,
-        kelem_global_id: &[usize],
-    ) {
-        self.global_id_from_interface
-            [compartment_id_0 * self.per_compartment.len() + compartment_id_k]
-            .extend_from_slice(kelem_global_id);
-    }
+   
 
     pub fn n_interfaces(&self) -> usize {
         self.at_interface.iter().filter(|&&v| v > 0).count()

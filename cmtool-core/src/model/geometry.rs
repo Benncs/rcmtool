@@ -1,13 +1,14 @@
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, default, sync::Arc};
 
 use crate::{
     ensight_gold::{self, types::ElementsType},
     grid::{
-        cylindrical_index, get_mesh, CompartmentMesh, CylindricalAxis, MeshType, NeighborDirection,
+        CompartmentMesh, CylindricalAxis, MeshType, NeighborDirection, cylindrical_index, get_mesh,
     },
     model::{
-        data::{VerticesData, VolumeElementData},
         CountVolumeElement,
+        data::{VerticesData, VolumeElementData},
+        interfaces::AInterfacesInfo,
     },
 };
 
@@ -131,23 +132,27 @@ impl CMGeometry {
         self.grid.as_ref().unwrap().number_cell()
     }
 
-    pub fn get_count_volume_element(&self) -> CountVolumeElement {
+    pub fn get_count_volume_element_first_pass(&self) -> CountVolumeElement {
         let mut count = CountVolumeElement::new(self.n_zone());
-        let mut tmp_constructor_kelem = Vec::new();
+
+        // let mut global_id_from_interface:Vec<Vec<usize>> = vec![Vec::new();self.n_zone()*self.n_zone()];
+
+        //self.volume_elements.n_element() OK
         for vol_element_global_id in 0..self.volume_elements.n_element() {
             let interface_cid_0 = self
                 .volume_elements
                 .get_list_compartment_id(vol_element_global_id, 0);
 
-            for k_vertex in 0..self.volume_elements.get_number_cid(vol_element_global_id) {
-                tmp_constructor_kelem.push(vol_element_global_id);
+            let n_cid = self.volume_elements.get_number_cid(vol_element_global_id);
+
+            for k_vertex in 0..n_cid {
                 let interface_cid_k = self
                     .volume_elements
                     .get_list_compartment_id(vol_element_global_id, k_vertex);
 
                 count.incr_compartment(interface_cid_k);
 
-                if k_vertex >= 1 {
+                if k_vertex >= 1 && n_cid > 1 {
                     match self
                         .grid
                         .as_ref()
@@ -155,20 +160,13 @@ impl CMGeometry {
                         .are_cell_neighbor(interface_cid_0, interface_cid_k)
                     {
                         NeighborDirection::NotNeighbors => {
-                            //NOP                            
-                        },
+                            //NOP
+                        }
                         neighbors => {
                             let (id1, id2) =
                                 neighbors.ordered_pair(interface_cid_0, interface_cid_k);
 
                             count.incr_interface(id1, id2);
-                            
-                            count.set_kelem(
-                                interface_cid_0,
-                                interface_cid_k,
-                                &tmp_constructor_kelem,
-                            );
-                            tmp_constructor_kelem.clear();
                         }
                     }
                 }
@@ -176,6 +174,8 @@ impl CMGeometry {
         }
         count
     }
+
+  
 
     pub fn init(
         n_div: [usize; 3],

@@ -200,7 +200,7 @@ pub fn compute_intersection_area(
     local_vertices: &[Coords3],
     elem_type: VolumeElementTypes,
     value_on_ax: f64,
-    axe_index: usize,
+    axis_index: usize,
 ) -> Option<f64> {
     let tetra_indices = elem_type.tetra_subdivisions();
     if local_vertices.len() != ElementsType::VolumeElementType(elem_type).node_count() as usize {
@@ -213,7 +213,7 @@ pub fn compute_intersection_area(
             let b = local_vertices[i1];
             let c = local_vertices[i2];
             let d = local_vertices[i3];
-            tetra_area(a, b, c, d, value_on_ax, axe_index)
+            tetra_area(a, b, c, d, value_on_ax, axis_index)
         })
         .sum();
 
