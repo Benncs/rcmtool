@@ -1,7 +1,7 @@
-use crate::ensight_gold::{
+use crate::{coordinates::CartesianCoordinates, ensight_gold::{
     types::{ElementsType, VolumeElementTypes},
     Part,
-};
+}};
 const C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM: usize = 20;
 
 #[derive(Default, Debug)]
@@ -11,7 +11,7 @@ pub struct VolumeElementData {
     pub vtype: Vec<VolumeElementTypes>, // Volume element type accessed via voGID
     ids: Vec<usize>,                    // Volume element ID accessed via voGID
     vertices: Vec<usize>,               // List of vertices attached to volume element
-    // xyz: Vec<f64>,                // Coordinates of center of volume element
+    pub xyz: Vec<CartesianCoordinates>,                // Coordinates of center of volume element
     // raz: Vec<f64>,                // Additional coordinates or metadata
 
     // cell_id: Vec<usize>,          // cID accessed via voGID
@@ -75,7 +75,7 @@ impl VolumeElementData {
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
         self.compartment_ids
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
-        // self.xyz.resize(n_velement * 3, 0.);
+        self.xyz.resize(n_velement , Default::default());
         // self.raz.resize(n_velement * 3, 0.);
 
         self.vertices_cell_id

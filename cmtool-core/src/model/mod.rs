@@ -1,4 +1,6 @@
 use crate::{
+    CoreError,
+    coordinates::CartesianCoordinates,
     ensight_gold::types::VolumeElementTypes,
     grid::MeshType,
     model::{
@@ -6,7 +8,6 @@ use crate::{
         interfaces::{AInterfacesInfo, InterfaceFlow, InterfaceInfo},
     },
     utils::{self, compute_volume},
-    CoreError,
 };
 use std::sync::Arc;
 mod data;
@@ -46,7 +47,6 @@ impl CMModel {
 
         let (c_info, interfaces) = volume_element_count.into_reduce();
 
-
         let mut model = Self {
             geometry,
             c_info,
@@ -54,10 +54,7 @@ impl CMModel {
         };
         model.c_info.fill(&model.geometry);
 
-        model.interfaces.fill(
-            &model.geometry,
-            &interface_count_raw,
-        );
+        model.interfaces.fill(&model.geometry, &interface_count_raw);
 
         model
     }
@@ -85,14 +82,15 @@ impl CMModel {
             let curent_inteface_element = &self.interfaces.global_id_from_interface[i_interface];
 
             for (global_id, area) in curent_inteface_element.iter().zip(current_interface_area) {
+                let vector_coords = vector.get_slice_xyz(*global_id);
+
                 let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
-                    let centroid = [0., 0., 0.];
-                    utils::vector_cartesian_to_cylindrical(
-                        vector.get_slice_xyz(*global_id),
-                        centroid,
-                    )
+                    let CartesianCoordinates(centroid) =
+                        self.geometry.volume_elements.xyz[*global_id];
+
+                    utils::vector_cartesian_to_cylindrical(vector_coords, centroid)
                 } else {
-                    vector.get_slice_xyz(*global_id).to_owned()
+                    vector_coords.to_owned()
                 };
 
                 let f = coords[axis] * area;

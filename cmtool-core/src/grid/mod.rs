@@ -144,8 +144,18 @@ impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
         self.n_cells
     }
 
+    
     fn get_cell_edge(&self, i_axis: usize, i_point: usize) -> f64 {
-        self.axes[i_axis].edges[i_point]
+        #[cfg(debug_assertions)]
+        {
+            // Debug mode: safe indexing with bounds check
+            self.axes[i_axis].edges[i_point]
+        }
+
+        #[cfg(not(debug_assertions))]
+        unsafe {
+            *self.axes.get_unchecked(i_axis).edges.get_unchecked(i_point)
+        }
     }
 
     fn get_cell_center(&self, i_axis: usize, i_point: usize) -> f64 {

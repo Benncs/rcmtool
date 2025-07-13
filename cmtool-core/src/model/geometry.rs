@@ -1,6 +1,7 @@
 use std::{collections::BTreeSet, default, sync::Arc};
 
 use crate::{
+    coordinates::{CartesianCoordinates, Coords3},
     ensight_gold::{self, types::ElementsType},
     grid::{
         CompartmentMesh, CylindricalAxis, MeshType, NeighborDirection, cylindrical_index, get_mesh,
@@ -106,6 +107,9 @@ impl CMGeometry {
                 .volume_elements
                 .get_vertex_per_element(vol_element_global_id);
 
+            self.volume_elements.xyz[vol_element_global_id] =
+                self.get_element_centroid(vol_element_global_id, n_vertex);
+
             let unique_cids: BTreeSet<_> = (0..n_vertex)
                 .map(|k_vertex| {
                     let vertex_global_id = self
@@ -125,6 +129,29 @@ impl CMGeometry {
             }
         }
     }
+
+    fn get_element_centroid(
+        &self,
+        vol_element_global_id: usize,
+        n_vertex: usize,
+    ) -> CartesianCoordinates {
+        let mut coords: Coords3 = Default::default();
+
+        for k_vertex in 0..n_vertex {
+            let vertex_id = self
+                .volume_elements
+                .get_vertex_from_vol_global_id(vol_element_global_id, k_vertex);
+            let base_index = 3 * vertex_id;
+
+            coords[0] += self.vertices.xyz[base_index];
+            coords[1] += self.vertices.xyz[base_index + 1];
+            coords[2] += self.vertices.xyz[base_index + 2];
+        }
+        coords[0] /= n_vertex as f64;
+        coords[1] /= n_vertex as f64;
+        coords[2] /= n_vertex as f64;
+        CartesianCoordinates(coords)
+    }
 }
 
 impl CMGeometry {
@@ -132,12 +159,7 @@ impl CMGeometry {
         self.grid.as_ref().unwrap().number_cell()
     }
 
-    pub fn get_count_volume_element_first_pass(&self) -> CountVolumeElement {
-        let mut count = CountVolumeElement::new(self.n_zone());
-
-        // let mut global_id_from_interface:Vec<Vec<usize>> = vec![Vec::new();self.n_zone()*self.n_zone()];
-
-        //self.volume_elements.n_element() OK
+    pub(super) fn interface_iterator(&self, mut f: impl FnMut(usize, usize, usize, usize)) {
         for vol_element_global_id in 0..self.volume_elements.n_element() {
             let interface_cid_0 = self
                 .volume_elements
@@ -149,33 +171,48 @@ impl CMGeometry {
                 let interface_cid_k = self
                     .volume_elements
                     .get_list_compartment_id(vol_element_global_id, k_vertex);
+                f(
+                    vol_element_global_id,
+                    interface_cid_0,
+                    interface_cid_k,
+                    k_vertex,
+                );
+            }
+        }
+    }
 
-                count.incr_compartment(interface_cid_k);
+    pub fn get_count_volume_element_first_pass(&self) -> CountVolumeElement {
+        let mut count = CountVolumeElement::new(self.n_zone());
 
-                if k_vertex >= 1 && n_cid > 1 {
-                    match self
-                        .grid
-                        .as_ref()
-                        .unwrap()
-                        .are_cell_neighbor(interface_cid_0, interface_cid_k)
-                    {
-                        NeighborDirection::NotNeighbors => {
-                            //NOP
-                        }
-                        neighbors => {
-                            let (id1, id2) =
-                                neighbors.ordered_pair(interface_cid_0, interface_cid_k);
+        let functor = |_vol_element_global_id: usize,
+                       interface_cid_0: usize,
+                       interface_cid_k: usize,
+                       k_vertex: usize| {
+            count.incr_compartment(interface_cid_k);
 
-                            count.incr_interface(id1, id2);
-                        }
+            if k_vertex >= 1 {
+                match self
+                    .grid
+                    .as_ref()
+                    .unwrap()
+                    .are_cell_neighbor(interface_cid_0, interface_cid_k)
+                {
+                    NeighborDirection::NotNeighbors => {
+                        //NOP
+                    }
+                    neighbors => {
+                        let (id1, id2) = neighbors.ordered_pair(interface_cid_0, interface_cid_k);
+
+                        count.incr_interface(id1, id2);
                     }
                 }
             }
-        }
+        };
+
+        self.interface_iterator(functor);
+
         count
     }
-
-  
 
     pub fn init(
         n_div: [usize; 3],
