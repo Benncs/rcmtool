@@ -1,14 +1,38 @@
-
+///Represent axis absolution direction in a direct-orientied coordinate system
 pub enum OrientedAxis {
     I = 0,
     J = 1,
     K = 2,
 }
 
+///Represent axis direction in cylindrical coordinates
 pub enum CylindricalAxis {
-    R = 0,
-    Theta = 1,
-    Z = 2,
+    R = OrientedAxis::I as isize,
+    Theta = OrientedAxis::J as isize,
+    Z = OrientedAxis::K as isize,
+}
+
+///Represent axis direction in cartesian coordinates
+pub enum CartesianAxis {
+    X = OrientedAxis::I as isize,
+    Y = OrientedAxis::J as isize,
+    Z = OrientedAxis::K as isize,
+}
+
+impl From<CartesianAxis> for usize {
+    fn from(axis: CartesianAxis) -> usize {
+        axis as usize
+    }
+}
+impl From<CylindricalAxis> for usize {
+    fn from(axis: CylindricalAxis) -> usize {
+        axis as usize
+    }
+}
+impl From<OrientedAxis> for usize {
+    fn from(axis: OrientedAxis) -> usize {
+        axis as usize
+    }
 }
 
 #[inline(always)]
@@ -29,8 +53,6 @@ pub const fn index_to_oriented(axis: usize) -> OrientedAxis {
         _ => panic!("index_to_oriented needs index between 0 and 3"),
     }
 }
-
-
 
 #[derive(Default)]
 pub struct AxisDescriptor {

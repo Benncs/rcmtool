@@ -1,5 +1,5 @@
 mod collections;
-use std::{cell, default, f64};
+use std::f64;
 
 use collections::*;
 pub use collections::{AxisDescriptor, CylindricalAxis, cylindrical_index};
@@ -7,24 +7,41 @@ pub use collections::{AxisDescriptor, CylindricalAxis, cylindrical_index};
 use crate::coordinates::*;
 use crate::utils::AxisPoints;
 
+/// Represents the type of mesh geometry.
 #[derive(PartialEq, Clone, Copy)]
 pub enum MeshType {
+    /// A cylindrical mesh type.
     Cylindrical,
-    MeshRectangular,
+    /// A rectangular mesh type.
+    Rectangular,
 }
 
+/// Represents the direction of a neighboring cell relative to a given cell in a 3D grid.
+///
+/// This enum is used to indicate the spatial relationship between cells in a grid
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum NeighborDirection {
+    /// Indicates that the cells are not neighbors.
     NotNeighbors = 0,
+    /// Indicates the neighbor is in the negative X direction.
     XMinus = 1,
+    /// Indicates the neighbor is in the positive X direction.
     XPlus = 2,
+    /// Indicates the neighbor is in the negative Y direction.
     YMinus = 3,
+    /// Indicates the neighbor is in the positive Y direction.
     YPlus = 4,
+    /// Indicates the neighbor is in the negative Z direction.
     ZMinus = 5,
+    /// Indicates the neighbor is in the positive Z direction.
     ZPlus = 6,
 }
 
 impl NeighborDirection {
+    /// Checks if the direction is positive.
+    ///
+    /// Returns `true` if the direction is positive (XPlus, YPlus, ZPlus),
+    /// otherwise returns `false`.
     pub const fn is_positive(self) -> bool {
         matches!(
             self,
@@ -32,6 +49,10 @@ impl NeighborDirection {
         )
     }
 
+    /// Checks if the direction is negative.
+    ///
+    /// Returns `true` if the direction is negative (XMinus, YMinus, ZMinus),
+    /// otherwise returns `false`.
     pub const fn is_negative(self) -> bool {
         matches!(
             self,
@@ -39,10 +60,17 @@ impl NeighborDirection {
         )
     }
 
+    /// Returns an ordered pair of values based on the direction's positivity.
+    ///
+    /// If the direction is positive, returns (a, b). Otherwise, returns (b, a).
     pub fn ordered_pair<T: Copy>(self, a: T, b: T) -> (T, T) {
         if self.is_positive() { (a, b) } else { (b, a) }
     }
 
+    /// Converts the direction into a coordinate index.
+    ///
+    /// Returns `Some(usize)` representing the index of the coordinate (0 for X axis,
+    /// 1 for Y axis, 2 for Z axis), or `None` if the variant is `NotNeighbors`.
     pub fn to_coord_index(&self) -> Option<usize> {
         match self {
             Self::XMinus | Self::XPlus => Some(0),
@@ -53,58 +81,220 @@ impl NeighborDirection {
     }
 }
 
-impl TryFrom<i32> for NeighborDirection {
-    type Error = &'static str;
+// impl TryFrom<i32> for NeighborDirection {
+//     type Error = &'static str;
 
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(NeighborDirection::NotNeighbors),
-            1 => Ok(NeighborDirection::XMinus),
-            2 => Ok(NeighborDirection::XPlus),
-            3 => Ok(NeighborDirection::YMinus),
-            4 => Ok(NeighborDirection::YPlus),
-            5 => Ok(NeighborDirection::ZMinus),
-            6 => Ok(NeighborDirection::ZPlus),
-            _ => Err("Invalid integer value for NeighborDirection"),
-        }
-    }
-}
+//     fn try_from(value: i32) -> Result<Self, Self::Error> {
+//         match value {
+//             0 => Ok(NeighborDirection::NotNeighbors),
+//             1 => Ok(NeighborDirection::XMinus),
+//             2 => Ok(NeighborDirection::XPlus),
+//             3 => Ok(NeighborDirection::YMinus),
+//             4 => Ok(NeighborDirection::YPlus),
+//             5 => Ok(NeighborDirection::ZMinus),
+//             6 => Ok(NeighborDirection::ZPlus),
+//             _ => Err("Invalid integer value for NeighborDirection"),
+//         }
+//     }
+// }
 
+/// Trait for accessing mesh data in a coarsed-mesh model.
+///
+/// Defines methods to access various properties of a coarsed mesh (structured grid),
 pub trait CompartmentMeshAccessor {
+    /// Returns the minimum value along the specified axis.
+    ///
+    /// # Arguments
+    ///
+    /// * `i_axis` - The index of the axis
+    ///
+    /// # Returns
+    ///
+    /// The minimum value along the specified axis.
     fn min_axis(&self, i_axis: usize) -> f64;
 
+    /// Returns the maximum value along the specified axis.
+    ///
+    /// # Arguments
+    ///
+    /// * `i_axis` - The index of the axis
+    ///
+    /// # Returns
+    ///
+    /// The maximum value along the specified axis.
     fn max_axis(&self, i_axis: usize) -> f64;
 
+    /// Returns the step size between points along the specified axis.
+    ///
+    /// # Arguments
+    ///
+    /// * `i_axis` - The index of the axis
+    ///
+    /// # Returns
+    ///
+    /// The step size between points along the specified axis.
     fn mesh_step_axis(&self, i_axis: usize) -> f64;
 
+    /// Returns the number of points along the specified axis.
+    ///
+    /// # Arguments
+    ///
+    /// * `i_axis` - The index of the axis
+    ///
+    /// # Returns
+    ///
+    /// The number of points along the specified axis.
     fn n_points_axis(&self, i_axis: usize) -> usize;
 
+    /// Returns the total number of cells in the mesh.
+    ///
+    /// # Returns
+    ///
+    /// The total number of cells.
     fn number_cell(&self) -> usize;
 
+    /// Returns the edge position of a specific cell along the specified axis and point index.
+    ///
+    /// # Arguments
+    ///
+    /// * `i_axis` - The index of the axis.
+    /// * `i_point` - The index of the point along the specified axis.
+    ///
+    /// # Returns
+    ///
+    /// The edge position of the specified cell.
     fn get_cell_edge(&self, i_axis: usize, i_point: usize) -> f64;
 
+    /// Returns the center position of a specific cell along the specified axis and point index.
+    ///
+    /// # Arguments
+    ///
+    /// * `i_axis` - The index of the axis.
+    /// * `i_point` - The index of the point along the specified axis.
+    ///
+    /// # Returns
+    ///
+    /// The center position of the specified cell.
     fn get_cell_center(&self, i_axis: usize, i_point: usize) -> f64;
 }
 
+/// Trait for manipulating and querying properties of cells in a compartment mesh.
 pub trait CompartmentMeshManip {
+    /// Determines if two cells are neighbors and returns the direction of neighborhood.
+    ///
+    /// # Arguments
+    ///
+    /// * `cell1_id` - The ID of the first cell.
+    /// * `cell2_id` - The ID of the second cell.
+    ///
+    /// # Returns
+    ///
+    /// A `NeighborDirection` indicating whether and how the cells are neighbors.
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection;
+
+    /// Computes the surface area of a specified cell.
+    ///
+    /// # Arguments
+    ///
+    /// * `cell_id` - The ID of the cell.
+    ///
+    /// # Returns
+    ///
+    /// The surface area of the cell as a floating-point number.
     fn cell_surface(&self, cell_id: usize) -> f64;
+
+    /// Computes the volume of a specified cell.
+    ///
+    /// # Arguments
+    ///
+    /// * `cell_id` - The ID of the cell.
+    ///
+    /// # Returns
+    ///
+    /// The volume of the cell as a floating-point number.
     fn cell_volume(&self, cell_id: usize) -> f64;
+
+    /// Finds the cell ID corresponding to specific 3D coordinates.
+    ///
+    /// # Arguments
+    ///
+    /// * `coords` - A reference to a `Coords3` representing the 3D coordinates.
+    ///
+    /// # Returns
+    ///
+    /// An `Option<usize>` containing the cell ID if found, or `None` otherwise.
     fn cell_from_coordinates(&self, coords: &Coords3) -> Option<usize>;
+
+    /// Checks if a point is inside a specified cell.
+    ///
+    /// # Arguments
+    ///
+    /// * `cell_id` - The ID of the cell to check.
+    /// * `point_coords` - A reference to a `Coords3` representing the point's coordinates.
+    ///
+    /// # Returns
+    ///
+    /// A boolean indicating whether the point is inside the cell.
     fn is_point_inside(&self, cell_id: usize, point_coords: &Coords3) -> bool;
+
+    /// Retrieves the points defining a specified cell.
+    ///
+    /// # Arguments
+    ///
+    /// * `cell_1d` - The ID of the cell.
+    ///
+    /// # Returns
+    ///
+    /// An `AxisPoints` object containing the points of the cell.
     fn cell_points(&self, cell_1d: usize) -> AxisPoints;
+
+    /// Returns the maximum number of interfaces a cell can have in this mesh.
+    ///
+    /// # Returns
+    ///
+    /// The maximum number of interfaces as a `usize`.
     fn n_maximum_interface(&self) -> usize;
 }
-
+/// A compartment mesh grid.
+///
+/// This trait is automatically implemented for any type that implements both
+/// `CompartmentMeshAccessor` and `CompartmentMeshManip`, and is thread-safe (`Send` + `Sync`).
+/// It provides a unified interface for operations on compartment meshes, ensuring that such types
+/// can be used in concurrent programming contexts safely.
 pub trait CompartmentMesh: Send + Sync + CompartmentMeshAccessor + CompartmentMeshManip {}
+
+/// Automatically implements `CompartmentMesh` for any type `T` that implements both
+/// `CompartmentMeshAccessor` and `CompartmentMeshManip`, and is thread-safe.
+///
+/// This blanket implementation ensures that any type meeting these criteria can be used
+/// wherever a `CompartmentMesh` is required, without explicit implementation.
 impl<T: CompartmentMeshAccessor + CompartmentMeshManip + Send + Sync> CompartmentMesh for T {}
 
 pub struct CylindricalMarker;
 pub struct RectangularMarker;
 
+/// Base Compartment mesh structure for spatial modeling.
+///
+/// This struct provides the base components data for compartmental meshes
+///
+/// # Type Parameters
+///
+/// * `T`: A marker type used to distinguish different mesh configurations
 pub struct BaseCompartmentMesh<T> {
+    /// The axes of the coordinate system for the mesh.
+    ///
+    /// This array contains three `CoordAxis` instances, each representing one of the
+    /// principal axes
     axes: [CoordAxis; 3],
+
+    /// The total number of cells in the mesh.
+    ///
+    /// This field stores the count of cells within the compartmental mesh.
     n_cells: usize,
+
+    /// PhantomData marker for generic type `T`.
+    ///
+    /// This field is used to mark the generic type `T` in the struct without actually storing data.
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -163,21 +353,24 @@ impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
     }
 }
 
+/// Cylindrical Compartment mesh structure for spatial modeling.
 pub type MeshCylindrical = BaseCompartmentMesh<CylindricalMarker>;
+
+/// Cuboid Compartment mesh structure for spatial modeling.
 pub type MeshRectangular = BaseCompartmentMesh<RectangularMarker>;
 
 impl CompartmentMeshManip for MeshCylindrical {
     fn n_maximum_interface(&self) -> usize {
-        let nr = self.axes[0].descriptor.n_range ;
-        let ntheta = self.axes[1].descriptor.n_range ;
-        let nz = self.axes[2].descriptor.n_range ;
+        //Trivial numbering of interfaces in a structured grid
+        let nr = self.axes[0].descriptor.n_range;
+        let ntheta = self.axes[1].descriptor.n_range;
+        let nz = self.axes[2].descriptor.n_range;
 
-        let interfaces_r = (nr-1) * ntheta * nz;
+        let interfaces_r = (nr - 1) * ntheta * nz;
         let interfaces_theta = nr * (ntheta - 1) * nz;
         let interfaces_z = nr * ntheta * (nz - 1);
 
-        let wrap = nr * nz; //Conexion between theta=-pi and theta=pi 
-
+        let wrap = nr * nz; //Wrap-in for connection between theta=-pi and theta=pi 
 
         interfaces_r + interfaces_theta + interfaces_z + wrap
     }
@@ -200,6 +393,7 @@ impl CompartmentMeshManip for MeshCylindrical {
 
         let delta_theta = (t2 - t1 + theta_divs) % theta_divs;
 
+        //Handle specific case for theta, which is mod pi
         let dtheta: isize = if delta_theta == 1 {
             1
         } else if delta_theta == theta_divs - 1 {
@@ -271,6 +465,7 @@ impl CompartmentMeshManip for MeshCylindrical {
         //     p_coeff_up /= array_size;
         // }
 
+        //Keep same logic as c++ code, would be better to start numbering from top to have forward loop
         for i in (0..self.axes.len()).rev() {
             let axe = &self.axes[i];
             let array_size = axe.descriptor.n_range;
@@ -287,13 +482,15 @@ pub fn get_mesh(
     mut ax_descriptor: [AxisDescriptor; 3],
 ) -> Box<dyn CompartmentMesh> {
     match meshtype {
+        //TODO move this into geometryy module as just assert
+        //Having this logic here, hides specific behaviour to user which may lead to errors
         MeshType::Cylindrical => {
             ax_descriptor[0].min_range = 0.;
             ax_descriptor[1].min_range = -std::f64::consts::PI;
             ax_descriptor[1].max_range = std::f64::consts::PI;
             Box::new(MeshCylindrical::new(ax_descriptor))
         }
-        MeshType::MeshRectangular => unimplemented!("Manip for Rectangular impl"),
+        MeshType::Rectangular => unimplemented!("Manip for Rectangular impl"),
     }
 }
 
