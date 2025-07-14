@@ -96,7 +96,7 @@ impl AInterfacesInfo {
                 let direction_neighbors = neighbors
                     .to_coord_index()
                     .expect("Unwrap because we already know they are neighbors");
-                self.axis[interface_id]=direction_neighbors;
+                self.axis[interface_id] = direction_neighbors;
                 let indices_cell = grid.cell_points(source_id);
                 for (i_axis, ax_index) in indices_cell.iter().enumerate() {
                     let plane_index = interface_id * 6 + 2 * i_axis; // 6 account for number of extent (x-,x+,y-,y+,z-.z+)
@@ -123,7 +123,6 @@ impl AInterfacesInfo {
         geometry: &CMGeometry,
         interfaces_id_from_cells: &[usize],
     ) -> Vec<Vec<usize>> {
-        
         let mut tmp_element_counter = vec![0; self.n_facet.len()];
         let mut global_id_from_interface: Vec<Vec<usize>> = vec![Vec::new(); self.n_facet.len()];
         for (element_id, n_element) in global_id_from_interface.iter_mut().zip(self.n_facet.iter())
@@ -162,7 +161,7 @@ impl AInterfacesInfo {
             self.area[i].resize(*n, 0.);
         }
 
-        let mut local_vertices: Vec<Coords3> = Vec::new();
+        let mut local_vertices: Vec<CartesianCoordinates> = Vec::new();
 
         for (interface_id, cn_facet) in self.n_facet.iter().enumerate() {
             let interface_plane = &self.plane_coordinates[6 * interface_id..6 * interface_id + 6];
@@ -179,7 +178,9 @@ impl AInterfacesInfo {
                     let vertex_global_id = geometry
                         .volume_elements
                         .get_vertex_from_vol_global_id(volume_element_global_id, k_vertex);
-                    *local_vertex = geometry.vertices.get_slice_xyz(vertex_global_id).to_owned();
+                    *local_vertex = CartesianCoordinates(
+                        geometry.vertices.get_slice_xyz(vertex_global_id).to_owned(),
+                    );
                 }
                 let value_on_ax = interface_plane[2 * self.axis[interface_id]];
 
@@ -188,10 +189,15 @@ impl AInterfacesInfo {
                     elem_type,
                     value_on_ax,
                     self.axis[interface_id],
+                    geometry.mesh_type,
                 )
                 .expect("Area between element");
 
-                self.area[interface_id][i_facet] += area;
+                if area == 0. {
+                    println!("{} {} {} ", area, interface_id, i_facet);
+                }
+
+                self.area[interface_id][i_facet] = area;
             }
         }
     }

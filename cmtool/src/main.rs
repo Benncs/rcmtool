@@ -1,4 +1,5 @@
 use clap::Parser;
+use cmtool_data::{RawData, RawDataFlux};
 use std::{env, path::Path};
 
 #[derive(Parser)]
@@ -11,12 +12,7 @@ struct GenArgs {
 }
 
 fn main() {
-    // let case = cmtool_core::ensight_gold::Case::read(
-    //     "/home/benjamin/Documents/thesis/cfd-cma/Cas_Test_CMA/export/wall_cart.encas",
-    // )
-    // .unwrap();
-
-    // let args = GenArgs::parse();
+    
 
     #[cfg(debug_assertions)]
     let args = GenArgs {
@@ -60,7 +56,18 @@ fn main() {
     let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
     let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";
 
-    handle
+    let export = handle
         .dump_vector_from_scalar(format!("{}/flowL", root_dir), p1, p2, p3)
-        .unwrap()
+        .unwrap();
+
+    cmtool::check_flows(&export);
+
+
+//     cmtool::check_flows(&RawDataFlux::read_raw(
+//         "/home/benjamin/Documents/thesis/flowL.raw",
+//     ).unwrap());
+
+//    cmtool::check_flows(&RawDataFlux::read_raw(
+//         "/home/benjamin/Documents/thesis/cfd-cma/sanofi/raw/flowL.raw",
+//     ).unwrap()); 
 }

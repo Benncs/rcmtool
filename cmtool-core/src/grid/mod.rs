@@ -93,6 +93,7 @@ pub trait CompartmentMeshManip {
     fn cell_from_coordinates(&self, coords: &Coords3) -> Option<usize>;
     fn is_point_inside(&self, cell_id: usize, point_coords: &Coords3) -> bool;
     fn cell_points(&self, cell_1d: usize) -> AxisPoints;
+    fn n_maximum_interface(&self) -> usize;
 }
 
 pub trait CompartmentMesh: Send + Sync + CompartmentMeshAccessor + CompartmentMeshManip {}
@@ -144,7 +145,6 @@ impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
         self.n_cells
     }
 
-    
     fn get_cell_edge(&self, i_axis: usize, i_point: usize) -> f64 {
         #[cfg(debug_assertions)]
         {
@@ -167,6 +167,21 @@ pub type MeshCylindrical = BaseCompartmentMesh<CylindricalMarker>;
 pub type MeshRectangular = BaseCompartmentMesh<RectangularMarker>;
 
 impl CompartmentMeshManip for MeshCylindrical {
+    fn n_maximum_interface(&self) -> usize {
+        let nr = self.axes[0].descriptor.n_range ;
+        let ntheta = self.axes[1].descriptor.n_range ;
+        let nz = self.axes[2].descriptor.n_range ;
+
+        let interfaces_r = (nr-1) * ntheta * nz;
+        let interfaces_theta = nr * (ntheta - 1) * nz;
+        let interfaces_z = nr * ntheta * (nz - 1);
+
+        let wrap = nr * nz; //Conexion between theta=-pi and theta=pi 
+
+
+        interfaces_r + interfaces_theta + interfaces_z + wrap
+    }
+
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
         let [r1, theta1, z1] = self.cell_points(cell1_id);
         let [r2, theta2, z2] = self.cell_points(cell2_id);
@@ -192,7 +207,7 @@ impl CompartmentMeshManip for MeshCylindrical {
         } else if delta_theta == 0 {
             0
         } else {
-            2 
+            2
         };
 
         let distance = dr.abs() + dtheta.abs() + dz.abs();
@@ -208,7 +223,7 @@ impl CompartmentMeshManip for MeshCylindrical {
             (0, -1, 0) => NeighborDirection::YMinus,
             (0, 0, 1) => NeighborDirection::ZPlus,
             (0, 0, -1) => NeighborDirection::ZMinus,
-            _ => NeighborDirection::NotNeighbors, 
+            _ => NeighborDirection::NotNeighbors,
         }
     }
 

@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use cmtool_data::RawData;
+use cmtool_data::{RawData, RawDataFlux};
 
 use crate::{
     ensight_gold::{RawField, VariableInfo},
@@ -220,7 +220,7 @@ impl CMHandle {
         path_i: impl AsRef<std::path::Path>,
         path_j: impl AsRef<std::path::Path>,
         path_k: impl AsRef<std::path::Path>,
-    ) -> Result<(), CoreError> {
+    ) -> Result<RawDataFlux, CoreError> {
         let s = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path_i)?;
         let sj = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path_j)?;
         let sk = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path_k)?;
@@ -228,7 +228,7 @@ impl CMHandle {
         let flow_data = self.model.export_flux_through_limits(vector)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
-        Ok(())
+        Ok(flow_data)
     }
 
     pub fn export_geometry_compartments(&self) {

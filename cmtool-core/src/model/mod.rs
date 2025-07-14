@@ -47,6 +47,11 @@ impl CMModel {
 
         let (c_info, interfaces) = volume_element_count.into_reduce();
 
+        if interfaces.n_facet.len()!=geometry.get_grid().as_ref().unwrap().n_maximum_interface()
+        {
+            unimplemented!("Intefaces should be n_maximum_interface")
+        }
+
         let mut model = Self {
             geometry,
             c_info,
@@ -83,7 +88,7 @@ impl CMModel {
 
             for (global_id, area) in curent_inteface_element.iter().zip(current_interface_area) {
                 let vector_coords = vector.get_slice_xyz(*global_id);
-
+           
                 let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
                     let CartesianCoordinates(centroid) =
                         self.geometry.volume_elements.xyz[*global_id];
@@ -95,9 +100,10 @@ impl CMModel {
 
                 let f = coords[axis] * area;
 
-                match f > 0. {
-                    true => flow.source_flow += f,
-                    false => flow.target_flow += f.abs(),
+                if f > 0. {
+                    flow.source_flow += f
+                } else if f < 0. {
+                    flow.target_flow += f.abs()
                 }
             }
         }
