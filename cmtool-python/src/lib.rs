@@ -1,5 +1,6 @@
 use cmtool_data::RawData;
 use pyo3::prelude::*;
+use numpy::PyArray2;
 
 #[pyclass(name = "RawDataScalar")]
 pub struct RawDataScalarWrapper(cmtool_data::RawDataScalar);
@@ -31,8 +32,16 @@ fn read_rawscalar(path: &str) -> RawDataScalarWrapper {
     RawDataScalarWrapper(cmtool_data::RawDataScalar::read_raw(path).unwrap())
 }
 
+
+#[pyfunction]
+fn read_flowmap( py: Python<'_>,path: &str) -> Py<PyArray2<f64>> {
+    let f= cmtool_data::RawDataFlux::read_raw(path).unwrap();
+    let fm = cmtool_data::FlowMapDescriptor::from_raw_data(&f).unwrap();
+    PyArray2::from_owned_array(py, fm.flowmap).unbind()
+}
+
 #[pymodule]
 mod pycmtool {
     #[pymodule_export]
-    use super::{read_rawflow,read_rawscalar};
+    use super::{read_rawflow,read_rawscalar,read_flowmap};
 }
