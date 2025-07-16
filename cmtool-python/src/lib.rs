@@ -1,6 +1,12 @@
 use cmtool_data::RawData;
+use numpy::ndarray::Array2;
+use numpy::{IntoPyArray, PyArray1};
+use numpy::{PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
-use numpy::PyArray2;
+
+
+#[pyclass(name = "FlowMapDescriptor")]
+pub struct FlowMapDescriptorWrapper(cmtool_data::FlowMapDescriptor);
 
 #[pyclass(name = "RawDataScalar")]
 pub struct RawDataScalarWrapper(cmtool_data::RawDataScalar);
@@ -32,16 +38,48 @@ fn read_rawscalar(path: &str) -> RawDataScalarWrapper {
     RawDataScalarWrapper(cmtool_data::RawDataScalar::read_raw(path).unwrap())
 }
 
-
 #[pyfunction]
-fn read_flowmap( py: Python<'_>,path: &str) -> Py<PyArray2<f64>> {
-    let f= cmtool_data::RawDataFlux::read_raw(path).unwrap();
+fn read_flowmap(py: Python<'_>, path: &str) -> FlowMapDescriptorWrapper {
+    let f = cmtool_data::RawDataFlux::read_raw(path).unwrap();
     let fm = cmtool_data::FlowMapDescriptor::from_raw_data(&f).unwrap();
-    PyArray2::from_owned_array(py, fm.flowmap).unbind()
+    FlowMapDescriptorWrapper(fm)
 }
+
+#[pymethods]
+impl FlowMapDescriptorWrapper {
+
+    //TODO check safety of this, maybe use RC<refcell> to do not have rust mutability
+    #[getter]
+    fn flowmap<'py>(this: Bound<'py, Self>) -> Bound<'py, PyArray2<f64>> {
+        let flowmap = &this.borrow().0.flowmap;
+
+        // SAFETY:
+        // - The returned NumPy array shares memory with the internal `flowmap` (Array2<f64>).
+        // - We use `borrow_from_array`, which ties the array's lifetime to the Python object (`this`).
+        // - This guarantees that the underlying Rust memory remains valid as long as Python holds the array.
+        //
+        // Critical Requirements:
+        // - `self.0.flowmap` must not be mutated in a way that causes memory reallocation (e.g., replacing it).
+        //   For example, the following code is unsafe if it runs after `pyobject.flowmap` is accessed:
+        //
+        //     fn drop(&mut self) {
+        //         self.0.flowmap = Array2::zeros((1, 1));  // BAD: reallocates backing buffer
+        //     }
+        //
+        // - Violating this invariant (e.g., replacing the array or shrinking it) while Python holds a reference
+        //   will cause undefined behavior (likely a segmentation fault).
+        //
+        // - Only expose immutable views or ensure exclusive access if mutations are needed.
+        unsafe { PyArray2::borrow_from_array(flowmap, this.into_any()) }
+    }
+
+
+        
+}
+
 
 #[pymodule]
 mod pycmtool {
     #[pymodule_export]
-    use super::{read_rawflow,read_rawscalar,read_flowmap};
+    use super::{read_flowmap, read_rawflow, read_rawscalar};
 }
