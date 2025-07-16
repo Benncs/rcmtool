@@ -1,0 +1,21 @@
+[package]
+name = "cmtool-python"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+
+[package.metadata.maturin]
+bindings = "pyo3"
+
+[lib]
+name = "pycmtool"
+crate-type = ["cdylib"]
+
+[dependencies]
+cmtool-data.workspace=true
+pyo3.workspace=true
+
+
+

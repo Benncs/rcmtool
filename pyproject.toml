@@ -1,0 +1,28 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pycmtool"
+dependencies = [
+  "numpy",
+]
+requires-python = ">=3.10"
+dynamic = ["version"]
+
+
+
+
+[tool.maturin]
+python-source = "cmtool-python/python_src"
+profile = "release"
+bindings = "pyo3"
+features = ["pyo3/extension-module"]
+all-features = false
+no-default-features = false
+manifest-path = "cmtool-python/Cargo.toml"
+frozen = false
+locked = false
+config = []
+unstable-flags = []
+rustc-args = []

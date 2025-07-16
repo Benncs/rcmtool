@@ -11,6 +11,9 @@ use std::io;
 
 use thiserror::Error;
 
+
+
+
 /// Errors that can occur during data operations.
 ///
 /// This enum encapsulates various error conditions that might arise during

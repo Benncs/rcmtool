@@ -1,5 +1,7 @@
 /target
 .vscode/
 
+.env/
+.venv/
 
 /out
