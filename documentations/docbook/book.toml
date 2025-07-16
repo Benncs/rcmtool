@@ -1,0 +1,5 @@
+[book]
+authors = ["Casale Benjamin"]
+language = "en"
+src = "src"
+title = "Compartment Modeling Tool"
