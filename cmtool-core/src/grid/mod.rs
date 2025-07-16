@@ -1,6 +1,6 @@
 mod collections;
 use std::f64;
-
+use enum_dispatch::enum_dispatch;
 use collections::*;
 pub use collections::{AxisDescriptor, CylindricalAxis, cylindrical_index};
 
@@ -176,6 +176,7 @@ pub trait CompartmentMeshAccessor {
     ///
     /// The center position of the specified cell.
     fn get_cell_center(&self, i_axis: usize, i_point: usize) -> f64;
+
 }
 
 /// Trait for manipulating and querying properties of cells in a compartment mesh.
@@ -261,6 +262,7 @@ pub trait CompartmentMeshManip {
 /// `CompartmentMeshAccessor` and `CompartmentMeshManip`, and is thread-safe (`Send` + `Sync`).
 /// It provides a unified interface for operations on compartment meshes, ensuring that such types
 /// can be used in concurrent programming contexts safely.
+#[enum_dispatch]
 pub trait CompartmentMesh: Send + Sync + CompartmentMeshAccessor + CompartmentMeshManip {}
 
 /// Automatically implements `CompartmentMesh` for any type `T` that implements both
@@ -318,6 +320,7 @@ impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
     fn min_axis(&self, i_axis: usize) -> f64 {
         self.axes[i_axis].descriptor.min_range
     }
+
 
     fn max_axis(&self, i_axis: usize) -> f64 {
         self.axes[i_axis].descriptor.max_range
@@ -476,6 +479,9 @@ impl CompartmentMeshManip for MeshCylindrical {
         axis_points
     }
 }
+
+
+
 
 pub fn get_mesh(
     meshtype: MeshType,

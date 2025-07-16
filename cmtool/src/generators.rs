@@ -508,8 +508,8 @@ mod tests {
 
         //volume is h*pi*d^2/4
         let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
-
-        assert!(liquid_volume - (1. - alpha_g) * geo_volume < 1e-9);
+         
+        assert!(liquid_volume - (1. - alpha_g) * geo_volume < 1e-9,"liquid_volume {}, alpha {}, geo_volume {}",liquid_volume,alpha_g,geo_volume);
         clean(case);
     }
 }

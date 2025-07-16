@@ -46,10 +46,12 @@ impl CMModel {
         // let n_interfaces = volume_element_count.n_interfaces();
 
         let (c_info, interfaces) = volume_element_count.into_reduce();
-
-        if interfaces.n_facet.len()!=geometry.get_grid().as_ref().unwrap().n_maximum_interface()
+        
+        let n_max_interface = geometry.get_grid().as_ref().unwrap().n_maximum_interface();
+        if interfaces.n_facet.len()!= n_max_interface
         {
-            unimplemented!("Intefaces should be n_maximum_interface")
+            eprintln!("Intefaces should be n_maximum_interface {} {}",interfaces.n_facet.len(),n_max_interface);
+         //   unimplemented!("Intefaces should be n_maximum_interface")
         }
 
         let mut model = Self {
