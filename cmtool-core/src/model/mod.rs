@@ -84,7 +84,7 @@ impl CMModel {
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
 
         for (i_interface, flow) in flows.iter_mut().enumerate() {
-            let axis: usize = self.interfaces.axis[i_interface];
+            let axis: usize = self.interfaces.normal_axis[i_interface];
             let current_interface_area = &self.interfaces.area[i_interface];
             let curent_inteface_element = &self.interfaces.global_id_from_interface[i_interface];
 

@@ -56,10 +56,27 @@ impl Coords3Ext for Coords3 {
     }
 }
 
-#[derive(Debug,Clone, Copy,Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct CylindricalCoordinates(pub Coords3);
-#[derive(Debug,Clone, Copy,Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct CartesianCoordinates(pub Coords3);
+
+pub enum Plane {
+    Vector {
+        normal: Coords3,
+        point: Coords3,
+    },
+    Cartesian {
+        normal: Coords3,
+        d: f64,
+    },
+    Cylindrical {
+        axis: usize,     // 0=r, 1=theta, 2=z
+        coordinate: f64, // plane position along axis
+        theta: f64,      // required for axis 0 and 1
+        radius: f64,     // required for axis 1
+    },
+}
 
 impl From<&CartesianCoordinates> for CylindricalCoordinates {
     fn from(cart: &CartesianCoordinates) -> Self {

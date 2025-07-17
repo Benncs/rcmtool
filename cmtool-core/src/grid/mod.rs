@@ -1,8 +1,8 @@
 mod collections;
-use std::f64;
-use enum_dispatch::enum_dispatch;
 use collections::*;
 pub use collections::{AxisDescriptor, CylindricalAxis, cylindrical_index};
+use enum_dispatch::enum_dispatch;
+use std::f64;
 
 use crate::coordinates::*;
 use crate::utils::AxisPoints;
@@ -176,7 +176,6 @@ pub trait CompartmentMeshAccessor {
     ///
     /// The center position of the specified cell.
     fn get_cell_center(&self, i_axis: usize, i_point: usize) -> f64;
-
 }
 
 /// Trait for manipulating and querying properties of cells in a compartment mesh.
@@ -255,6 +254,8 @@ pub trait CompartmentMeshManip {
     ///
     /// The maximum number of interfaces as a `usize`.
     fn n_maximum_interface(&self) -> usize;
+
+    fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (Plane,usize);
 }
 /// A compartment mesh grid.
 ///
@@ -321,7 +322,6 @@ impl<T> CompartmentMeshAccessor for BaseCompartmentMesh<T> {
         self.axes[i_axis].descriptor.min_range
     }
 
-
     fn max_axis(&self, i_axis: usize) -> f64 {
         self.axes[i_axis].descriptor.max_range
     }
@@ -376,6 +376,31 @@ impl CompartmentMeshManip for MeshCylindrical {
         let wrap = nr * nz; //Wrap-in for connection between theta=-pi and theta=pi 
 
         interfaces_r + interfaces_theta + interfaces_z + wrap
+    }
+
+    fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (Plane,usize) {
+        let neighbors = self.are_cell_neighbor(cell1_id, cell2_id);
+        let axis = neighbors
+            .to_coord_index()
+            .expect("Cells must be neighbors to get interface plane");
+
+        let sign = if neighbors.is_negative() { -1.0 } else { 1.0 };
+
+        let indices_cell = self.cell_points(cell1_id);
+        let theta = self.get_cell_edge(1, indices_cell[1]);
+        let r = self.get_cell_edge(0, indices_cell[0]);
+        let z = self.get_cell_edge(2, indices_cell[2]);
+
+        let normal = match axis {
+            0 => [sign, 0.0, 0.0],
+            1 => [0.0, sign, 0.0],
+            2 => [0.0, 0.0, sign],
+            _ => panic!("Invalid axis"),
+        };
+
+        let CartesianCoordinates(point) = CylindricalCoordinates([r, theta, z]).into();
+
+        (Plane::Vector { normal, point },axis)
     }
 
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
@@ -479,9 +504,6 @@ impl CompartmentMeshManip for MeshCylindrical {
         axis_points
     }
 }
-
-
-
 
 pub fn get_mesh(
     meshtype: MeshType,

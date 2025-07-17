@@ -24,9 +24,11 @@ pub struct AInterfacesInfo {
     pub n_facet: Vec<usize>,
     pub info: Vec<InterfaceInfo>,
     pub area: Vec<Vec<f64>>,
-    pub axis: Vec<usize>,
+    pub normal_axis: Vec<usize>,
     pub global_id_from_interface: Vec<Vec<usize>>,
     pub plane_coordinates: Vec<f64>,
+
+    pub planes: Vec<Plane>,
 }
 
 impl AInterfacesInfo {
@@ -37,9 +39,10 @@ impl AInterfacesInfo {
             n_facet: at_interface,
             info: vec![Default::default(); n_interfaces],
             area: vec![Default::default(); n_interfaces],
-            axis: vec![Default::default(); n_interfaces],
+            normal_axis: vec![Default::default(); n_interfaces],
             global_id_from_interface: vec![Default::default(); n_interfaces],
             plane_coordinates: vec![0.; n_interfaces * 3 * 2], //Extent geometry
+            planes: Vec::new(),
         }
     }
 }
@@ -92,11 +95,17 @@ impl AInterfacesInfo {
                 };
                 interfaces_id_from_cells[source_id * n_zones + target_id] = interface_id;
                 interfaces_id_from_cells[target_id * n_zones + source_id] = interface_id;
+
+                // let (plane, direction_neighbors) = grid.get_interface_plane(source_id, target_id);
+                // self.planes.push(plane);
+                // self.normal_axis[interface_id] = direction_neighbors;
+                //TODO impl logic with planes 
+
                 let neighbors = grid.are_cell_neighbor(source_id, target_id);
                 let direction_neighbors = neighbors
                     .to_coord_index()
                     .expect("Unwrap because we already know they are neighbors");
-                self.axis[interface_id] = direction_neighbors;
+                self.normal_axis[interface_id] = direction_neighbors;
                 let indices_cell = grid.cell_points(source_id);
                 for (i_axis, ax_index) in indices_cell.iter().enumerate() {
                     let plane_index = interface_id * 6 + 2 * i_axis; // 6 account for number of extent (x-,x+,y-,y+,z-.z+)
@@ -182,14 +191,20 @@ impl AInterfacesInfo {
                         geometry.vertices.get_slice_xyz(vertex_global_id).to_owned(),
                     );
                 }
-                let value_on_ax = interface_plane[2 * self.axis[interface_id]];
+
+                //TODO impl logic with planes 
+                // let value_on_ax = match &self.planes[interface_id] {
+                //     Plane::Vector { normal: _, point } => point[self.normal_axis[interface_id]],
+                //     _ => panic!("Plane variant not supported for value extraction"),
+                // };
+                let value_on_ax = interface_plane[2 * self.normal_axis[interface_id]];
 
                 let area = compute_intersection_area(
                     &local_vertices,
                     elem_type,
                     value_on_ax,
-                    self.axis[interface_id],
-                    geometry.mesh_type,
+                    self.normal_axis[interface_id],
+                     geometry.mesh_type,
                 )
                 .expect("Area between element");
 

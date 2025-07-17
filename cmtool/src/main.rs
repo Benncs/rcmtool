@@ -52,20 +52,20 @@ fn main() {
         .dump_all(format!("{}/{}", root_dir, stem), &case.root, &case.paths)
         .unwrap();
 
-    //let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
-    //let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
-    //let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";
+    let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
+    let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
+    let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";
 //
-    //let export = handle
-        //.dump_vector_from_scalar(format!("{}/flowL", root_dir), p1, p2, p3)
-        //.unwrap();
-//
-    //cmtool::check_flows(&export);
+    let export = handle
+        .dump_vector_from_scalar(format!("{}/flowL", root_dir), p1, p2, p3)
+        .unwrap();
+
+    cmtool::check_flows(&export);
 
 
-     cmtool::check_flows(&RawDataFlux::read_raw(
-         "./out/cuve_sldmsh_initmrf/axial_velocity.raw",
-     ).unwrap());
+    //  cmtool::check_flows(&RawDataFlux::read_raw(
+    //      "./out/cuve_sldmsh_initmrf/axial_velocity.raw",
+    //  ).unwrap());
 
 //    cmtool::check_flows(&RawDataFlux::read_raw(
 //         "/home/benjamin/Documents/thesis/cfd-cma/sanofi/raw/flowL.raw",
