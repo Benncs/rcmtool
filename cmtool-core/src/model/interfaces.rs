@@ -5,7 +5,7 @@ use crate::grid::NeighborDirection;
 use crate::{
     ensight_gold::types::ElementsType,
     model::{CMGeometry, geometry},
-    utils::compute_intersection_area,
+    // utils::compute_intersection_area,
 };
 
 #[derive(Default, Clone)]
@@ -199,15 +199,15 @@ impl AInterfacesInfo {
                 // };
                 let value_on_ax = interface_plane[2 * self.normal_axis[interface_id]];
 
-                let area = compute_intersection_area(
-                    &local_vertices,
-                    elem_type,
-                    value_on_ax,
-                    self.normal_axis[interface_id],
-                     geometry.mesh_type,
-                )
-                .expect("Area between element");
-
+                // let area = compute_intersection_area(
+                //     &local_vertices,
+                //     elem_type,
+                //     value_on_ax,
+                //     self.normal_axis[interface_id],
+                //      geometry.mesh_type,
+                // )
+                // .expect("Area between element");
+                let area = 0.;
                 if area == 0. {
                     println!("{} {} {} ", area, interface_id, i_facet);
                 }

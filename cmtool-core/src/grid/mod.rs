@@ -398,7 +398,7 @@ impl CompartmentMeshManip for MeshCylindrical {
             _ => panic!("Invalid axis"),
         };
 
-        let CartesianCoordinates(point) = CylindricalCoordinates([r, theta, z]).into();
+        let point = CylindricalCoordinates([r, theta, z]).into();
 
         (Plane::Vector { normal, point },axis)
     }
@@ -460,7 +460,7 @@ impl CompartmentMeshManip for MeshCylindrical {
     fn cell_from_coordinates(&self, coords: &Coords3) -> Option<usize> {
         let mut mesh_id = 0;
         let mut cumulative_product = 1;
-        let cylindrical_coords = coords.cartesian_to_cylindrical();
+        let CylindricalCoordinates(cylindrical_coords)=CartesianCoordinates(*coords).into();
 
         // for (i, axe) in self.axes.as_ref().iter().enumerate() {
         //     let current_index = axe.index_from_edge_value(cylindrical_coords[i])?;
@@ -584,7 +584,8 @@ mod test {
         let mesh = ref_mesh_cyclindrical();
 
         let assert_id = |a: Coords3, expect: usize| {
-            let aa = a.cylindrical_to_cartesian();
+
+            let CartesianCoordinates(aa) = CylindricalCoordinates(a).into();
 
             let id1 = mesh
                 .cell_from_coordinates(&aa)

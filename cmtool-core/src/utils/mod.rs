@@ -63,223 +63,6 @@ pub fn vector_cartesian_to_cylindrical(
 //     calculate_polygon_area(&projected)
 // }
 
-fn tetra_area(
-    a: CartesianCoordinates,
-    b: CartesianCoordinates,
-    c: CartesianCoordinates,
-    d: CartesianCoordinates,
-    value_on_ax: f64,
-    axe_index: usize,
-) -> f64 {
-    let mut intersections = Vec::new();
-
-    // Add vertices that lie exactly on the plane
-    for &pt in &[a, b, c, d] {
-        if (pt.0[axe_index] - value_on_ax).abs() < 1e-10 {
-            intersections.push(pt.0);
-        }
-    }
-
-    // All tetrahedron edges
-    let edges = [(a, b), (a, c), (a, d), (b, c), (b, d), (c, d)];
-
-    for (start, end) in edges.iter() {
-        if let Some(intersect) = intersect_line_plane(*start, *end, axe_index, value_on_ax) {
-            intersections.push(intersect);
-        }
-    }
-
-    if intersections.len() < 3 {
-        return 0.0; // Not enough points to form a polygon
-    }
-
-    // Project and sort the intersection polygon
-    let projected = project_and_sort_polygon(&intersections, axe_index);
-
-    calculate_polygon_area(&projected)
-}
-
-fn intersect_line_plane(
-    CartesianCoordinates(a): CartesianCoordinates,
-    CartesianCoordinates(b): CartesianCoordinates,
-    axe_index: usize,
-    value_on_ax: f64,
-) -> Option<Coords3> {
-    let ab = b.sub(&a);
-    let denom = ab[axe_index];
-
-    if denom.abs() < 1e-10 {
-        return None; // Parallel to plane
-    }
-
-    let t = (value_on_ax - a[axe_index]) / denom;
-
-    if (0.0..=1.0).contains(&t) {
-        Some([a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]])
-    } else {
-        None
-    }
-}
-
-fn normalize(v: Coords3) -> Coords3 {
-    let norm = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-    [v[0] / norm, v[1] / norm, v[2] / norm]
-}
-
-fn orthonormal_basis(normal: Coords3) -> (Coords3, Coords3) {
-    let mut u = if normal[0].abs() < 0.9 {
-        [1.0, 0.0, 0.0]
-    } else {
-        [0.0, 1.0, 0.0]
-    };
-    let d = normal.dot(&u);
-    u = [
-        u[0] - d * normal[0],
-        u[1] - d * normal[1],
-        u[2] - d * normal[2],
-    ];
-    u = normalize(u);
-    let v = normal.cross(&u);
-    (u, v)
-}
-
-fn tetra_area_cylindrical(
-    a: CartesianCoordinates,
-    b: CartesianCoordinates,
-    c: CartesianCoordinates,
-    d: CartesianCoordinates,
-    value_on_ax: f64,
-    axis_index: usize,
-) -> f64 {
-    let points_cyl = [a, b, c, d].map(CylindricalCoordinates::from);
-
-    let mut intersections = Vec::new();
-
-    for pt in &points_cyl {
-        if (pt.0[axis_index] - value_on_ax).abs() < 1e-10 {
-            intersections.push(CartesianCoordinates::from(pt).0);
-        }
-    }
-
-    let edges = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)];
-    for &(i0, i1) in &edges {
-        if let Some(intersect) = intersect_line_plane_cylindrical(
-            CartesianCoordinates([a.0, b.0, c.0, d.0][i0]),
-            CartesianCoordinates([a.0, b.0, c.0, d.0][i1]),
-            axis_index,
-            value_on_ax,
-        ) {
-            intersections.push(intersect);
-        }
-    }
-
-    if intersections.len() < 3 {
-        return 0.0;
-    }
-
-    let projected: Vec<[f64; 2]> = intersections
-        .iter()
-        .map(|p| {
-            match axis_index {
-                0 => {
-                    // r=const
-                    let cyl = CylindricalCoordinates::from(CartesianCoordinates(*p));
-                    [cyl.0[1], cyl.0[2]]
-                }
-                1 => {
-                    // θ=const
-                    let cyl = CylindricalCoordinates::from(CartesianCoordinates(*p));
-                    [cyl.0[0], cyl.0[2]]
-                }
-                2 => {
-                    // z=const
-                    let cyl = CylindricalCoordinates::from(CartesianCoordinates(*p));
-                    [cyl.0[0], cyl.0[1]]
-                }
-                _ => panic!("Invalid axis_index"),
-            }
-        })
-        .collect();
-
-    let projected_sorted = sort_polygon_ccw(&projected);
-    calculate_polygon_area(&projected_sorted)
-}
-
-fn intersect_line_plane_cylindrical(
-    CartesianCoordinates(a): CartesianCoordinates,
-    CartesianCoordinates(b): CartesianCoordinates,
-    axis_index: usize,
-    value_on_ax: f64,
-) -> Option<Coords3> {
-    let ab = b.sub(&a);
-
-    match axis_index {
-        0 => {
-            // r = const
-            // (x(t)^2 + y(t)^2 = r^2)
-            let A = ab[0] * ab[0] + ab[1] * ab[1];
-            if A.abs() < 1e-14 {
-                return None;
-            }
-            let B = 2.0 * (a[0] * ab[0] + a[1] * ab[1]);
-            let C = a[0] * a[0] + a[1] * a[1] - value_on_ax * value_on_ax;
-
-            let discr = B * B - 4.0 * A * C;
-            if discr < 0.0 {
-                return None;
-            }
-
-            let sqrt_discr = discr.sqrt();
-            let t_candidates = [(-B - sqrt_discr) / (2.0 * A), (-B + sqrt_discr) / (2.0 * A)];
-            t_candidates
-                .iter()
-                .copied()
-                .filter(|&t| (0.0..=1.0).contains(&t))
-                .min_by(|x, y| x.partial_cmp(y).unwrap())
-                .map(|t| [a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]])
-        }
-        1 => {
-            // θ = const
-            let normal = [value_on_ax.sin(), -value_on_ax.cos(), 0.0];
-            let denom = normal[0] * ab[0] + normal[1] * ab[1];
-            if denom.abs() < 1e-14 {
-                return None;
-            }
-            let t = -(normal[0] * a[0] + normal[1] * a[1]) / denom;
-            if (0.0..=1.0).contains(&t) {
-                Some([a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]])
-            } else {
-                None
-            }
-        }
-        2 => {
-            // z = const
-            intersect_line_plane(
-                CartesianCoordinates(a),
-                CartesianCoordinates(b),
-                axis_index,
-                value_on_ax,
-            )
-        }
-        _ => None,
-    }
-}
-
-/// Project 3D points onto the slicing plane and sort them counter-clockwise
-fn project_and_sort_polygon(points: &[Coords3], axe_index: usize) -> Vec<[f64; 2]> {
-    // Determine which 2D plane to project onto
-    let (i1, i2) = match axe_index {
-        0 => (1, 2), // yz-plane
-        1 => (0, 2), // xz-plane
-        2 => (0, 1), // xy-plane
-        _ => panic!("Invalid axis index"),
-    };
-
-    let projected: Vec<[f64; 2]> = points.iter().map(|p| [p[i1], p[i2]]).collect();
-
-    sort_polygon_ccw(&projected)
-}
-
 fn sort_polygon_ccw(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
     let centroid = {
         let (mut sx, mut sy) = (0.0, 0.0);
@@ -297,21 +80,6 @@ fn sort_polygon_ccw(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
         angle_a.partial_cmp(&angle_b).unwrap()
     });
     sorted
-}
-
-fn calculate_polygon_area(points: &[[f64; 2]]) -> f64 {
-    if points.len() < 3 {
-        return 0.0;
-    }
-
-    let mut area = 0.0;
-    let n = points.len();
-    for i in 0..n {
-        let j = (i + 1) % n;
-        area += points[i][0] * points[j][1];
-        area -= points[j][0] * points[i][1];
-    }
-    area.abs() / 2.0
 }
 
 /// Computes the signed volume of a tetrahedron defined by four 3D points.
@@ -379,18 +147,111 @@ impl VolumeElementTypes {
     }
 }
 
-pub fn compute_intersection_area(
+// pub fn compute_intersection_area(
+//     local_vertices: &[CartesianCoordinates],
+//     elem_type: VolumeElementTypes,
+//     value_on_ax: f64,
+//     axis_index: usize,
+//     mestype: MeshType,
+// ) -> Option<f64> {
+//     let callback = match mestype {
+//         MeshType::Cylindrical => tetra_area_cylindrical,
+//         _ => tetra_area,
+//     };
+
+//     let tetra_indices = elem_type.tetra_subdivisions();
+//     if local_vertices.len() != ElementsType::VolumeElementType(elem_type).node_count() as usize {
+//         return None;
+//     }
+//     let area = tetra_indices
+//         .iter()
+//         .map(|&[i0, i1, i2, i3]| {
+//             let a = local_vertices[i0];
+//             let b = local_vertices[i1];
+//             let c = local_vertices[i2];
+//             let d = local_vertices[i3];
+//             callback(a, b, c, d, value_on_ax, axis_index)
+//         })
+//         .sum();
+
+//     Some(area)
+// }
+
+fn project_points_to_plane_2d(points: &Vec<[f64; 3]>, normal: &Coords3) -> Vec<[f64; 2]> {
+    let n = normal.normalized();
+    let arbitrary = if n[0].abs() < 0.9 {
+        [1.0, 0.0, 0.0]
+    } else {
+        [0.0, 1.0, 0.0]
+    };
+    let u = n.cross(&arbitrary).normalized();
+    let v = n.cross(&u);
+
+    points.iter().map(|p| [p.dot(&u), p.dot(&v)]).collect()
+}
+
+fn polygon_area_2d(points: &Vec<[f64; 2]>) -> f64 {
+    let n = points.len();
+    let mut area = 0.0;
+    for i in 0..n {
+        let (x0, y0) = (points[i][0], points[i][1]);
+        let (x1, y1) = (points[(i + 1) % n][0], points[(i + 1) % n][1]);
+        area += x0 * y1 - x1 * y0;
+    }
+    area.abs() * 0.5
+}
+
+fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &Plane) -> f64 {
+    let value = 0.;
+    let mut intersection_points = vec![];
+    if let Plane::Vector { normal, point:CartesianCoordinates(point) } = plane {
+        let d = -normal.dot(point); // plane offset
+        let distances: Vec<f64> = vertices
+            .iter()
+            .map(|CartesianCoordinates(v)| normal.dot(v) + d)
+            .collect();
+
+        for i in 0..4 {
+            for j in (i + 1)..4 {
+                let d1 = distances[i];
+                let d2 = distances[j];
+
+                if d1 * d2 < 0.0 {
+                    let t = d1 / (d1 - d2);
+                    let p1 = &vertices[i].0;
+                    let p2 = &vertices[j].0;
+                    let intersection = [
+                        p1[0] + t * (p2[0] - p1[0]),
+                        p1[1] + t * (p2[1] - p1[1]),
+                        p1[2] + t * (p2[2] - p1[2]),
+                    ];
+                    intersection_points.push(intersection);
+                }
+            }
+        }
+
+        if intersection_points.len() < 3 {
+            return 0.0; // No intersection area
+        }
+
+        // Step 3: Project points to 2D plane
+        let projected = project_points_to_plane_2d(&intersection_points, normal);
+
+        // Step 4: Sort points counterclockwise
+        let sorted = sort_polygon_ccw(&projected);
+
+        // Step 5: Compute area using shoelace formula
+        return polygon_area_2d(&sorted);
+    }
+
+    value
+}
+
+pub fn _compute_intersection_area(
     local_vertices: &[CartesianCoordinates],
     elem_type: VolumeElementTypes,
-    value_on_ax: f64,
-    axis_index: usize,
-    mestype: MeshType,
+    plane: &Plane,
 ) -> Option<f64> {
-    let callback = match mestype {
-        MeshType::Cylindrical => tetra_area_cylindrical,
-        _ => tetra_area,
-    };
-
     let tetra_indices = elem_type.tetra_subdivisions();
     if local_vertices.len() != ElementsType::VolumeElementType(elem_type).node_count() as usize {
         return None;
@@ -402,7 +263,7 @@ pub fn compute_intersection_area(
             let b = local_vertices[i1];
             let c = local_vertices[i2];
             let d = local_vertices[i3];
-            callback(a, b, c, d, value_on_ax, axis_index)
+            1.
         })
         .sum();
 
@@ -477,17 +338,23 @@ mod tests {
         let b = CartesianCoordinates::from(b);
         let c = CartesianCoordinates::from(c);
         let d = CartesianCoordinates::from(d);
+        
+        
 
-        let vertices = vec![a, b, c, d];
+        let plane = &Plane::Vector { normal: [0.,0.,0.], point: CartesianCoordinates([0.,0.,0.]) };
 
-        let area = compute_intersection_area(
-            &vertices,
-            VolumeElementTypes::Tetra4,
-            1.0,
-            0,
-            MeshType::Cylindrical,
-        )
-        .unwrap();
+        let vertices = [a, b, c, d];
+        
+        let area = tetra_area(vertices, plane);
+
+        // let area = compute_intersection_area(
+        //     &vertices,
+        //     VolumeElementTypes::Tetra4,
+        //     1.0,
+        //     0,
+        //     MeshType::Cylindrical,
+        // )
+        // .unwrap();
 
         assert!(
             (area - expected_area).abs() < 1e-12,
@@ -505,18 +372,30 @@ mod tests {
         let c = [0.0, 1.0, 0.0];
         let d = [0.0, 0.0, 1.0];
 
-        // Define the slicing plane z = 0.5
-        let value_on_ax = 0.5;
-        let axe_index = 2; // z-axis
+    
+        let plane = Plane::Vector {
+            normal: [0., 0., 1.],
+            point: CartesianCoordinates([0., 0., 0.5]),
+        };
 
         // Calculate the intersection area
+        // let area = tetra_area(
+        //     CartesianCoordinates(a),
+        //     CartesianCoordinates(b),
+        //     CartesianCoordinates(c),
+        //     CartesianCoordinates(d),
+        //     value_on_ax,
+        //     axe_index,
+        // );
+
         let area = tetra_area(
-            CartesianCoordinates(a),
-            CartesianCoordinates(b),
-            CartesianCoordinates(c),
-            CartesianCoordinates(d),
-            value_on_ax,
-            axe_index,
+            [
+                CartesianCoordinates(a),
+                CartesianCoordinates(b),
+                CartesianCoordinates(c),
+                CartesianCoordinates(d),
+            ],
+            &plane,
         );
 
         // Manually compute the triangle formed by slicing at z = 0.5
