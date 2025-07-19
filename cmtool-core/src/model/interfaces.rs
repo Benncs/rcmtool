@@ -29,7 +29,7 @@ pub struct AInterfacesInfo {
     pub global_id_from_interface: Vec<Vec<usize>>,
     // pub plane_coordinates: Vec<f64>,
 
-    pub planes: Vec<Plane>,
+    pub planes: Vec<BoundedPlane>,
 }
 
 impl AInterfacesInfo {
@@ -100,27 +100,7 @@ impl AInterfacesInfo {
                 let (plane, direction_neighbors) = grid.get_interface_plane(source_id, target_id);
                 self.planes.push(plane);
                 self.normal_axis[interface_id] = direction_neighbors;
-                //TODO impl logic with planes
-
-                // let neighbors = grid.are_cell_neighbor(source_id, target_id);
-                // let direction_neighbors = neighbors
-                //     .to_coord_index()
-                //     .expect("Unwrap because we already know they are neighbors");
-                // self.normal_axis[interface_id] = direction_neighbors;
-                // let indices_cell = grid.cell_points(source_id);
-                // for (i_axis, ax_index) in indices_cell.iter().enumerate() {
-                //     let plane_index = interface_id * 6 + 2 * i_axis; // 6 account for number of extent (x-,x+,y-,y+,z-.z+)
-                //     self.plane_coordinates[plane_index] = grid.get_cell_edge(i_axis, *ax_index);
-                //     self.plane_coordinates[plane_index + 1] =
-                //         grid.get_cell_edge(i_axis, *ax_index + 1);
-                // }
-                // let plane_index = interface_id * 6 + 2 * direction_neighbors; // 6 account for number of extent (x-,x+,y-,y+,z-.z+)
-
-                // if neighbors.is_negative() {
-                //     self.plane_coordinates[plane_index + 1] = self.plane_coordinates[plane_index];
-                // } else {
-                //     self.plane_coordinates[plane_index] = self.plane_coordinates[plane_index + 1];
-                // }
+             
             }
         }
         self.global_id_from_interface =

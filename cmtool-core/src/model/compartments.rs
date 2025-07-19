@@ -51,12 +51,9 @@ impl CompartmentInfo {
                 .volume_elements
                 .get_number_cid(volume_element_global_id);
 
-            let n_vertex = geometry
-                .volume_elements
-                .get_vertex_per_element(volume_element_global_id);
-
-            let vtype: VolumeElementTypes =
-                geometry.volume_elements.vtype[volume_element_global_id];
+            let (elem_type, n_vertex) = geometry
+                    .volume_elements
+                    .get_element_and_nvertex(volume_element_global_id);
 
             local_vertices.clear();
             local_vertices.resize(n_vertex, Default::default());
@@ -77,8 +74,9 @@ impl CompartmentInfo {
                     );
                 }
 
-                let volume = compute_volume(&local_vertices, vtype).unwrap()
+                let volume = compute_volume(&local_vertices, elem_type).unwrap()
                     / (n_compartment_in_velem as f64);
+                    
                 self.volumes[compartment_id][k_element] = ElementVolumeInfo {
                     global_id: volume_element_global_id,
                     volume,

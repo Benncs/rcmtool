@@ -5,23 +5,29 @@ import pycmtool
 # print(f"Read scalar with {scalar.n_zone} compartment")
 
 
-
-import gc
-
-def get():
-    fm = pycmtool.read_flowmap("/home/benjamin/Documents/code/rust/rcmtool/out/flowL.raw")  
-    fm.flowmap[0,0] = 1    # mutates data via NumPy view in Python (no Rust checks)
-    
-    f = fm.flowmap          # borrow again, Python still holds the array (data mut)
-    del fm                  # Rust object drops but Python still references underlying buffer -> undefined behavior possible!
-      
-    return f                        
-
-f = get()
-print(f)  
-print(f.base)   
+import numpy as np
 
 
+def get(path: str):
+    # fm = pycmtool.read_flowmap(
+    #    "/home/benjamin/Documents/code/rust/rcmtool/out/cuve_sldmsh_initmrf/velocity.raw"
+    # )
+    fm = pycmtool.read_flowmap(path)
+    f = fm.flowmap  # borrow again, Python still holds the array (data mut)
+    return f
 
-   
 
+cpp_ref = "/home/benjamin/Documents/code/cpp/compartment-modelling-tool/cuve_sldmsh_initmrf.vel.vector-raw"
+rust = "/home/benjamin/Documents/code/rust/rcmtool/out/cuve_sldmsh_initmrf/velocity.raw"
+
+f = get(cpp_ref)
+inf = np.sum(f, axis=1)
+out = np.sum(f, axis=0)
+
+print(inf[0:5])
+print(out[0:5])
+f = get(rust)
+inf = np.sum(f, axis=1)
+out = np.sum(f, axis=0)
+print(inf[0])
+print(out[0])
