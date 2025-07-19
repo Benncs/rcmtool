@@ -255,7 +255,7 @@ pub trait CompartmentMeshManip {
     /// The maximum number of interfaces as a `usize`.
     fn n_maximum_interface(&self) -> usize;
 
-    fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (Plane,usize);
+    fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (Plane, usize);
 }
 /// A compartment mesh grid.
 ///
@@ -378,7 +378,7 @@ impl CompartmentMeshManip for MeshCylindrical {
         interfaces_r + interfaces_theta + interfaces_z + wrap
     }
 
-    fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (Plane,usize) {
+    fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (Plane, usize) {
         let neighbors = self.are_cell_neighbor(cell1_id, cell2_id);
         let axis = neighbors
             .to_coord_index()
@@ -387,20 +387,50 @@ impl CompartmentMeshManip for MeshCylindrical {
         let sign = if neighbors.is_negative() { -1.0 } else { 1.0 };
 
         let indices_cell = self.cell_points(cell1_id);
-        let theta = self.get_cell_edge(1, indices_cell[1]);
-        let r = self.get_cell_edge(0, indices_cell[0]);
-        let z = self.get_cell_edge(2, indices_cell[2]);
 
         let normal = match axis {
             0 => [sign, 0.0, 0.0],
             1 => [0.0, sign, 0.0],
             2 => [0.0, 0.0, sign],
-            _ => panic!("Invalid axis"),
+            _ => unreachable!("Axis is between 0 and 2"),
         };
+
+        let r0 = self.get_cell_edge(0, indices_cell[0]);
+        let r1 = self.get_cell_edge(0, indices_cell[0] + 1);
+        let t0 = self.get_cell_edge(1, indices_cell[1]);
+        let t1 = self.get_cell_edge(1, indices_cell[1] + 1);
+        let z0 = self.get_cell_edge(2, indices_cell[2]);
+        let z1 = self.get_cell_edge(2, indices_cell[2] + 1);
+
+        let mut r = 0.5 * (r0 + r1);
+        let mut theta = 0.5 * (t0 + t1);
+        let mut z = 0.5 * (z0 + z1);
+
+        match axis {
+            0 => {
+                r = if sign < 0.0 { r0 } else { r1 };
+            }
+            1 => {
+                theta = if sign < 0.0 { t0 } else { t1 };
+            }
+            2 => {
+                z = if sign < 0.0 { z0 } else { z1 };
+            }
+            _ => unreachable!(),
+        }
+
+        let cyl_normal = CylindricalVec3(normal, theta); // base_theta = theta
+        let normal_cartesian = cyl_normal.to_cartesian_vec();
 
         let point = CylindricalCoordinates([r, theta, z]).into();
 
-        (Plane::Vector { normal, point },axis)
+        (
+            Plane::Vector {
+                normal: normal_cartesian,
+                point,
+            },
+            axis,
+        )
     }
 
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
@@ -460,7 +490,7 @@ impl CompartmentMeshManip for MeshCylindrical {
     fn cell_from_coordinates(&self, coords: &Coords3) -> Option<usize> {
         let mut mesh_id = 0;
         let mut cumulative_product = 1;
-        let CylindricalCoordinates(cylindrical_coords)=CartesianCoordinates(*coords).into();
+        let CylindricalCoordinates(cylindrical_coords) = CartesianCoordinates(*coords).into();
 
         // for (i, axe) in self.axes.as_ref().iter().enumerate() {
         //     let current_index = axe.index_from_edge_value(cylindrical_coords[i])?;
@@ -584,7 +614,6 @@ mod test {
         let mesh = ref_mesh_cyclindrical();
 
         let assert_id = |a: Coords3, expect: usize| {
-
             let CartesianCoordinates(aa) = CylindricalCoordinates(a).into();
 
             let id1 = mesh

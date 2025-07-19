@@ -203,12 +203,11 @@ impl CMHandle {
         res_name: impl AsRef<std::path::Path>,
         path: impl AsRef<std::path::Path>,
     ) -> Result<(), CoreError> {
-        let n_zone = 10;
-        let n_flux = 20;
+     
 
         let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
         let vector = Vector::new(v, &self.cm_geometry, &self.eg_geometry);
-        let flow_data = self.model.export_flux_through_limits(vector)?;
+        let flow_data = self.model.compute_flux_between_compartments(vector)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -225,7 +224,7 @@ impl CMHandle {
         let sj = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path_j)?;
         let sk = ensight_gold::scalar::ScalarField::init(self.eg_geometry.clone(), path_k)?;
         let vector = Vector::from_scalar([s, sj, sk], &self.cm_geometry, &self.eg_geometry)?;
-        let flow_data = self.model.export_flux_through_limits(vector)?;
+        let flow_data = self.model.compute_flux_between_compartments(vector)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(flow_data)

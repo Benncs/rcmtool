@@ -1,13 +1,8 @@
 use crate::{
-    CoreError,
-    coordinates::CartesianCoordinates,
-    ensight_gold::types::VolumeElementTypes,
-    grid::MeshType,
-    model::{
+    coordinates::{CartesianCoordinates, CartesianVec3, CylindricalCoordinates}, ensight_gold::types::VolumeElementTypes, grid::MeshType, model::{
         compartments::{CompartmentInfo, CountVolumeElement, ElementVolumeInfo},
         interfaces::{AInterfacesInfo, InterfaceFlow, InterfaceInfo},
-    },
-    utils::{self, compute_volume},
+    }, utils::{self, compute_volume}, CoreError
 };
 use std::sync::Arc;
 mod data;
@@ -46,12 +41,15 @@ impl CMModel {
         // let n_interfaces = volume_element_count.n_interfaces();
 
         let (c_info, interfaces) = volume_element_count.into_reduce();
-        
+
         let n_max_interface = geometry.get_grid().as_ref().unwrap().n_maximum_interface();
-        if interfaces.n_facet.len()!= n_max_interface
-        {
-            eprintln!("Intefaces should be n_maximum_interface {} {}",interfaces.n_facet.len(),n_max_interface);
-         //   unimplemented!("Intefaces should be n_maximum_interface")
+        if interfaces.n_facet.len() != n_max_interface {
+            eprintln!(
+                "Intefaces should be n_maximum_interface {} {}",
+                interfaces.n_facet.len(),
+                n_max_interface
+            );
+            //   unimplemented!("Intefaces should be n_maximum_interface")
         }
 
         let mut model = Self {
@@ -66,15 +64,13 @@ impl CMModel {
         model
     }
 
-    fn compute_flux_through_limits() -> Vec<f64> {
-        todo!()
-    }
+    
 
     fn compute_volume_integral_per_zone() -> Vec<f64> {
         todo!()
     }
 
-    pub fn export_flux_through_limits(
+    pub fn compute_flux_between_compartments(
         &self,
         vector: Vector,
     ) -> Result<cmtool_data::RawDataFlux, CoreError> {
@@ -89,19 +85,21 @@ impl CMModel {
             let curent_inteface_element = &self.interfaces.global_id_from_interface[i_interface];
 
             for (global_id, area) in curent_inteface_element.iter().zip(current_interface_area) {
-                let vector_coords = vector.get_slice_xyz(*global_id);
-           
+                let vector_value = CartesianVec3(vector.get_slice_xyz(*global_id).to_owned());
+
                 let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
                     let CartesianCoordinates(centroid) =
                         self.geometry.volume_elements.xyz[*global_id];
+                    
+                    let CylindricalCoordinates(centroid)=CartesianCoordinates(centroid).into();
 
-                    utils::vector_cartesian_to_cylindrical(vector_coords, centroid)
+                    vector_value.to_cylindrical_vec(centroid[1]).0
                 } else {
-                    vector_coords.to_owned()
+                    vector_value.0
                 };
-
+               
                 let f = coords[axis] * area;
-
+                 println!("{} {} {:.6e} {:.6e}",axis,coords[axis],area,f);
                 if f > 0. {
                     flow.source_flow += f
                 } else if f < 0. {

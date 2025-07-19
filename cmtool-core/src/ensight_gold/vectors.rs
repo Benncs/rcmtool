@@ -41,9 +41,9 @@ impl VectorField {
             panic!("Error: mesh_cell index out of bounds");
         }
 
-        let x = flat[mesh_cell] as f64;
-        let y = flat[cols + mesh_cell] as f64;
-        let z = flat[2 * cols + mesh_cell] as f64;
+        let x = flat[utils::linear_index_coordinates_matrix(mesh_cell, 0)] as f64;
+        let y = flat[utils::linear_index_coordinates_matrix(mesh_cell, 1)] as f64;
+        let z = flat[utils::linear_index_coordinates_matrix(mesh_cell, 2)] as f64;
 
         [x, y, z]
     }

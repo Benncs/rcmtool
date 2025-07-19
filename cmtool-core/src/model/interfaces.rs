@@ -2,6 +2,7 @@ use std::{iter::Sum, ops::Add};
 
 use crate::coordinates::*;
 use crate::grid::NeighborDirection;
+use crate::utils::compute_intersection_area;
 use crate::{
     ensight_gold::types::ElementsType,
     model::{CMGeometry, geometry},
@@ -26,7 +27,7 @@ pub struct AInterfacesInfo {
     pub area: Vec<Vec<f64>>,
     pub normal_axis: Vec<usize>,
     pub global_id_from_interface: Vec<Vec<usize>>,
-    pub plane_coordinates: Vec<f64>,
+    // pub plane_coordinates: Vec<f64>,
 
     pub planes: Vec<Plane>,
 }
@@ -41,7 +42,7 @@ impl AInterfacesInfo {
             area: vec![Default::default(); n_interfaces],
             normal_axis: vec![Default::default(); n_interfaces],
             global_id_from_interface: vec![Default::default(); n_interfaces],
-            plane_coordinates: vec![0.; n_interfaces * 3 * 2], //Extent geometry
+            // plane_coordinates: vec![0.; n_interfaces * 3 * 2], //Extent geometry
             planes: Vec::new(),
         }
     }
@@ -96,30 +97,30 @@ impl AInterfacesInfo {
                 interfaces_id_from_cells[source_id * n_zones + target_id] = interface_id;
                 interfaces_id_from_cells[target_id * n_zones + source_id] = interface_id;
 
-                // let (plane, direction_neighbors) = grid.get_interface_plane(source_id, target_id);
-                // self.planes.push(plane);
-                // self.normal_axis[interface_id] = direction_neighbors;
-                //TODO impl logic with planes 
-
-                let neighbors = grid.are_cell_neighbor(source_id, target_id);
-                let direction_neighbors = neighbors
-                    .to_coord_index()
-                    .expect("Unwrap because we already know they are neighbors");
+                let (plane, direction_neighbors) = grid.get_interface_plane(source_id, target_id);
+                self.planes.push(plane);
                 self.normal_axis[interface_id] = direction_neighbors;
-                let indices_cell = grid.cell_points(source_id);
-                for (i_axis, ax_index) in indices_cell.iter().enumerate() {
-                    let plane_index = interface_id * 6 + 2 * i_axis; // 6 account for number of extent (x-,x+,y-,y+,z-.z+)
-                    self.plane_coordinates[plane_index] = grid.get_cell_edge(i_axis, *ax_index);
-                    self.plane_coordinates[plane_index + 1] =
-                        grid.get_cell_edge(i_axis, *ax_index + 1);
-                }
-                let plane_index = interface_id * 6 + 2 * direction_neighbors; // 6 account for number of extent (x-,x+,y-,y+,z-.z+)
+                //TODO impl logic with planes
 
-                if neighbors.is_negative() {
-                    self.plane_coordinates[plane_index + 1] = self.plane_coordinates[plane_index];
-                } else {
-                    self.plane_coordinates[plane_index] = self.plane_coordinates[plane_index + 1];
-                }
+                // let neighbors = grid.are_cell_neighbor(source_id, target_id);
+                // let direction_neighbors = neighbors
+                //     .to_coord_index()
+                //     .expect("Unwrap because we already know they are neighbors");
+                // self.normal_axis[interface_id] = direction_neighbors;
+                // let indices_cell = grid.cell_points(source_id);
+                // for (i_axis, ax_index) in indices_cell.iter().enumerate() {
+                //     let plane_index = interface_id * 6 + 2 * i_axis; // 6 account for number of extent (x-,x+,y-,y+,z-.z+)
+                //     self.plane_coordinates[plane_index] = grid.get_cell_edge(i_axis, *ax_index);
+                //     self.plane_coordinates[plane_index + 1] =
+                //         grid.get_cell_edge(i_axis, *ax_index + 1);
+                // }
+                // let plane_index = interface_id * 6 + 2 * direction_neighbors; // 6 account for number of extent (x-,x+,y-,y+,z-.z+)
+
+                // if neighbors.is_negative() {
+                //     self.plane_coordinates[plane_index + 1] = self.plane_coordinates[plane_index];
+                // } else {
+                //     self.plane_coordinates[plane_index] = self.plane_coordinates[plane_index + 1];
+                // }
             }
         }
         self.global_id_from_interface =
@@ -173,7 +174,7 @@ impl AInterfacesInfo {
         let mut local_vertices: Vec<CartesianCoordinates> = Vec::new();
 
         for (interface_id, cn_facet) in self.n_facet.iter().enumerate() {
-            let interface_plane = &self.plane_coordinates[6 * interface_id..6 * interface_id + 6];
+            let plane = &self.planes[interface_id];
             for i_facet in 0..*cn_facet {
                 let volume_element_global_id = self.global_id_from_interface[interface_id][i_facet]; //m_dbLimit_lvelem[interface][n_elem]
 
@@ -192,12 +193,15 @@ impl AInterfacesInfo {
                     );
                 }
 
-                //TODO impl logic with planes 
+                //TODO impl logic with planes
                 // let value_on_ax = match &self.planes[interface_id] {
                 //     Plane::Vector { normal: _, point } => point[self.normal_axis[interface_id]],
                 //     _ => panic!("Plane variant not supported for value extraction"),
                 // };
-                let value_on_ax = interface_plane[2 * self.normal_axis[interface_id]];
+                // let value_on_ax = interface_plane[2 * self.normal_axis[interface_id]];
+
+                let area = compute_intersection_area(&local_vertices, elem_type, plane)
+                    .expect("Area between element");
 
                 // let area = compute_intersection_area(
                 //     &local_vertices,
@@ -207,10 +211,9 @@ impl AInterfacesInfo {
                 //      geometry.mesh_type,
                 // )
                 // .expect("Area between element");
-                let area = 0.;
-                if area == 0. {
-                    println!("{} {} {} ", area, interface_id, i_facet);
-                }
+                // if area == 0. {
+                //     println!("{} {} {} ", area, interface_id, i_facet);
+                // }
 
                 self.area[interface_id][i_facet] = area;
             }

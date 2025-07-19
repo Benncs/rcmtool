@@ -1,7 +1,7 @@
 mod points;
 mod vec3;
 pub use points::*;
-
+pub use vec3::*;
 
 pub const NUMBER_OF_AXIS: usize = 3;
 pub type Coords3 = [f64; NUMBER_OF_AXIS];
@@ -50,7 +50,7 @@ impl Coords3Ext for Coords3 {
 
 pub enum Plane {
     Vector {
-        normal: Coords3,
+        normal: CartesianVec3,
         point: CartesianCoordinates,
     },
     Cartesian {
