@@ -24,10 +24,13 @@ f = get(cpp_ref)
 inf = np.sum(f, axis=1)
 out = np.sum(f, axis=0)
 
+n = np.random.randint(0,f.shape[0],5)
+
+
 print(inf[0:5])
 print(out[0:5])
 f = get(rust)
 inf = np.sum(f, axis=1)
 out = np.sum(f, axis=0)
-print(inf[0])
-print(out[0])
+print(inf[0:5])
+print(out[0:5])

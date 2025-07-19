@@ -38,19 +38,22 @@ impl CMModel {
             )
         }
         let interface_count_raw = volume_element_count.at_interface.clone();
-        // let n_interfaces = volume_element_count.n_interfaces();
 
         let (c_info, interfaces) = volume_element_count.into_reduce();
 
         let n_max_interface = geometry.get_grid().as_ref().unwrap().n_maximum_interface();
-        if interfaces.n_facet.len() != n_max_interface {
-            eprintln!(
-                "Intefaces should be n_maximum_interface {} {}",
-                interfaces.n_facet.len(),
-                n_max_interface
-            );
-            //   unimplemented!("Intefaces should be n_maximum_interface")
+        if interfaces.n_interfaces() >= n_max_interface
+        {
+            unimplemented!("should have intefaces  < n_maximum_interface")
         }
+        // if interfaces.n_facet.len() != n_max_interface {
+        //     eprintln!(
+        //         "Intefaces should be n_maximum_interface {} {}",
+        //         interfaces.n_facet.len(),
+        //         n_max_interface
+        //     );
+        //     //   unimplemented!("Intefaces should be n_maximum_interface")
+        // }
 
         let mut model = Self {
             geometry,
@@ -74,7 +77,7 @@ impl CMModel {
         &self,
         vector: Vector,
     ) -> Result<cmtool_data::RawDataFlux, CoreError> {
-        let n_fluxes = self.interfaces.n_facet.len();
+        let n_fluxes = self.interfaces.n_interfaces();
         let mut flux_field = RawDataFlux::new(self.geometry.n_zone(), n_fluxes);
 
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
@@ -99,7 +102,6 @@ impl CMModel {
                 };
                
                 let f = coords[axis] * area;
-                 println!("{} {} {:.6e} {:.6e}",axis,coords[axis],area,f);
                 if f > 0. {
                     flow.source_flow += f
                 } else if f < 0. {

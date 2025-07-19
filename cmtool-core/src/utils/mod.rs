@@ -31,14 +31,19 @@ pub type AxisPoints = [usize; NUMBER_OF_AXIS];
 /// volume of the tetrahedron.
 ///
 fn tetra_volume(
-    CartesianCoordinates(a): CartesianCoordinates,
-    CartesianCoordinates(b): CartesianCoordinates,
-    CartesianCoordinates(c): CartesianCoordinates,
-    CartesianCoordinates(d): CartesianCoordinates,
+    a: CartesianCoordinates,
+    b: CartesianCoordinates,
+    c: CartesianCoordinates,
+   d: CartesianCoordinates,
 ) -> f64 {
-    let ab = b.sub(&a);
-    let ac = c.sub(&a);
-    let ad = d.sub(&a);
+    
+    // let ab = b.sub(&a);
+    // let ac = c.sub(&a);
+    // let ad = d.sub(&a);
+    let ac = CartesianVec3::from_point(c, a);
+    let ab = CartesianVec3::from_point(b, a);
+    let ad = CartesianVec3::from_point(d, a);
+    
     ab.dot(&ac.cross(&ad)).abs() / 6.0
 }
 

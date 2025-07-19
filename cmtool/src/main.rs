@@ -63,11 +63,9 @@ fn main() {
 //     cmtool::check_flows(&export);
 
 
-//     cmtool::check_flows(&RawDataFlux::read_raw(
-//         "./out/cuve_sldmsh_initmrf/velocity.raw",
-//     ).unwrap());
-
     cmtool::check_flows(&RawDataFlux::read_raw(
-         "/home/benjamin/Documents/code/cpp/compartment-modelling-tool/cuve_sldmsh_initmrf.vel.vector-raw",
-     ).unwrap()); 
+        "./out/cuve_sldmsh_initmrf/velocity.raw",
+    ).unwrap());
+
+    
 }

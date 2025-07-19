@@ -22,14 +22,13 @@ pub struct InterfaceFlow {
 }
 
 pub struct AInterfacesInfo {
-    pub n_facet: Vec<usize>,
+    n_facet: Vec<usize>,
     pub info: Vec<InterfaceInfo>,
     pub area: Vec<Vec<f64>>,
     pub normal_axis: Vec<usize>,
     pub global_id_from_interface: Vec<Vec<usize>>,
     // pub plane_coordinates: Vec<f64>,
-
-    pub planes: Vec<BoundedPlane>,
+    // pub planes: Vec<BoundedPlane>,
 }
 
 impl AInterfacesInfo {
@@ -43,7 +42,7 @@ impl AInterfacesInfo {
             normal_axis: vec![Default::default(); n_interfaces],
             global_id_from_interface: vec![Default::default(); n_interfaces],
             // plane_coordinates: vec![0.; n_interfaces * 3 * 2], //Extent geometry
-            planes: Vec::new(),
+            // planes: Vec::new(),
         }
     }
 }
@@ -75,11 +74,19 @@ impl Default for InterfaceFlow {
 }
 
 impl AInterfacesInfo {
+
+    pub fn n_interfaces(&self)->usize
+    {
+        self.n_facet.len()
+    }
+
     pub fn fill(&mut self, geometry: &CMGeometry, interface_count_raw: &[usize]) {
+
+        let mut planes: Vec<BoundedPlane> = Vec::with_capacity(self.n_interfaces());
+
         let grid = geometry.get_grid().unwrap();
         let n_zones = geometry.n_zone();
         let mut interface_counter = 0;
-
         let mut interfaces_id_from_cells = vec![0; n_zones * n_zones];
 
         for source_id in 0..n_zones {
@@ -98,14 +105,13 @@ impl AInterfacesInfo {
                 interfaces_id_from_cells[target_id * n_zones + source_id] = interface_id;
 
                 let (plane, direction_neighbors) = grid.get_interface_plane(source_id, target_id);
-                self.planes.push(plane);
+                planes.push(plane);
                 self.normal_axis[interface_id] = direction_neighbors;
-             
             }
         }
         self.global_id_from_interface =
             self.count_interfaces_second_pass(geometry, &interfaces_id_from_cells);
-        self.fill_area(geometry);
+        self.fill_area(geometry,&planes);
     }
 
     fn count_interfaces_second_pass(
@@ -145,7 +151,22 @@ impl AInterfacesInfo {
         global_id_from_interface
     }
 
-    fn fill_area(&mut self, geometry: &CMGeometry) {
+    fn fill_area(&mut self, geometry: &CMGeometry,planes:&[BoundedPlane]) {
+        let fill_vertices =
+            |volume_element_global_id, n_vertex, local_vertices: &mut Vec<CartesianCoordinates>| {
+                local_vertices.clear();
+                local_vertices.reserve(n_vertex);
+
+                for k_vertex in 0..n_vertex {
+                    let vertex_global_id = geometry
+                        .volume_elements
+                        .get_vertex_from_vol_global_id(volume_element_global_id, k_vertex);
+                    local_vertices.push(CartesianCoordinates(
+                        geometry.vertices.get_slice_xyz(vertex_global_id).to_owned(),
+                    ));
+                }
+            };
+
         //This is almost the same algorithm as fill for c_info struct (to compute volume of velem)
         for (i, n) in self.n_facet.iter().enumerate() {
             self.area[i].resize(*n, 0.);
@@ -154,48 +175,19 @@ impl AInterfacesInfo {
         let mut local_vertices: Vec<CartesianCoordinates> = Vec::new();
 
         for (interface_id, cn_facet) in self.n_facet.iter().enumerate() {
-            let plane = &self.planes[interface_id];
+            let plane = &planes[interface_id];
             for i_facet in 0..*cn_facet {
-                let volume_element_global_id = self.global_id_from_interface[interface_id][i_facet]; //m_dbLimit_lvelem[interface][n_elem]
+                let volume_element_global_id = self.global_id_from_interface[interface_id][i_facet];
 
                 let (elem_type, n_vertex) = geometry
                     .volume_elements
                     .get_element_and_nvertex(volume_element_global_id);
 
-                local_vertices.resize(n_vertex, Default::default());
+                fill_vertices(volume_element_global_id, n_vertex, &mut local_vertices);
 
-                for (k_vertex, local_vertex) in local_vertices.iter_mut().enumerate() {
-                    let vertex_global_id = geometry
-                        .volume_elements
-                        .get_vertex_from_vol_global_id(volume_element_global_id, k_vertex);
-                    *local_vertex = CartesianCoordinates(
-                        geometry.vertices.get_slice_xyz(vertex_global_id).to_owned(),
-                    );
-                }
-
-                //TODO impl logic with planes
-                // let value_on_ax = match &self.planes[interface_id] {
-                //     Plane::Vector { normal: _, point } => point[self.normal_axis[interface_id]],
-                //     _ => panic!("Plane variant not supported for value extraction"),
-                // };
-                // let value_on_ax = interface_plane[2 * self.normal_axis[interface_id]];
-
-                let area = compute_intersection_area(&local_vertices, elem_type, plane)
-                    .expect("Area between element");
-
-                // let area = compute_intersection_area(
-                //     &local_vertices,
-                //     elem_type,
-                //     value_on_ax,
-                //     self.normal_axis[interface_id],
-                //      geometry.mesh_type,
-                // )
-                // .expect("Area between element");
-                // if area == 0. {
-                //     println!("{} {} {} ", area, interface_id, i_facet);
-                // }
-
-                self.area[interface_id][i_facet] = area;
+                self.area[interface_id][i_facet] =
+                    compute_intersection_area(&local_vertices, elem_type, plane)
+                        .expect("Area between element");
             }
         }
     }
