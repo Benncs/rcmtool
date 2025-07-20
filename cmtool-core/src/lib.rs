@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use cmtool_data::{RawData, RawDataFlux};
+use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 
 use crate::{
     ensight_gold::{RawField, VariableInfo},
@@ -196,6 +196,15 @@ impl CMHandle {
             self.cm_geometry.clone(),
             self.model.clone(),
         )
+    }
+
+    pub fn dump_real_volume(&self,res_name :impl AsRef<std::path::Path>)->Result<(),CoreError>
+    {
+        let volumes_data:RawDataScalar = self.model.get_real_volume().into();
+
+        volumes_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
+
+        Ok(())
     }
 
     pub fn dump_vector(

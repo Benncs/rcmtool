@@ -74,14 +74,11 @@ impl Default for InterfaceFlow {
 }
 
 impl AInterfacesInfo {
-
-    pub fn n_interfaces(&self)->usize
-    {
+    pub fn n_interfaces(&self) -> usize {
         self.n_facet.len()
     }
 
     pub fn fill(&mut self, geometry: &CMGeometry, interface_count_raw: &[usize]) {
-
         let mut planes: Vec<BoundedPlane> = Vec::with_capacity(self.n_interfaces());
 
         let grid = geometry.get_grid().unwrap();
@@ -111,7 +108,7 @@ impl AInterfacesInfo {
         }
         self.global_id_from_interface =
             self.count_interfaces_second_pass(geometry, &interfaces_id_from_cells);
-        self.fill_area(geometry,&planes);
+        self.fill_area(geometry, &planes);
     }
 
     fn count_interfaces_second_pass(
@@ -151,7 +148,7 @@ impl AInterfacesInfo {
         global_id_from_interface
     }
 
-    fn fill_area(&mut self, geometry: &CMGeometry,planes:&[BoundedPlane]) {
+    fn fill_area(&mut self, geometry: &CMGeometry, planes: &[BoundedPlane]) {
         let fill_vertices =
             |volume_element_global_id, n_vertex, local_vertices: &mut Vec<CartesianCoordinates>| {
                 local_vertices.clear();
@@ -185,9 +182,12 @@ impl AInterfacesInfo {
 
                 fill_vertices(volume_element_global_id, n_vertex, &mut local_vertices);
 
-                self.area[interface_id][i_facet] =
-                    compute_intersection_area(&local_vertices, elem_type, plane)
-                        .expect("Area between element");
+                let area = compute_intersection_area(&local_vertices, elem_type, plane)
+                    .expect("Area between element");
+                if area == 0. {
+                    println!("{} {}", interface_id, i_facet);
+                }
+                self.area[interface_id][i_facet] = area;
             }
         }
     }

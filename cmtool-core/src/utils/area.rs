@@ -63,16 +63,16 @@ fn sort_points_ccw_3d(points: &Vec<[f64; 3]>, normal: &CartesianVec3) -> Vec<[f6
     sorted_3d
 }
 
-fn polygon_area_2d(points: &Vec<[f64; 2]>) -> f64 {
-    let n = points.len();
-    let mut area = 0.0;
-    for i in 0..n {
-        let (x0, y0) = (points[i][0], points[i][1]);
-        let (x1, y1) = (points[(i + 1) % n][0], points[(i + 1) % n][1]);
-        area += x0 * y1 - x1 * y0;
-    }
-    area.abs() * 0.5
-}
+// fn polygon_area_2d(points: &Vec<[f64; 2]>) -> f64 {
+//     let n = points.len();
+//     let mut area = 0.0;
+//     for i in 0..n {
+//         let (x0, y0) = (points[i][0], points[i][1]);
+//         let (x1, y1) = (points[(i + 1) % n][0], points[(i + 1) % n][1]);
+//         area += x0 * y1 - x1 * y0;
+//     }
+//     area.abs() * 0.5
+// }
 
 fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 {
     let mut intersection_points = vec![];
@@ -87,8 +87,9 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
         .collect();
 
     let mut points_on_plane = vec![];
+    const TOL:f64 =1e-1;
     for (i, dist) in distances.iter().enumerate() {
-        if dist.abs() < 1e-12 {
+        if dist.abs() < TOL {
             points_on_plane.push(vertices[i].0);
         }
     }
@@ -141,7 +142,7 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
 
     //Compute area using shoelace formula
     // return polygon_area_2d(&sorted);
-    return polygon_area_3d(&sorted, normal);
+    polygon_area_3d(&sorted, normal)
 }
 
 fn polygon_area_3d(points: &[Coords3], normal: &CartesianVec3) -> f64 {
@@ -197,6 +198,7 @@ mod test {
             origin,
             extent_u: extent,
             extent_v: extent,
+            axis:0,
         }
     }
 

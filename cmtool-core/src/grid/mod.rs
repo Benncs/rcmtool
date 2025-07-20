@@ -7,6 +7,30 @@ use std::f64;
 use crate::coordinates::*;
 use crate::utils::AxisPoints;
 
+fn get_tangent_plane_at_r(axis:usize,
+    r0: f64,
+    theta: f64,
+    z: f64,
+    extent_u: [f64; 2],
+    extent_v: [f64; 2],
+) -> BoundedPlane {
+    let x0 = r0 * theta.cos();
+    let y0 = r0 * theta.sin();
+    let z0 = z;
+
+    let normal = CartesianVec3([x0 / r0, y0 / r0, 0.0]);
+
+    let origin = CartesianCoordinates([x0, y0, z0]);
+
+    BoundedPlane {
+        normal,
+        origin,
+        extent_u, // extensités sur theta
+        extent_v, // extensités sur z
+        axis
+    }
+}
+
 /// Represents the type of mesh geometry.
 #[derive(PartialEq, Clone, Copy)]
 pub enum MeshType {
@@ -415,14 +439,7 @@ impl CompartmentMeshManip for MeshCylindrical {
             _ => unreachable!(),
         };
 
-        // Convert normal from cylindrical to cartesian
-        let cyl_normal = CylindricalVec3(normal_dir, theta);
-        let normal_cartesian = cyl_normal.to_cartesian_vec();
-
-        // Origin in cartesian coordinates
-        let origin = CylindricalCoordinates([r, theta, z]).into();
-
-        // Define bounded extents on the two other axes
+       
         let (extent_u, extent_v) = match axis {
             0 => ([theta0, theta1], [z0, z1]), // u = theta, v = z
             1 => ([r0, r1], [z0, z1]),         // u = r, v = z
@@ -430,14 +447,24 @@ impl CompartmentMeshManip for MeshCylindrical {
             _ => unreachable!(),
         };
 
-        let bounded_plane = BoundedPlane {
-            normal: normal_cartesian,
-            origin,
-            extent_u,
-            extent_v,
-        };
-
-        (bounded_plane, axis)
+        if axis == 0 {
+            // axe r -> plan tangent au cylindre
+            let bounded_plane = get_tangent_plane_at_r(axis,r, theta, z, extent_u, extent_v);
+            (bounded_plane, axis)
+        } else {
+            // pour axis 1 et 2 on garde ta méthode normale
+            let cyl_normal = CylindricalVec3(normal_dir, theta);
+            let normal_cartesian = cyl_normal.to_cartesian_vec();
+            let origin = CylindricalCoordinates([r, theta, z]).into();
+            let bounded_plane = BoundedPlane {
+                normal: normal_cartesian,
+                origin,
+                extent_u,
+                extent_v,
+                axis
+            };
+            (bounded_plane, axis)
+        }
     }
 
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {

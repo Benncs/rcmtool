@@ -51,7 +51,7 @@ fn main() {
     handle
         .dump_all(format!("{}/{}", root_dir, stem), &case.root, &case.paths)
         .unwrap();
-
+    handle.dump_real_volume(format!("{}/{}/total_volume",root_dir,stem)).unwrap();
 //     let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
 //     let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
 //     let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";
