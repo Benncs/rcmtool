@@ -146,7 +146,7 @@ impl VolumeElementData {
                     let n_vertex = element.etype.node_count() as usize;
                     let n_volume_element = velem_detail[(i_part * N_NUMBER_TYPE) + var.to_index()];
 
-                    let current_vertex_vegid = &vertices.ve_gid[i_part];
+                    let current_vertex_vegid = vertices.get_current_vertex_from_part(i_part);
 
                     for ve_id in 0..n_volume_element {
                         let ve_global_id = *ve_counter;
@@ -177,13 +177,13 @@ impl VolumeElementData {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct VerticesData {
     ve_gid: Vec<Vec<usize>>, // Access to veGID by part and vertex
-    part_id: Vec<usize>,     // Access to vertex partID from veGID
-    pub ve_id: Vec<usize>,   // Access to vertex veID from veGID
-    pub xyz: Vec<f64>,       // Vertices coordinates
-    vertex_c_id: Vec<usize>, // Access to vertex cID from veGID
+    // part_id: Vec<usize>,     // Access to vertex partID from veGID
+    // ve_id: Vec<usize>,   // Access to vertex veID from veGID
+    xyz: Vec<f64>,       // Vertices coordinates
+    // vertex_c_id: Vec<usize>, // Access to vertex cID from veGID
 }
 
 impl VerticesData {
@@ -194,12 +194,15 @@ impl VerticesData {
         part_it: (usize, &Part),
     ) {
         let (i_part, part) = part_it;
+
+        
+
         for ve_id in 0..vertex_detail[i_part] {
             let vertex_global_identifier = *vertex_counter;
 
             self.ve_gid[i_part][ve_id] = vertex_global_identifier;
-            self.part_id[*vertex_counter] = i_part;
-            self.ve_id[vertex_global_identifier] = ve_id;
+            // self.part_id[*vertex_counter] = i_part;
+            // self.ve_id[vertex_global_identifier] = ve_id;
 
             let offset = (*vertex_counter) * 3;
             self.xyz[offset..offset + 3].copy_from_slice(part.get_vertex_coordinates_slice(ve_id));
@@ -219,19 +222,32 @@ impl VerticesData {
             }
         );
 
-        self.part_id.resize(n_vertices, 0);
-        self.ve_id.resize(n_vertices, 0);
+        // self.part_id.resize(n_vertices, 0);
+        // self.ve_id.resize(n_vertices, 0);
+
         self.xyz.resize(n_vertices * 3, 0.);
-        self.vertex_c_id.resize(n_vertices, 0);
+        // self.vertex_c_id.resize(n_vertices, 0);
     }
 
     pub fn n_vertex(&self) -> usize {
-        self.ve_id.len()
+        self.xyz.len()/3
     }
+
+    fn get_current_vertex_from_part(&self,part_id:usize)->&[usize]
+    {
+        &self.ve_gid[part_id]
+    }
+
     pub fn get_slice_xyz(&self, global_id: usize) -> &[f64; 3] {
         let offset = global_id * 3;
         self.xyz[offset..offset + 3]
             .try_into()
             .expect("Slice with exactly 3 elements")
+    }
+    pub fn get_radius_from_global_id(&self,vertex_global_id:usize)->f64
+    {
+           let offset = vertex_global_id * 3;
+            self.xyz[offset].hypot(self.xyz[offset + 1])
+            
     }
 }

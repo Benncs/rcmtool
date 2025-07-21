@@ -74,8 +74,9 @@ impl CMGeometry {
                     axe.max_range = axe.max_range.max(vertex);
                 });
             if mesh_type == MeshType::Cylindrical {
-                let offset = vertex_global_id * 3;
-                let radius = self.vertices.xyz[offset].hypot(self.vertices.xyz[offset + 1]);
+                // let offset = vertex_global_id * 3;
+                // let radius = self.vertices.xyz[offset].hypot(self.vertices.xyz[offset + 1]);
+                let radius = self.vertices.get_radius_from_global_id(vertex_global_id);
                 axis[cylindrical_index(CylindricalAxis::R)].max_range =
                     axis[0].max_range.max(radius);
             }
@@ -143,9 +144,11 @@ impl CMGeometry {
                 .get_vertex_from_vol_global_id(vol_element_global_id, k_vertex);
             let base_index = 3 * vertex_id;
 
-            coords[0] += self.vertices.xyz[base_index];
-            coords[1] += self.vertices.xyz[base_index + 1];
-            coords[2] += self.vertices.xyz[base_index + 2];
+            let vertex_coordinate = self.vertices.get_slice_xyz(vertex_id);
+            // coords[0] += self.vertices.xyz[base_index];
+            // coords[1] += self.vertices.xyz[base_index + 1];
+            // coords[2] += self.vertices.xyz[base_index + 2];
+            coords.iter_mut().zip(vertex_coordinate).for_each(|(c,v)|*c+=*v);
         }
         coords[0] /= n_vertex as f64;
         coords[1] /= n_vertex as f64;
