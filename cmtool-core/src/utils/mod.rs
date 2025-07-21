@@ -90,16 +90,31 @@ where
     let mut coords: Coords3 = Default::default();
     let mut count = 0;
 
+    // for vertex in vertices {
+    //     coords
+    //         .iter_mut()
+    //         .zip(vertex.iter())
+    //         .for_each(|(c, v)| *c += *v);
+    //     count += 1;
+    // }
+    // if count > 0 {
+    //     coords.iter_mut().for_each(|c| *c /= count as f64);
+    // }
+
+    //SIMD friendly version ? Even if it's not the case, loop unroling here is still very readable
     for vertex in vertices {
-        coords
-            .iter_mut()
-            .zip(vertex.iter())
-            .for_each(|(c, v)| *c += *v);
+        coords[0] += vertex[0];
+        coords[1] += vertex[1];
+        coords[2] += vertex[2];
         count += 1;
     }
 
+    //Same here loop unrolling may improve SIMD and still elegant
     if count > 0 {
-        coords.iter_mut().for_each(|c| *c /= count as f64);
+        let inv_count = 1.0 / count as f64;
+        coords[0] *= inv_count;
+        coords[1] *= inv_count;
+        coords[2] *= inv_count;
     }
 
     CartesianCoordinates(coords)
@@ -227,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_centroid_hexa() {
-        //Vertices are chosen to be -1 0 or 1 to have origin as centroid 
+        //Vertices are chosen to be -1 0 or 1 to have origin as centroid
         let cube_vertices = [
             &[-1.0, -1.0, -1.0],
             &[1.0, -1.0, -1.0],
@@ -246,5 +261,27 @@ mod tests {
             "Centroid is not at origin: got {:?}",
             centroid.0
         );
+    }
+
+    #[test]
+    fn test_centroid_tetraheadron() {
+
+        //for tetra: Centroid=1/4​(A+B+C+D)
+
+        let tetrahedron_vertices = [
+            &[0.0, 0.0, 0.0],
+            &[2.0, 0.0, 0.0],
+            &[0.0, 2.0, 0.0],
+            &[2.0, 2.0, 4.0],
+        ];
+
+        let centroid = compute_centroid(tetrahedron_vertices.iter().copied());
+
+        let expect_centroid = [1., 1., 1.];
+        centroid
+        .0
+        .iter()
+        .zip(expect_centroid)
+        .for_each(|(c, e)| assert!((c - e).abs() < 1e-12, "expected {e}, got {c}"));
     }
 }

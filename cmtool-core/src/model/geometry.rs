@@ -132,33 +132,7 @@ impl CMGeometry {
         }
     }
 
-    // fn get_element_centroid(
-    //     &self,
-    //     vol_element_global_id: usize,
-    //     n_vertex: usize,
-    // ) -> CartesianCoordinates {
-    //     let mut coords: Coords3 = Default::default();
-
-    //     for k_vertex in 0..n_vertex {
-    //         let vertex_id = self
-    //             .volume_elements
-    //             .get_vertex_from_vol_global_id(vol_element_global_id, k_vertex);
-    //         let base_index = 3 * vertex_id;
-
-    //         let vertex_coordinate = self.vertices.get_slice_xyz(vertex_id);
-    //         // coords[0] += self.vertices.xyz[base_index];
-    //         // coords[1] += self.vertices.xyz[base_index + 1];
-    //         // coords[2] += self.vertices.xyz[base_index + 2];
-    //         coords
-    //             .iter_mut()
-    //             .zip(vertex_coordinate)
-    //             .for_each(|(c, v)| *c += *v);
-    //     }
-    //     coords[0] /= n_vertex as f64;
-    //     coords[1] /= n_vertex as f64;
-    //     coords[2] /= n_vertex as f64;
-    //     CartesianCoordinates(coords)
-    // }
+   
 
     pub fn get_element_centroid(
         &self,
