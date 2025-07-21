@@ -189,25 +189,26 @@ pub struct VerticesData {
 impl VerticesData {
     pub fn fill_from_part(
         &mut self,
-        vertex_counter: &mut usize,
+        vertex_counter: usize,
         vertex_detail: &[usize],
         part_it: (usize, &Part),
-    ) {
+    )->usize {
         let (i_part, part) = part_it;
 
-        
+        let mut vertex_global_identifier = vertex_counter;
 
         for ve_id in 0..vertex_detail[i_part] {
-            let vertex_global_identifier = *vertex_counter;
+            
 
             self.ve_gid[i_part][ve_id] = vertex_global_identifier;
             // self.part_id[*vertex_counter] = i_part;
             // self.ve_id[vertex_global_identifier] = ve_id;
 
-            let offset = (*vertex_counter) * 3;
+            let offset = vertex_global_identifier * 3;
             self.xyz[offset..offset + 3].copy_from_slice(part.get_vertex_coordinates_slice(ve_id));
-            *vertex_counter += 1;
+            vertex_global_identifier += 1;
         }
+        vertex_detail[i_part]
     }
     pub fn resize(&mut self, n_part: usize, n_vertices: usize, vertex_detail: &[usize]) {
         self.ve_gid.resize(n_part, Vec::new());

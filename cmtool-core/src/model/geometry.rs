@@ -148,7 +148,10 @@ impl CMGeometry {
             // coords[0] += self.vertices.xyz[base_index];
             // coords[1] += self.vertices.xyz[base_index + 1];
             // coords[2] += self.vertices.xyz[base_index + 2];
-            coords.iter_mut().zip(vertex_coordinate).for_each(|(c,v)|*c+=*v);
+            coords
+                .iter_mut()
+                .zip(vertex_coordinate)
+                .for_each(|(c, v)| *c += *v);
         }
         coords[0] /= n_vertex as f64;
         coords[1] /= n_vertex as f64;
@@ -231,13 +234,14 @@ impl CMGeometry {
 
         let (vertex_detail, velem_detail) = cm_geometry.fill_detail(&geometry);
 
-        let mut vertex_counter = 0;
+        let mut global_vertex_counter = 0;
         let mut ve_counter = 0;
 
         for part_it in geometry.parts.iter().enumerate() {
-            cm_geometry
-                .vertices
-                .fill_from_part(&mut vertex_counter, &vertex_detail, part_it);
+            global_vertex_counter +=
+                cm_geometry
+                    .vertices
+                    .fill_from_part(global_vertex_counter, &vertex_detail, part_it);
 
             cm_geometry.volume_elements.fill_from_part(
                 part_it,
