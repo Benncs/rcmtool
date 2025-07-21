@@ -1,23 +1,26 @@
-use crate::{coordinates::CartesianCoordinates, ensight_gold::{
-    types::{ElementsType, VolumeElementTypes},
-    Part,
-}};
+use crate::{
+    coordinates::CartesianCoordinates,
+    ensight_gold::{
+        Part,
+        types::{ElementsType, VolumeElementTypes},
+    },
+};
 const C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM: usize = 20;
 
 #[derive(Default, Debug)]
 pub struct VolumeElementData {
     global_id: Vec<Vec<usize>>,
     // part_global_id: Vec<usize>,         // Part GID accessed via voGID
-    pub vtype: Vec<VolumeElementTypes>, // Volume element type accessed via voGID
+    vtype: Vec<VolumeElementTypes>, // Volume element type accessed via voGID
     ids: Vec<usize>,                    // Volume element ID accessed via voGID
     vertices: Vec<usize>,               // List of vertices attached to volume element
-    pub xyz: Vec<CartesianCoordinates>,                // Coordinates of center of volume element
+    pub xyz: Vec<CartesianCoordinates>, // Coordinates of center of volume element
     // raz: Vec<f64>,                // Additional coordinates or metadata
 
     // cell_id: Vec<usize>,          // cID accessed via voGID
     vertices_cell_id: Vec<usize>, // cID associated with each vertex of volume element
     nc_id: Vec<usize>,            // Number of cID per volume element
-    compartment_ids: Vec<usize>,    // List of cID in which vertices are
+    compartment_ids: Vec<usize>,  // List of cID in which vertices are
 }
 
 impl VolumeElementData {
@@ -33,17 +36,20 @@ impl VolumeElementData {
             .unwrap()
     }
 
-    pub fn get_element_and_nvertex(&self, global_id: usize) -> (VolumeElementTypes,usize) {
+    pub fn get_element_and_nvertex(&self, global_id: usize) -> (VolumeElementTypes, usize) {
         // if self.vtype.len() <= global_id {
         //     return 0;
         // } else {
         //     self.vtype[global_id].to_index()
         // }
         let element = self.vtype[global_id];
-        (element,ElementsType::VolumeElementType(element)
-            .node_count()
-            .try_into()
-            .unwrap())
+        (
+            element,
+            ElementsType::VolumeElementType(element)
+                .node_count()
+                .try_into()
+                .unwrap(),
+        )
     }
 
     pub fn set_number_cid(&mut self, global_id: usize, n_cid: usize) {
@@ -75,7 +81,7 @@ impl VolumeElementData {
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
         self.compartment_ids
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
-        self.xyz.resize(n_velement , Default::default());
+        self.xyz.resize(n_velement, Default::default());
         // self.raz.resize(n_velement * 3, 0.);
 
         self.vertices_cell_id
@@ -126,9 +132,10 @@ impl VolumeElementData {
     fn set_vertex_from_vol_global_id(
         &mut self,
         vol_element_global_id: usize,
-        k_vertex: usize,val:usize
-    )  {
-        self.vertices[vol_element_global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex]=val;
+        k_vertex: usize,
+        val: usize,
+    ) {
+        self.vertices[vol_element_global_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] = val;
     }
 
     pub fn fill_from_part(
@@ -162,7 +169,11 @@ impl VolumeElementData {
                         for k_vertex in 0..n_vertex {
                             // let vtx = element.vertices[ve_id * n_vertex + k_vertex];
                             let vtx = element.get_vertex(ve_id, k_vertex);
-                            self.set_vertex_from_vol_global_id(ve_global_id,k_vertex,current_vertex_vegid[vtx-1]);
+                            self.set_vertex_from_vol_global_id(
+                                ve_global_id,
+                                k_vertex,
+                                current_vertex_vegid[vtx - 1],
+                            );
                             // self.vertices[ve_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] =
                             //     current_vertex_vegid[vtx - 1];
                         }
@@ -182,8 +193,8 @@ pub struct VerticesData {
     ve_gid: Vec<Vec<usize>>, // Access to veGID by part and vertex
     // part_id: Vec<usize>,     // Access to vertex partID from veGID
     // ve_id: Vec<usize>,   // Access to vertex veID from veGID
-    xyz: Vec<f64>,       // Vertices coordinates
-    // vertex_c_id: Vec<usize>, // Access to vertex cID from veGID
+    xyz: Vec<f64>, // Vertices coordinates
+                   // vertex_c_id: Vec<usize>, // Access to vertex cID from veGID
 }
 
 impl VerticesData {
@@ -192,14 +203,12 @@ impl VerticesData {
         vertex_counter: usize,
         vertex_detail: &[usize],
         part_it: (usize, &Part),
-    )->usize {
+    ) -> usize {
         let (i_part, part) = part_it;
 
         let mut vertex_global_identifier = vertex_counter;
 
         for ve_id in 0..vertex_detail[i_part] {
-            
-
             self.ve_gid[i_part][ve_id] = vertex_global_identifier;
             // self.part_id[*vertex_counter] = i_part;
             // self.ve_id[vertex_global_identifier] = ve_id;
@@ -216,12 +225,12 @@ impl VerticesData {
         //     self.ve_gid[i].resize(vertex_detail[i], 0);
         // }
 
-        self.ve_gid.iter_mut().zip(vertex_detail).for_each(
-            |(ve,size)|
-            {
+        self.ve_gid
+            .iter_mut()
+            .zip(vertex_detail)
+            .for_each(|(ve, size)| {
                 ve.resize(*size, 0);
-            }
-        );
+            });
 
         // self.part_id.resize(n_vertices, 0);
         // self.ve_id.resize(n_vertices, 0);
@@ -231,11 +240,10 @@ impl VerticesData {
     }
 
     pub fn n_vertex(&self) -> usize {
-        self.xyz.len()/3
+        self.xyz.len() / 3
     }
 
-    fn get_current_vertex_from_part(&self,part_id:usize)->&[usize]
-    {
+    fn get_current_vertex_from_part(&self, part_id: usize) -> &[usize] {
         &self.ve_gid[part_id]
     }
 
@@ -245,10 +253,8 @@ impl VerticesData {
             .try_into()
             .expect("Slice with exactly 3 elements")
     }
-    pub fn get_radius_from_global_id(&self,vertex_global_id:usize)->f64
-    {
-           let offset = vertex_global_id * 3;
-            self.xyz[offset].hypot(self.xyz[offset + 1])
-            
+    pub fn get_radius_from_global_id(&self, vertex_global_id: usize) -> f64 {
+        let offset = vertex_global_id * 3;
+        self.xyz[offset].hypot(self.xyz[offset + 1])
     }
 }

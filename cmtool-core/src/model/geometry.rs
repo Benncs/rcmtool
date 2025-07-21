@@ -11,6 +11,7 @@ use crate::{
         data::{VerticesData, VolumeElementData},
         interfaces::AInterfacesInfo,
     },
+    utils::compute_centroid,
 };
 
 pub struct CMGeometry {
@@ -131,32 +132,48 @@ impl CMGeometry {
         }
     }
 
-    fn get_element_centroid(
+    // fn get_element_centroid(
+    //     &self,
+    //     vol_element_global_id: usize,
+    //     n_vertex: usize,
+    // ) -> CartesianCoordinates {
+    //     let mut coords: Coords3 = Default::default();
+
+    //     for k_vertex in 0..n_vertex {
+    //         let vertex_id = self
+    //             .volume_elements
+    //             .get_vertex_from_vol_global_id(vol_element_global_id, k_vertex);
+    //         let base_index = 3 * vertex_id;
+
+    //         let vertex_coordinate = self.vertices.get_slice_xyz(vertex_id);
+    //         // coords[0] += self.vertices.xyz[base_index];
+    //         // coords[1] += self.vertices.xyz[base_index + 1];
+    //         // coords[2] += self.vertices.xyz[base_index + 2];
+    //         coords
+    //             .iter_mut()
+    //             .zip(vertex_coordinate)
+    //             .for_each(|(c, v)| *c += *v);
+    //     }
+    //     coords[0] /= n_vertex as f64;
+    //     coords[1] /= n_vertex as f64;
+    //     coords[2] /= n_vertex as f64;
+    //     CartesianCoordinates(coords)
+    // }
+
+    pub fn get_element_centroid(
         &self,
         vol_element_global_id: usize,
         n_vertex: usize,
     ) -> CartesianCoordinates {
-        let mut coords: Coords3 = Default::default();
-
-        for k_vertex in 0..n_vertex {
+        //This iter is lazy as we map without operation 
+        let iter = (0..n_vertex).map(|k| {
             let vertex_id = self
                 .volume_elements
-                .get_vertex_from_vol_global_id(vol_element_global_id, k_vertex);
-            let base_index = 3 * vertex_id;
+                .get_vertex_from_vol_global_id(vol_element_global_id, k);
+            self.vertices.get_slice_xyz(vertex_id)
+        });
 
-            let vertex_coordinate = self.vertices.get_slice_xyz(vertex_id);
-            // coords[0] += self.vertices.xyz[base_index];
-            // coords[1] += self.vertices.xyz[base_index + 1];
-            // coords[2] += self.vertices.xyz[base_index + 2];
-            coords
-                .iter_mut()
-                .zip(vertex_coordinate)
-                .for_each(|(c, v)| *c += *v);
-        }
-        coords[0] /= n_vertex as f64;
-        coords[1] /= n_vertex as f64;
-        coords[2] /= n_vertex as f64;
-        CartesianCoordinates(coords)
+        compute_centroid(iter)
     }
 }
 
@@ -235,7 +252,7 @@ impl CMGeometry {
         let (vertex_detail, velem_detail) = cm_geometry.fill_detail(&geometry);
 
         let mut global_vertex_counter = 0;
-        let mut ve_counter = 0;
+        let mut global_volume_element_counter = 0;
 
         for part_it in geometry.parts.iter().enumerate() {
             global_vertex_counter +=
@@ -247,7 +264,7 @@ impl CMGeometry {
                 part_it,
                 &velem_detail,
                 &cm_geometry.vertices,
-                &mut ve_counter,
+                &mut global_volume_element_counter,
             )
         }
 

@@ -14,11 +14,6 @@ pub fn linear_index_coordinates_matrix(i_coord: usize, i_axis: usize) -> usize {
 
 pub type AxisPoints = [usize; NUMBER_OF_AXIS];
 
-
-
-
-
-
 /// Computes the signed volume of a tetrahedron defined by four 3D points.
 ///
 /// # Arguments
@@ -34,16 +29,15 @@ fn tetra_volume(
     a: CartesianCoordinates,
     b: CartesianCoordinates,
     c: CartesianCoordinates,
-   d: CartesianCoordinates,
+    d: CartesianCoordinates,
 ) -> f64 {
-    
     // let ab = b.sub(&a);
     // let ac = c.sub(&a);
     // let ad = d.sub(&a);
     let ac = CartesianVec3::from_point(c, a);
     let ab = CartesianVec3::from_point(b, a);
     let ad = CartesianVec3::from_point(d, a);
-    
+
     ab.dot(&ac.cross(&ad)).abs() / 6.0
 }
 
@@ -89,8 +83,27 @@ impl VolumeElementTypes {
     }
 }
 
+pub fn compute_centroid<'a, I>(vertices: I) -> CartesianCoordinates
+where
+    I: Iterator<Item = &'a [f64; 3]>,
+{
+    let mut coords: Coords3 = Default::default();
+    let mut count = 0;
 
+    for vertex in vertices {
+        coords
+            .iter_mut()
+            .zip(vertex.iter())
+            .for_each(|(c, v)| *c += *v);
+        count += 1;
+    }
 
+    if count > 0 {
+        coords.iter_mut().for_each(|c| *c /= count as f64);
+    }
+
+    CartesianCoordinates(coords)
+}
 
 /// Computes the total volume of a given volume element by summing the
 /// volumes of its tetrahedral subdivisions.
@@ -132,8 +145,6 @@ pub fn compute_volume(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    
 
     #[test]
     fn unit_tetrahedron_volume() {
@@ -200,6 +211,40 @@ mod tests {
             "Expected volume ≈ {}, got {}",
             expected,
             volume
+        );
+    }
+
+    #[test]
+    fn test_centroid_triangle_2d() {
+        let v1 = &[0.0, 0.0, 0.0];
+        let v2 = &[1.0, 0.0, 0.0];
+        let v3 = &[0.0, 1.0, 0.0];
+
+        let centroid = compute_centroid([v1, v2, v3].iter().copied());
+
+        assert_eq!(centroid.0, [1.0 / 3.0, 1.0 / 3.0, 0.0]);
+    }
+
+    #[test]
+    fn test_centroid_hexa() {
+        //Vertices are chosen to be -1 0 or 1 to have origin as centroid 
+        let cube_vertices = [
+            &[-1.0, -1.0, -1.0],
+            &[1.0, -1.0, -1.0],
+            &[1.0, 1.0, -1.0],
+            &[-1.0, 1.0, -1.0],
+            &[-1.0, -1.0, 1.0],
+            &[1.0, -1.0, 1.0],
+            &[1.0, 1.0, 1.0],
+            &[-1.0, 1.0, 1.0],
+        ];
+
+        let centroid = compute_centroid(cube_vertices.iter().copied());
+
+        assert!(
+            centroid.0.iter().all(|c| c.abs() < 1e-12),
+            "Centroid is not at origin: got {:?}",
+            centroid.0
         );
     }
 }
