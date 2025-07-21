@@ -31,23 +31,15 @@ impl CMGeometry {
         let mut n_vertex_total = 0;
         let mut n_volume_elements_total = 0;
 
-        for (i, part) in geometry.parts.iter().enumerate() {
+        for (i_part, part) in geometry.parts.iter().enumerate() {
             n_vertex_total += part.n_vertex;
             vertex_detail.push(part.n_vertex);
-
+            let base_index = i_part * n_number_type;
             for element in &part.elements {
-                match element.etype {
-                    ElementsType::VolumeElementType(e) => {
-                        // let n_nodes = element.etype.node_count() as usize;
-
-                        let index_element = e.to_index();
-                        n_volume_elements_total += element.n_elements;
-                        velem_detail[(i * n_number_type) + index_element] += element.n_elements;
-                    }
-                    _ => {
-                        // panic!("TODO Not a volume element {:?}",e);
-                        continue;
-                    }
+                if let ElementsType::VolumeElementType(vol_element) = element.etype {
+                    let index_element = vol_element.to_index();
+                    n_volume_elements_total += element.n_elements;
+                    velem_detail[base_index + index_element] += element.n_elements;
                 }
             }
         }
@@ -75,8 +67,6 @@ impl CMGeometry {
                     axe.max_range = axe.max_range.max(vertex);
                 });
             if mesh_type == MeshType::Cylindrical {
-                // let offset = vertex_global_id * 3;
-                // let radius = self.vertices.xyz[offset].hypot(self.vertices.xyz[offset + 1]);
                 let radius = self.vertices.get_radius_from_global_id(vertex_global_id);
                 axis[cylindrical_index(CylindricalAxis::R)].max_range =
                     axis[0].max_range.max(radius);
@@ -132,14 +122,12 @@ impl CMGeometry {
         }
     }
 
-   
-
     pub fn get_element_centroid(
         &self,
         vol_element_global_id: usize,
         n_vertex: usize,
     ) -> CartesianCoordinates {
-        //This iter is lazy as we map without operation 
+        //This iter is lazy as we map without operation
         let iter = (0..n_vertex).map(|k| {
             let vertex_id = self
                 .volume_elements
