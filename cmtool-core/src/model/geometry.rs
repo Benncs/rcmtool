@@ -44,7 +44,7 @@ impl CMGeometry {
             }
         }
 
-        self.vertices.resize(n_part, n_vertex_total, &vertex_detail);
+        self.vertices.resize(n_vertex_total, &vertex_detail);
 
         self.volume_elements
             .resize(n_part, n_volume_elements_total, &velem_detail);
@@ -144,27 +144,29 @@ impl CMGeometry {
         self.grid.as_ref().unwrap().number_cell()
     }
 
-    pub(super) fn interface_iterator(&self, mut f: impl FnMut(usize, usize, usize, usize)) {
-        for vol_element_global_id in 0..self.volume_elements.n_element() {
+    pub(super) fn interface_iter(&self) -> impl Iterator<Item = (usize, usize, usize, usize)> + '_ {
+        (0..self.volume_elements.n_element()).flat_map(move |vol_element_global_id| {
             let interface_cid_0 = self
                 .volume_elements
                 .get_list_compartment_id(vol_element_global_id, 0);
 
             let n_cid = self.volume_elements.get_number_cid(vol_element_global_id);
 
-            for k_vertex in 0..n_cid {
+            (0..n_cid).map(move |k_vertex| {
                 let interface_cid_k = self
                     .volume_elements
                     .get_list_compartment_id(vol_element_global_id, k_vertex);
-                f(
+
+                (
                     vol_element_global_id,
                     interface_cid_0,
                     interface_cid_k,
                     k_vertex,
-                );
-            }
-        }
+                )
+            })
+        })
     }
+
     pub fn fill_vertices(
         &self,
         volume_element_global_id: usize,
@@ -188,10 +190,9 @@ impl CMGeometry {
     pub fn get_count_volume_element_first_pass(&self) -> CountVolumeElement {
         let mut count = CountVolumeElement::new(self.n_zone());
 
-        let functor = |_vol_element_global_id: usize,
-                       interface_cid_0: usize,
-                       interface_cid_k: usize,
-                       k_vertex: usize| {
+        for (_vol_element_global_id, interface_cid_0, interface_cid_k, k_vertex) in
+            self.interface_iter()
+        {
             count.incr_compartment(interface_cid_k);
 
             if k_vertex >= 1 {
@@ -211,9 +212,7 @@ impl CMGeometry {
                     }
                 }
             }
-        };
-
-        self.interface_iterator(functor);
+        }
 
         count
     }

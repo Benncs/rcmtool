@@ -1,8 +1,13 @@
 use crate::{
-    coordinates::{CartesianCoordinates, CartesianVec3, CylindricalCoordinates}, ensight_gold::types::VolumeElementTypes, grid::MeshType, model::{
+    CoreError,
+    coordinates::{CartesianCoordinates, CartesianVec3, CylindricalCoordinates},
+    ensight_gold::types::VolumeElementTypes,
+    grid::MeshType,
+    model::{
         compartments::{CompartmentInfo, CountVolumeElement, ElementVolumeInfo},
         interfaces::{AInterfacesInfo, InterfaceFlow, InterfaceInfo},
-    }, utils::{self, compute_volume}, CoreError
+    },
+    utils::{self, compute_volume},
 };
 use std::sync::Arc;
 mod data;
@@ -42,8 +47,7 @@ impl CMModel {
         let (c_info, interfaces) = volume_element_count.into_reduce();
 
         let n_max_interface = geometry.get_grid().as_ref().unwrap().n_maximum_interface();
-        if interfaces.n_interfaces() >= n_max_interface
-        {
+        if interfaces.n_interfaces() >= n_max_interface {
             unimplemented!("should have intefaces  < n_maximum_interface")
         }
         // if interfaces.n_facet.len() != n_max_interface {
@@ -66,8 +70,6 @@ impl CMModel {
 
         model
     }
-
-    
 
     fn compute_volume_integral_per_zone() -> Vec<f64> {
         todo!()
@@ -93,14 +95,14 @@ impl CMModel {
                 let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
                     let CartesianCoordinates(centroid) =
                         self.geometry.volume_elements.xyz[*global_id];
-                    
-                    let CylindricalCoordinates(centroid)=CartesianCoordinates(centroid).into();
+
+                    let CylindricalCoordinates(centroid) = CartesianCoordinates(centroid).into();
 
                     vector_value.to_cylindrical_vec(centroid[1]).0
                 } else {
                     vector_value.0
                 };
-               
+
                 let f = coords[axis] * area;
                 if f > 0. {
                     flow.source_flow += f
@@ -114,7 +116,7 @@ impl CMModel {
             let InterfaceInfo {
                 source_id,
                 target_id,
-            } = self.interfaces.info[i_interface];
+            } = self.interfaces.ids[i_interface];
 
             rd.id_source = source_id as u32;
             rd.id_target = target_id as u32;
@@ -136,9 +138,9 @@ impl CMModel {
 
     pub fn export_volume_integral_per_zone(
         &self,
-        scalar: Scalar,
+        model_scalar: Scalar,
     ) -> Result<cmtool_data::RawDataScalar, CoreError> {
-        println!("Creating scalar {}", scalar.name.trim(),);
+        println!("Creating scalar {}", model_scalar.name.trim(),);
         let mut scalar_field = RawDataScalar::new(self.geometry.n_zone());
 
         scalar_field.values = vec![(0.).into(); self.geometry.n_zone()];
@@ -146,11 +148,12 @@ impl CMModel {
         let iterator = self.c_info.volumes.iter().zip(&mut scalar_field.values);
 
         for (volumes_i, field) in iterator {
-            field.value = volumes_i
-                .iter()
-                .fold(0.0, |acc, ElementVolumeInfo { global_id, volume }| {
-                    acc + scalar[*global_id] * volume
-                });
+            field.value =
+                volumes_i
+                    .iter()
+                    .fold(0.0, |acc, ElementVolumeInfo { global_id, volume }| {
+                        acc + model_scalar[*global_id] * volume
+                    });
         }
 
         Ok(scalar_field)

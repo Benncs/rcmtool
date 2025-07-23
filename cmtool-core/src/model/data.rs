@@ -227,7 +227,7 @@ impl VerticesData {
         }
         vertex_detail[i_part]
     }
-    pub fn resize(&mut self, n_part: usize, n_vertices: usize, vertex_detail: &[usize]) {
+    pub fn resize(&mut self, n_vertices: usize, vertex_detail: &[usize]) {
         self.ve_gid = vertex_detail
             .iter()
             .map(|n_vertex_p_part| vec![0; *n_vertex_p_part])

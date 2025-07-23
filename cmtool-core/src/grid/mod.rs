@@ -7,7 +7,8 @@ use std::f64;
 use crate::coordinates::*;
 use crate::utils::AxisPoints;
 
-fn get_tangent_plane_at_r(axis:usize,
+fn get_tangent_plane_at_r(
+    axis: usize,
     r0: f64,
     theta: f64,
     z: f64,
@@ -27,7 +28,7 @@ fn get_tangent_plane_at_r(axis:usize,
         origin,
         extent_u, // extensités sur theta
         extent_v, // extensités sur z
-        axis
+        axis,
     }
 }
 
@@ -439,7 +440,6 @@ impl CompartmentMeshManip for MeshCylindrical {
             _ => unreachable!(),
         };
 
-       
         let (extent_u, extent_v) = match axis {
             0 => ([theta0, theta1], [z0, z1]), // u = theta, v = z
             1 => ([r0, r1], [z0, z1]),         // u = r, v = z
@@ -449,7 +449,7 @@ impl CompartmentMeshManip for MeshCylindrical {
 
         if axis == 0 {
             // axe r -> plan tangent au cylindre
-            let bounded_plane = get_tangent_plane_at_r(axis,r, theta, z, extent_u, extent_v);
+            let bounded_plane = get_tangent_plane_at_r(axis, r, theta, z, extent_u, extent_v);
             (bounded_plane, axis)
         } else {
             // pour axis 1 et 2 on garde ta méthode normale
@@ -461,7 +461,7 @@ impl CompartmentMeshManip for MeshCylindrical {
                 origin,
                 extent_u,
                 extent_v,
-                axis
+                axis,
             };
             (bounded_plane, axis)
         }
@@ -588,7 +588,6 @@ pub fn get_mesh(
 
 #[cfg(test)]
 mod test {
-    use std::process::id;
 
     use super::*;
 

@@ -1,13 +1,9 @@
-use std::{iter::Sum, ops::Add};
-
 use crate::coordinates::*;
 use crate::grid::NeighborDirection;
+use crate::model::CMGeometry;
 use crate::utils::compute_intersection_area;
-use crate::{
-    ensight_gold::types::ElementsType,
-    model::{CMGeometry, geometry},
-    // utils::compute_intersection_area,
-};
+
+use super::geometry;
 
 #[derive(Default, Clone)]
 pub struct InterfaceInfo {
@@ -23,7 +19,7 @@ pub struct InterfaceFlow {
 
 pub struct AInterfacesInfo {
     n_facet: Vec<usize>,
-    pub info: Vec<InterfaceInfo>,
+    pub ids: Vec<InterfaceInfo>,
     pub area: Vec<Vec<f64>>,
     pub normal_axis: Vec<usize>,
     pub global_id_from_interface: Vec<Vec<usize>>,
@@ -37,7 +33,7 @@ impl AInterfacesInfo {
 
         Self {
             n_facet: at_interface,
-            info: vec![Default::default(); n_interfaces],
+            ids: vec![Default::default(); n_interfaces],
             area: vec![Default::default(); n_interfaces],
             normal_axis: vec![Default::default(); n_interfaces],
             global_id_from_interface: vec![Default::default(); n_interfaces],
@@ -47,22 +43,23 @@ impl AInterfacesInfo {
     }
 }
 
-impl Add for InterfaceFlow {
-    type Output = Self;
+//use std::{iter::Sum, ops::Add};
+//impl Add for InterfaceFlow {
+//type Output = Self;
+//
+//fn add(self, other: Self) -> Self {
+//InterfaceFlow {
+//source_flow: self.source_flow + other.source_flow,
+//target_flow: self.target_flow + other.target_flow,
+//}
+//}
+//}
 
-    fn add(self, other: Self) -> Self {
-        InterfaceFlow {
-            source_flow: self.source_flow + other.source_flow,
-            target_flow: self.target_flow + other.target_flow,
-        }
-    }
-}
-
-impl Sum for InterfaceFlow {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self::default(), Add::add)
-    }
-}
+//impl Sum for InterfaceFlow {
+//fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+//iter.fold(Self::default(), Add::add)
+//}
+//}
 
 impl Default for InterfaceFlow {
     fn default() -> Self {
@@ -83,8 +80,8 @@ impl AInterfacesInfo {
 
         let grid = geometry.get_grid().unwrap();
         let n_zones = geometry.n_zone();
-        let mut interface_counter = 0;
         let mut interfaces_id_from_cells = vec![0; n_zones * n_zones];
+        let mut interface_counter = 0;
 
         for source_id in 0..n_zones {
             for target_id in 0..n_zones {
@@ -94,7 +91,7 @@ impl AInterfacesInfo {
 
                 let interface_id = interface_counter;
                 interface_counter += 1;
-                self.info[interface_id] = InterfaceInfo {
+                self.ids[interface_id] = InterfaceInfo {
                     source_id,
                     target_id,
                 };
@@ -122,18 +119,14 @@ impl AInterfacesInfo {
         {
             *element_id = vec![0; *n_element];
         }
-
+        let grid = geometry.get_grid().unwrap();
         let n_zones = geometry.n_zone();
-        let functor = |vol_element_global_id: usize,
-                       interface_cid_0: usize,
-                       interface_cid_k: usize,
-                       k_vertex: usize| {
+
+        for (vol_element_global_id, interface_cid_0, interface_cid_k, k_vertex) in
+            geometry.interface_iter()
+        {
             if k_vertex >= 1
-                && geometry
-                    .get_grid()
-                    .as_ref()
-                    .unwrap()
-                    .are_cell_neighbor(interface_cid_0, interface_cid_k)
+                && grid.are_cell_neighbor(interface_cid_0, interface_cid_k)
                     != NeighborDirection::NotNeighbors
             {
                 let interface_global_id =
@@ -142,11 +135,42 @@ impl AInterfacesInfo {
                 tmp_element_counter[interface_global_id] += 1;
                 global_id_from_interface[interface_global_id][k_element] = vol_element_global_id;
             }
-        };
-        geometry.interface_iterator(functor);
+        }
 
         global_id_from_interface
     }
+
+    //fn count_interfaces_second_pass(
+    //&mut self,
+    //geometry: &CMGeometry,
+    //interfaces_id_from_cells: &[usize],
+    //) -> Vec<Vec<usize>> {
+    //let mut tmp_element_counter = vec![0; self.n_facet.len()];
+    //let mut global_id_from_interface: Vec<Vec<usize>> = vec![Vec::new(); self.n_facet.len()];
+    //for (element_id, n_element) in global_id_from_interface.iter_mut().zip(self.n_facet.iter())
+    //{
+    //*element_id = vec![0; *n_element];
+    //}
+    //let grid = geometry.get_grid().unwrap();
+    //let n_zones = geometry.n_zone();
+    //let functor = |vol_element_global_id: usize,
+    //interface_cid_0: usize,
+    //interface_cid_k: usize,
+    //k_vertex: usize| {
+    //if k_vertex >= 1
+    //&& grid.are_cell_neighbor(interface_cid_0, interface_cid_k)!= NeighborDirection::NotNeighbors
+    //{
+    //let interface_global_id =
+    //interfaces_id_from_cells[interface_cid_0 * n_zones + interface_cid_k];
+    //let k_element = tmp_element_counter[interface_global_id];
+    //tmp_element_counter[interface_global_id] += 1;
+    //global_id_from_interface[interface_global_id][k_element] = vol_element_global_id;
+    //}
+    //};
+    //geometry.interface_iterator(functor);
+    //
+    //global_id_from_interface
+    //}
 
     fn fill_area(&mut self, geometry: &CMGeometry, planes: &[BoundedPlane]) {
         //This is almost the same algorithm as fill for c_info struct (to compute volume of velem)
