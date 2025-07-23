@@ -12,8 +12,8 @@ pub struct VolumeElementData {
     global_id: Vec<Vec<usize>>,
     // part_global_id: Vec<usize>,         // Part GID accessed via voGID
     vtype: Vec<VolumeElementTypes>, // Volume element type accessed via voGID
-    ids: Vec<usize>,                    // Volume element ID accessed via voGID
-    vertices: Vec<usize>,               // List of vertices attached to volume element
+    ids: Vec<usize>,                // Volume element ID accessed via voGID
+    vertices: Vec<usize>,           // List of vertices attached to volume element
     pub xyz: Vec<CartesianCoordinates>, // Coordinates of center of volume element
     // raz: Vec<f64>,                // Additional coordinates or metadata
 
@@ -57,6 +57,10 @@ impl VolumeElementData {
     }
     pub fn get_number_cid(&self, global_id: usize) -> usize {
         self.nc_id[global_id]
+    }
+
+    pub fn enumerate_number_id(&self) -> std::iter::Enumerate<std::slice::Iter<'_, usize>> {
+        self.nc_id.iter().enumerate()
     }
 
     pub fn resize(&mut self, n_part: usize, n_velement: usize, velement_detail: &[usize]) {
@@ -153,7 +157,7 @@ impl VolumeElementData {
                     let n_vertex = element.etype.node_count() as usize;
                     let n_volume_element = velem_detail[(i_part * N_NUMBER_TYPE) + var.to_index()];
 
-                    let current_vertex_vegid = vertices.get_current_vertex_from_part(i_part);
+                    let current_vertex_in_part = vertices.get_current_vertex_from_part(i_part);
 
                     for ve_id in 0..n_volume_element {
                         let ve_global_id = *ve_counter;
@@ -172,7 +176,7 @@ impl VolumeElementData {
                             self.set_vertex_from_vol_global_id(
                                 ve_global_id,
                                 k_vertex,
-                                current_vertex_vegid[vtx - 1],
+                                current_vertex_in_part[vtx - 1],
                             );
                             // self.vertices[ve_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] =
                             //     current_vertex_vegid[vtx - 1];
@@ -188,9 +192,13 @@ impl VolumeElementData {
     }
 }
 
+//TODO: Remove this and merge with volume ?
 #[derive(Default)]
 pub struct VerticesData {
+    //Actually only used to construct volume data
+    //TODO: Make this temp varialbe ?
     ve_gid: Vec<Vec<usize>>, // Access to veGID by part and vertex
+
     // part_id: Vec<usize>,     // Access to vertex partID from veGID
     // ve_id: Vec<usize>,   // Access to vertex veID from veGID
     xyz: Vec<f64>, // Vertices coordinates
@@ -220,17 +228,10 @@ impl VerticesData {
         vertex_detail[i_part]
     }
     pub fn resize(&mut self, n_part: usize, n_vertices: usize, vertex_detail: &[usize]) {
-        self.ve_gid.resize(n_part, Vec::new());
-        // for i in 0..n_part {
-        //     self.ve_gid[i].resize(vertex_detail[i], 0);
-        // }
-
-        self.ve_gid
-            .iter_mut()
-            .zip(vertex_detail)
-            .for_each(|(ve, size)| {
-                ve.resize(*size, 0);
-            });
+        self.ve_gid = vertex_detail
+            .iter()
+            .map(|n_vertex_p_part| vec![0; *n_vertex_p_part])
+            .collect();
 
         // self.part_id.resize(n_vertices, 0);
         // self.ve_id.resize(n_vertices, 0);

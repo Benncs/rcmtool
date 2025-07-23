@@ -165,6 +165,25 @@ impl CMGeometry {
             }
         }
     }
+    pub fn fill_vertices(
+        &self,
+        volume_element_global_id: usize,
+        n_vertex: usize,
+        local_vertices: &mut Vec<CartesianCoordinates>,
+    ) {
+        local_vertices.clear();
+        local_vertices.reserve(n_vertex);
+
+        for k_vertex in 0..n_vertex {
+            let vertex_global_id = self
+                .volume_elements
+                .get_vertex_from_vol_global_id(volume_element_global_id, k_vertex);
+
+            local_vertices.push(CartesianCoordinates(
+                self.vertices.get_slice_xyz(vertex_global_id).to_owned(),
+            ));
+        }
+    }
 
     pub fn get_count_volume_element_first_pass(&self) -> CountVolumeElement {
         let mut count = CountVolumeElement::new(self.n_zone());

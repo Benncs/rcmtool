@@ -1,7 +1,4 @@
-use std::{
-    path::{Path},
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 
 use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 
@@ -10,11 +7,11 @@ use crate::{
     model::{CMGeometry, CMModel, Scalar, Vector},
 };
 
+pub mod coordinates;
 pub mod ensight_gold;
 pub mod grid;
 pub mod model;
 pub mod utils;
-pub mod coordinates;
 pub enum ExportType {
     EnsightGold,
 }
@@ -106,7 +103,7 @@ impl CMHandle {
         root_input: impl AsRef<std::path::Path>,
         vars: &[ensight_gold::VariableInfo],
     ) -> Result<(), CoreError> {
-        std::fs::create_dir(&root_export)?;
+        std::fs::create_dir_all(&root_export)?;
 
         // let mut handles = Vec::new();
         for v in vars.iter() {
@@ -198,9 +195,8 @@ impl CMHandle {
         )
     }
 
-    pub fn dump_real_volume(&self,res_name :impl AsRef<std::path::Path>)->Result<(),CoreError>
-    {
-        let volumes_data:RawDataScalar = self.model.get_real_volume().into();
+    pub fn dump_real_volume(&self, res_name: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
+        let volumes_data: RawDataScalar = self.model.get_real_volume().into();
 
         volumes_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
 
@@ -212,8 +208,6 @@ impl CMHandle {
         res_name: impl AsRef<std::path::Path>,
         path: impl AsRef<std::path::Path>,
     ) -> Result<(), CoreError> {
-     
-
         let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
         let vector = Vector::new(v, &self.cm_geometry, &self.eg_geometry);
         let flow_data = self.model.compute_flux_between_compartments(vector)?;

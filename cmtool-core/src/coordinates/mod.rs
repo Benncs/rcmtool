@@ -49,30 +49,29 @@ impl BoundedPlane {
         //     && (v_proj >= self.extent_v[0] && v_proj <= self.extent_v[1])
 
         let r = (point[0].powi(2) + point[1].powi(2)).sqrt();
-        let theta = point[1].atan2(point[0]); // attention à l’ordre
+        let theta = point[1].atan2(point[0]);
         let z = point[2];
 
-        match self.axis {
+        let (u, v) = match self.axis {
             0 => {
                 let u = theta;
                 let v = z;
-                (u >= self.extent_u[0] && u <= self.extent_u[1])
-                    && (v >= self.extent_v[0] && v <= self.extent_v[1])
+                (u, v)
             }
             1 => {
                 let u = r;
                 let v = z;
-                (u >= self.extent_u[0] && u <= self.extent_u[1])
-                    && (v >= self.extent_v[0] && v <= self.extent_v[1])
+                (u, v)
             }
             2 => {
                 let u = r;
                 let v = theta;
-                (u >= self.extent_u[0] && u <= self.extent_u[1])
-                    && (v >= self.extent_v[0] && v <= self.extent_v[1])
+                (u, v)
             }
-            _ => false,
-        }
+            _ => unreachable!(),
+        };
+        (u >= self.extent_u[0] && u <= self.extent_u[1])
+            && (v >= self.extent_v[0] && v <= self.extent_v[1])
     }
 }
 

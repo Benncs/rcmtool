@@ -149,21 +149,6 @@ impl AInterfacesInfo {
     }
 
     fn fill_area(&mut self, geometry: &CMGeometry, planes: &[BoundedPlane]) {
-        let fill_vertices =
-            |volume_element_global_id, n_vertex, local_vertices: &mut Vec<CartesianCoordinates>| {
-                local_vertices.clear();
-                local_vertices.reserve(n_vertex);
-
-                for k_vertex in 0..n_vertex {
-                    let vertex_global_id = geometry
-                        .volume_elements
-                        .get_vertex_from_vol_global_id(volume_element_global_id, k_vertex);
-                    local_vertices.push(CartesianCoordinates(
-                        geometry.vertices.get_slice_xyz(vertex_global_id).to_owned(),
-                    ));
-                }
-            };
-
         //This is almost the same algorithm as fill for c_info struct (to compute volume of velem)
         for (i, n) in self.n_facet.iter().enumerate() {
             self.area[i].resize(*n, 0.);
@@ -180,7 +165,7 @@ impl AInterfacesInfo {
                     .volume_elements
                     .get_element_and_nvertex(volume_element_global_id);
 
-                fill_vertices(volume_element_global_id, n_vertex, &mut local_vertices);
+                geometry.fill_vertices(volume_element_global_id, n_vertex, &mut local_vertices);
 
                 let area = compute_intersection_area(&local_vertices, elem_type, plane)
                     .expect("Area between element");
