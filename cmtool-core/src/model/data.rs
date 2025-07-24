@@ -25,11 +25,6 @@ pub struct VolumeElementData {
 
 impl VolumeElementData {
     pub fn get_vertex_per_element(&self, global_id: usize) -> usize {
-        // if self.vtype.len() <= global_id {
-        //     return 0;
-        // } else {
-        //     self.vtype[global_id].to_index()
-        // }
         ElementsType::VolumeElementType(self.vtype[global_id])
             .node_count()
             .try_into()
@@ -37,11 +32,6 @@ impl VolumeElementData {
     }
 
     pub fn get_element_and_nvertex(&self, global_id: usize) -> (VolumeElementTypes, usize) {
-        // if self.vtype.len() <= global_id {
-        //     return 0;
-        // } else {
-        //     self.vtype[global_id].to_index()
-        // }
         let element = self.vtype[global_id];
         (
             element,
@@ -70,24 +60,17 @@ impl VolumeElementData {
         for (vec, &new_len) in self.global_id.iter_mut().zip(velement_detail.iter()) {
             vec.resize(new_len, 0);
         }
-        // for i in 0..self.global_id.len() {
-        //     self.global_id[i].resize(velement_detail[i], 0);
-        // }
-
-        // self.part_global_id.resize(n_velement, 0);
-        // self.vtype.resize(n_velement,VolumeElementTypes::Hexa8);
+        //Use with_capacity because volument_element
+        //doesn't provide default value.
         self.vtype = Vec::with_capacity(n_velement);
         self.ids.resize(n_velement, 0);
         self.nc_id.resize(n_velement, 0);
-        // self.cell_id.resize(n_velement, 0);
-
         self.vertices
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
         self.compartment_ids
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
         self.xyz.resize(n_velement, Default::default());
         // self.raz.resize(n_velement * 3, 0.);
-
         self.vertices_cell_id
             .resize(n_velement * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM, 0);
     }
@@ -144,51 +127,64 @@ impl VolumeElementData {
 
     pub fn fill_from_part(
         &mut self,
+        global_volume_element_counter: usize,
         part_it: (usize, &Part),
         velem_detail: &[usize],
         vertices: &VerticesData,
-        ve_counter: &mut usize,
-    ) {
+    ) -> usize {
         const N_NUMBER_TYPE: usize = VolumeElementTypes::NUMBER_OF_TYPES;
         let (i_part, part) = part_it;
+
+        //local_vec_counter is the sum of n_element for eaach element in part.
+        //Actually can be computed with the iter below
+        // let result :usize= part.elements.iter()
+        // .filter(|e| matches!(e.etype, ElementsType::VolumeElementType(_)))
+        // .map(|vol_element| vol_element.n_elements).sum();
+
+        //But as we perform different operation during the loop it's better to just iterate once.
+
+        //Vec counter logic is not the same as vertice becuase we can't predict the number of itertion
+        // inner loop bound si not trividl
+        //To return number of volument_element
+        //Start from count=n, during loop , count +=m, so return count-n
+        let mut local_vec_counter = global_volume_element_counter;
+
+        //mutable state, loop counters, nested loops, and side-effecting methods (self.set_*)
+        //the for loop + if let version is better than filter().for_each
+
+        let i_part_base_index = i_part * N_NUMBER_TYPE;
+
         for element in part.elements.iter() {
-            match element.etype {
-                ElementsType::VolumeElementType(var) => {
-                    let n_vertex = element.etype.node_count() as usize;
-                    let n_volume_element = velem_detail[(i_part * N_NUMBER_TYPE) + var.to_index()];
+            if let ElementsType::VolumeElementType(vol_elem) = element.etype {
+                let n_vertex = element.etype.node_count() as usize;
+                let element_index = vol_elem.to_index();
+                let n_volume_element = velem_detail[i_part_base_index + element_index];
 
-                    let current_vertex_in_part = vertices.get_current_vertex_from_part(i_part);
+                let current_vertex_in_part = vertices.get_current_vertex_from_part(i_part);
 
-                    for ve_id in 0..n_volume_element {
-                        let ve_global_id = *ve_counter;
-                        *ve_counter += 1;
+                for ve_id in 0..n_volume_element {
+                    let ve_global_id = local_vec_counter;
 
-                        self.set_global_id(i_part, var.to_index(), ve_id, ve_global_id);
+                    local_vec_counter += 1;
 
-                        // self.part_global_id[ve_global_id] = i_part;
-                        // self.vtype[ve_global_id] = var;
-                        self.vtype.push(var);
-                        self.ids[ve_global_id] = ve_id;
+                    self.set_global_id(i_part, element_index, ve_id, ve_global_id);
 
-                        for k_vertex in 0..n_vertex {
-                            // let vtx = element.vertices[ve_id * n_vertex + k_vertex];
-                            let vtx = element.get_vertex(ve_id, k_vertex);
-                            self.set_vertex_from_vol_global_id(
-                                ve_global_id,
-                                k_vertex,
-                                current_vertex_in_part[vtx - 1],
-                            );
-                            // self.vertices[ve_id * C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM + k_vertex] =
-                            //     current_vertex_vegid[vtx - 1];
-                        }
+                    self.vtype.push(vol_elem);
+                    self.ids[ve_global_id] = ve_id;
+
+                    for k_vertex in 0..n_vertex {
+                        let vtx = element.get_vertex(ve_id, k_vertex);
+                        self.set_vertex_from_vol_global_id(
+                            ve_global_id,
+                            k_vertex,
+                            current_vertex_in_part[vtx - 1],
+                        );
                     }
-                }
-                _ => {
-                    // panic!("TODO Not a volume element {:?}",e);
-                    continue;
                 }
             }
         }
+
+        local_vec_counter - global_volume_element_counter
     }
 }
 
@@ -218,9 +214,6 @@ impl VerticesData {
 
         for ve_id in 0..vertex_detail[i_part] {
             self.ve_gid[i_part][ve_id] = vertex_global_identifier;
-            // self.part_id[*vertex_counter] = i_part;
-            // self.ve_id[vertex_global_identifier] = ve_id;
-
             let offset = vertex_global_identifier * 3;
             self.xyz[offset..offset + 3].copy_from_slice(part.get_vertex_coordinates_slice(ve_id));
             vertex_global_identifier += 1;

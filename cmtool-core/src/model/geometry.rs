@@ -1,7 +1,7 @@
-use std::{collections::BTreeSet, default, sync::Arc};
+use std::{collections::BTreeSet, sync::Arc};
 
 use crate::{
-    coordinates::{CartesianCoordinates, Coords3},
+    coordinates::CartesianCoordinates,
     ensight_gold::{self, types::ElementsType},
     grid::{
         CompartmentMesh, CylindricalAxis, MeshType, NeighborDirection, cylindrical_index, get_mesh,
@@ -9,7 +9,6 @@ use crate::{
     model::{
         CountVolumeElement,
         data::{VerticesData, VolumeElementData},
-        interfaces::AInterfacesInfo,
     },
     utils::compute_centroid,
 };
@@ -26,19 +25,27 @@ impl CMGeometry {
     fn fill_detail(&mut self, geometry: &Arc<ensight_gold::Geometry>) -> (Vec<usize>, Vec<usize>) {
         let n_number_type = ensight_gold::types::VolumeElementTypes::NUMBER_OF_TYPES;
         let n_part = geometry.number_of_part();
-        let mut vertex_detail = Vec::<usize>::with_capacity(n_part);
+        // let mut vertex_detail = Vec::<usize>::with_capacity(n_part);
+
+        let mut vertex_detail = vec![0; n_part];
         let mut velem_detail = vec![0; n_part * n_number_type];
         let mut n_vertex_total = 0;
         let mut n_volume_elements_total = 0;
 
         for (i_part, part) in geometry.parts.iter().enumerate() {
-            n_vertex_total += part.n_vertex;
-            vertex_detail.push(part.n_vertex);
             let base_index = i_part * n_number_type;
+            let part_n_vertex = part.n_vertex;
+            n_vertex_total += part_n_vertex;
+            vertex_detail[i_part] = part_n_vertex;
+            // vertex_detail.push(part.n_vertex);
+
             for element in &part.elements {
                 if let ElementsType::VolumeElementType(vol_element) = element.etype {
                     let index_element = vol_element.to_index();
                     n_volume_elements_total += element.n_elements;
+                    //TODO:  prefetch slices in the outer loop as number of element type is known
+                    // Take mut slice [base_index.base_index+NUMBER_OF_TYPES]
+                    //Allow compiler to have linear indexing into slice: slice[index_element]+=elemenent.n_element
                     velem_detail[base_index + index_element] += element.n_elements;
                 }
             }
@@ -190,26 +197,17 @@ impl CMGeometry {
     pub fn get_count_volume_element_first_pass(&self) -> CountVolumeElement {
         let mut count = CountVolumeElement::new(self.n_zone());
 
-        for (_vol_element_global_id, interface_cid_0, interface_cid_k, k_vertex) in
-            self.interface_iter()
-        {
+        let grid = self.grid.as_ref().unwrap();
+        for (_gid, interface_cid_0, interface_cid_k, k_vertex) in self.interface_iter() {
             count.incr_compartment(interface_cid_k);
 
             if k_vertex >= 1 {
-                match self
-                    .grid
-                    .as_ref()
-                    .unwrap()
-                    .are_cell_neighbor(interface_cid_0, interface_cid_k)
-                {
-                    NeighborDirection::NotNeighbors => {
-                        //NOP
-                    }
-                    neighbors => {
-                        let (id1, id2) = neighbors.ordered_pair(interface_cid_0, interface_cid_k);
+                let neighbors = grid.are_cell_neighbor(interface_cid_0, interface_cid_k);
 
-                        count.incr_interface(id1, id2);
-                    }
+                if neighbors != NeighborDirection::NotNeighbors {
+                    let (id1, id2) = neighbors.ordered_pair(interface_cid_0, interface_cid_k);
+
+                    count.incr_interface(id1, id2);
                 }
             }
         }
@@ -240,12 +238,12 @@ impl CMGeometry {
                     .vertices
                     .fill_from_part(global_vertex_counter, &vertex_detail, part_it);
 
-            cm_geometry.volume_elements.fill_from_part(
+            global_volume_element_counter += cm_geometry.volume_elements.fill_from_part(
+                global_volume_element_counter,
                 part_it,
                 &velem_detail,
                 &cm_geometry.vertices,
-                &mut global_volume_element_counter,
-            )
+            );
         }
 
         cm_geometry.detect_compartment(n_div, mesh_type);
