@@ -1,5 +1,8 @@
 /target
 .vscode/
+.zed/
+result
+
 
 .env/
 .venv/
