@@ -1,4 +1,4 @@
-use crate::coordinates::{CartesianCoordinates, Coords3, CylindricalCoordinates};
+use crate::coordinates::{CartesianCoordinates, Coords3};
 
 #[derive(Clone, Copy)]
 pub struct CartesianVec3(pub Coords3);

@@ -1,5 +1,4 @@
 use crate::{
-    coordinates::CartesianCoordinates,
     model::{CMGeometry, interfaces::AInterfacesInfo},
     utils::compute_volume,
 };

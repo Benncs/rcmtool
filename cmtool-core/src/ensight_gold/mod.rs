@@ -1,8 +1,5 @@
 mod reader;
 use std::{
-    fmt::Debug,
-    fs::File,
-    io::{BufRead, BufReader},
     path::Path,
     sync::Arc,
 };
@@ -32,9 +29,9 @@ pub trait RawField: Sized {
 
 #[cfg(test)]
 mod test {
-    use crate::ensight_gold::case::{Case, VariableInfo, VariableType};
+    use crate::ensight_gold::case::{Case, VariableInfo};
 
-    use super::*;
+    
     use std::env;
     use std::fs::File;
     use std::io::Write;

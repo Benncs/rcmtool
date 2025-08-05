@@ -1,6 +1,6 @@
 use cmtool_data::RawData;
-use numpy::ndarray::{self, Array2};
-use numpy::{IntoPyArray, PyArray1};
+use numpy::ndarray::{self};
+use numpy::PyArray1;
 use numpy::{PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 
@@ -57,7 +57,7 @@ fn read_flowmap(py: Python<'_>, path: &str) -> FlowMapDescriptorWrapper {
 impl FlowMapDescriptorWrapper {
     //TODO check safety of this, maybe use RC<refcell> to do not have rust mutability
     #[getter]
-    fn flowmap<'py>(this: Bound<'py, Self>) -> Bound<'py, PyArray2<f64>> {
+    fn flowmap(this: Bound<'_, Self>) -> Bound<'_, PyArray2<f64>> {
         let flowmap = &this.borrow().0.flowmap;
 
         // SAFETY:

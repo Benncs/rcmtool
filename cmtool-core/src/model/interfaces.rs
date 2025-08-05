@@ -3,7 +3,6 @@ use crate::grid::NeighborDirection;
 use crate::model::CMGeometry;
 use crate::utils::compute_intersection_area;
 
-use super::geometry;
 
 #[derive(Default, Clone)]
 pub struct InterfaceInfo {

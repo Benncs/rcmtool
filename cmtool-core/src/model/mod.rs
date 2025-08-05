@@ -1,13 +1,11 @@
 use crate::{
     CoreError,
     coordinates::{CartesianCoordinates, CartesianVec3, CylindricalCoordinates},
-    ensight_gold::types::VolumeElementTypes,
     grid::MeshType,
     model::{
         compartments::{CompartmentInfo, CountVolumeElement, ElementVolumeInfo},
         interfaces::{AInterfacesInfo, InterfaceFlow, InterfaceInfo},
     },
-    utils::{self, compute_volume},
 };
 use std::sync::Arc;
 mod data;

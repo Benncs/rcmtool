@@ -1,6 +1,5 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use cmtool::CmtoolError;
-use cmtool_core::CoreError;
 use std::fmt::Write;
 
 use std::{env, path::Path};

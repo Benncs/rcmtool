@@ -1,11 +1,7 @@
-use std::{io::ErrorKind, path::Path, str::FromStr, sync::Arc};
 
 use crate::ensight_gold::{
-    geo::Geometry,
     reader::EnsightGoldReader,
-    types::ElementsType,
     variable::{PerElementVariable, VarTypeReader},
-    RawField, Reader,
 };
 
 
