@@ -423,13 +423,13 @@ mod tests {
             .expect("case");
 
         let liquid_volume_path = case
-            .resolve(&root, cmtool_data::CMAExportType::LiquidVolume)
+            .resolve(root, cmtool_data::CMAExportType::LiquidVolume)
             .expect("path");
 
         let liquid_volume =
             cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone()).expect("Liquid error");
         let gas_volume_path = case
-            .resolve(&root, cmtool_data::CMAExportType::GasVolume)
+            .resolve(root, cmtool_data::CMAExportType::GasVolume)
             .expect("path");
 
         let gas_volume =
@@ -444,7 +444,7 @@ mod tests {
     #[test]
     fn test_1d() {
         let root = "/tmp/test_1d";
-        std::fs::create_dir_all(root);
+        std::fs::create_dir_all(root).unwrap();
         let l = 1.;
         let d = 0.2;
         let alpha_g = 0.1;
@@ -452,7 +452,7 @@ mod tests {
             .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, Some(root.to_owned()))
             .expect("case");
         let liquid_volume_path: String = case
-            .resolve(&root, cmtool_data::CMAExportType::LiquidVolume)
+            .resolve(root, cmtool_data::CMAExportType::LiquidVolume)
             .expect("path");
 
         let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone())
@@ -472,7 +472,7 @@ mod tests {
     #[test]
     fn test_merge_phase() {
         let root = "/tmp/test_merge";
-        std::fs::create_dir_all(root);
+        std::fs::create_dir_all(root).unwrap();
         let l = 1.;
         let d = 0.2;
         let alpha_g = 0.1;
@@ -480,7 +480,7 @@ mod tests {
             .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, Some(root.to_owned()))
             .expect("case");
         let liquid_volume_path = case
-            .resolve(&root, cmtool_data::CMAExportType::LiquidVolume)
+            .resolve(root, cmtool_data::CMAExportType::LiquidVolume)
             .expect("path");
 
         let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone())
