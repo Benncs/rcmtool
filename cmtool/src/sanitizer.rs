@@ -10,7 +10,7 @@ fn smape(a: f64, b: f64) -> f64 {
     (a - b).abs() / (a.abs() + b.abs())
 }
 
-pub fn check_flows(raw_flows: &cmtool_data::RawDataFlux) {
+pub fn check_flows(raw_flows: &cmtool_data::RawDataFlux) -> Option<String> {
     let mut mass_balance: Vec<(f64, f64)> = vec![(0.0, 0.0); raw_flows.header.n_zone as usize];
 
     for flow in raw_flows.fluxes.iter() {
@@ -37,7 +37,15 @@ pub fn check_flows(raw_flows: &cmtool_data::RawDataFlux) {
         total_inflow += inflow;
         total_outflow += outflow;
 
-        writeln!(&mut f, "{},{},{},{}", i + 1,inflow,outflow, relative_error * 100.0).unwrap();
+        writeln!(
+            &mut f,
+            "{},{},{},{}",
+            i + 1,
+            inflow,
+            outflow,
+            relative_error * 100.0
+        )
+        .unwrap();
     }
     writeln!(&mut f).unwrap();
     let mean_relative_error = total_relative_error / raw_flows.header.n_zone as f64;
@@ -49,17 +57,20 @@ pub fn check_flows(raw_flows: &cmtool_data::RawDataFlux) {
         &mut f,
         "global_net_error_percent,{:.6}",
         smape(total_inflow, total_outflow) * 100.0
-    ).unwrap();
+    )
+    .unwrap();
     writeln!(
         &mut f,
         "mean_relative_error_percent,{:.6}",
         mean_relative_error * 100.0
-    ).unwrap();
+    )
+    .unwrap();
     writeln!(
         &mut f,
         "max_relative_error_percent,{:.6}",
         max_relative_error * 100.0
-    ).unwrap();
+    )
+    .unwrap();
 
-    std::fs::write("sanitize.csv", f);
+    Some(f)
 }

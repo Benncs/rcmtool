@@ -22,6 +22,8 @@ use thiserror::Error;
 pub enum CmtoolError {
     #[error("Cmtool: {0}")]
     Data(#[from] cmtool_data::DataError),
+    #[error("Cmtool: {0}")]
+    Core(#[from] cmtool_core::CoreError),
 
     #[error("Cmtool: {0}")]
     Custom(String),
@@ -152,13 +154,10 @@ impl Generator {
 
         let cp = if gas { PhaseCM::Gas } else { PhaseCM::Liquid };
         let mut phase = RawPhase::new(n_compartment, n_flow, cp);
-        
-        //n_flow != n_compartment, need to set volume separately 
-        phase.volume = RawDataScalar::from(vec![compartment_volume;n_compartment]);//Scalar values are not preallo
 
+        //n_flow != n_compartment, need to set volume separately
+        phase.volume = RawDataScalar::from(vec![compartment_volume; n_compartment]); //Scalar values are not preallo
 
-
-        
         for (current_index, flow) in phase.flow.fluxes.iter_mut().enumerate() {
             flow.id_source = current_index as u32;
             flow.id_target = (current_index + 1) as u32;
@@ -349,7 +348,7 @@ impl Generator {
                 Some(rf) => rf,
                 None => {
                     RawDataFlux::new(n_zone, 1) //Default implementation of RawFlux implies
-                                                //correct workaround
+                    //correct workaround
                 }
             };
             gas_flows.push(rf);
@@ -414,8 +413,7 @@ impl Generator {
 #[cfg(test)]
 mod tests {
 
-    fn clean(case:CMCase)
-    {
+    fn clean(case: CMCase) {
         std::fs::remove_file(
             case.resolve("/tmp", cmtool_data::CMAExportType::GasVolume)
                 .expect("path"),
@@ -429,11 +427,13 @@ mod tests {
         std::fs::remove_file(
             case.resolve("/tmp", cmtool_data::CMAExportType::LiquidFlow)
                 .unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         std::fs::remove_file(
             case.resolve("/tmp", cmtool_data::CMAExportType::GasFlow)
                 .unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     use super::*;
@@ -508,8 +508,14 @@ mod tests {
 
         //volume is h*pi*d^2/4
         let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
-         
-        assert!(liquid_volume - (1. - alpha_g) * geo_volume < 1e-9,"liquid_volume {}, alpha {}, geo_volume {}",liquid_volume,alpha_g,geo_volume);
+
+        assert!(
+            liquid_volume - (1. - alpha_g) * geo_volume < 1e-9,
+            "liquid_volume {}, alpha {}, geo_volume {}",
+            liquid_volume,
+            alpha_g,
+            geo_volume
+        );
         clean(case);
     }
 }

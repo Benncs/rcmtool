@@ -2,10 +2,7 @@ use std::{path::Path, sync::Arc};
 
 use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 
-use crate::{
-    ensight_gold::{RawField, VariableInfo},
-    model::{CMGeometry, CMModel, Scalar, Vector},
-};
+use crate::model::{CMGeometry, CMModel, Scalar, Vector};
 
 pub mod coordinates;
 pub mod ensight_gold;
@@ -23,21 +20,8 @@ trait CfdCase {
     fn get_geometry_relative_path(&self) -> String;
 }
 
-use thiserror::Error;
-#[derive(Error, Debug)]
-pub enum CoreError {
-    #[error("Cmtool: {0}")]
-    Data(#[from] cmtool_data::DataError),
-
-    #[error("Cmtool: {0}")]
-    Custom(String),
-
-    #[error("Handle")]
-    Handle,
-
-    #[error("Error writing/reading file: {0}")]
-    IO(#[from] std::io::Error),
-}
+mod errors;
+pub use errors::CoreError;
 
 pub struct CMHandle {
     model: Arc<model::CMModel>,
@@ -101,7 +85,7 @@ impl CMHandle {
         &self,
         root_export: impl AsRef<std::path::Path>,
         root_input: impl AsRef<std::path::Path>,
-        vars: &[ensight_gold::VariableInfo],
+        vars: &[ensight_gold::case::VariableInfo],
     ) -> Result<(), CoreError> {
         std::fs::create_dir_all(&root_export)?;
 
@@ -122,7 +106,7 @@ impl CMHandle {
             // let cm_geometry_clone = self.cm_geometry.clone();
             // let model_clone = self.model.clone();
             match v.get_type() {
-                ensight_gold::VariableType::Scalar => {
+                ensight_gold::case::VariableType::Scalar => {
                     self.dump_scalar(
                         resolve_path(&root_export, &v.name),
                         resolve_path(&root_input, &v.filepath),
@@ -142,7 +126,7 @@ impl CMHandle {
                     //     )
                     // }));
                 }
-                ensight_gold::VariableType::Vector => {
+                ensight_gold::case::VariableType::Vector => {
                     self.dump_vector(
                         resolve_path(&root_export, &v.name),
                         resolve_path(&root_input, &v.filepath),
