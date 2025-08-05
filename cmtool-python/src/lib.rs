@@ -1,9 +1,8 @@
 use cmtool_data::RawData;
-use numpy::ndarray::Array2;
+use numpy::ndarray::{self, Array2};
 use numpy::{IntoPyArray, PyArray1};
 use numpy::{PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
-
 
 #[pyclass(name = "FlowMapDescriptor")]
 pub struct FlowMapDescriptorWrapper(cmtool_data::FlowMapDescriptor);
@@ -15,6 +14,15 @@ impl RawDataScalarWrapper {
     #[getter]
     fn n_zone(&self) -> usize {
         self.0.header.n_zone as usize
+    }
+
+    #[getter]
+    fn data(&self, py: Python<'_>) -> Py<PyArray1<f64>> {
+        let values: Vec<f64> = self.0.values.iter().map(|f| f.value).collect();
+
+        let array = ndarray::Array1::from(values);
+
+        PyArray1::from_owned_array(py, array).unbind()
     }
 }
 
@@ -47,7 +55,6 @@ fn read_flowmap(py: Python<'_>, path: &str) -> FlowMapDescriptorWrapper {
 
 #[pymethods]
 impl FlowMapDescriptorWrapper {
-
     //TODO check safety of this, maybe use RC<refcell> to do not have rust mutability
     #[getter]
     fn flowmap<'py>(this: Bound<'py, Self>) -> Bound<'py, PyArray2<f64>> {
@@ -72,11 +79,7 @@ impl FlowMapDescriptorWrapper {
         // - Only expose immutable views or ensure exclusive access if mutations are needed.
         unsafe { PyArray2::borrow_from_array(flowmap, this.into_any()) }
     }
-
-
-        
 }
-
 
 #[pymodule]
 mod pycmtool {

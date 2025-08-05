@@ -51,11 +51,6 @@ fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> us
     j * n_row + i
 }
 
-#[derive(Clone, Copy)]
-pub enum Layout {
-    RowMajor,
-    ColMajor,
-}
 
 pub struct FlowMapDescriptor {
     pub flowmap: Array2<f64>,
