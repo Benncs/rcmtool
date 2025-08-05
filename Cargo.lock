@@ -106,7 +106,7 @@ checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 
 [[package]]
 name = "cmtool"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "cmtool-core",
@@ -116,7 +116,7 @@ dependencies = [
 
 [[package]]
 name = "cmtool-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "cmtool-data",
  "enum_dispatch",
@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "cmtool-data"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ndarray",
  "serde",
@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "cmtool-python"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "cmtool-data",
  "numpy",
