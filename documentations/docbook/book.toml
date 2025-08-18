@@ -3,3 +3,4 @@ authors = ["Casale Benjamin"]
 language = "en"
 src = "src"
 title = "Compartment Modeling Tool"
+heading-split-level = 4

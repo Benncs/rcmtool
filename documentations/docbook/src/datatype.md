@@ -6,10 +6,6 @@ A reactor compartment model is composed of two main parts:
 - Flows between compartments (Called flowmaps)
 - Scalar fields inside compartments
 
-## Case 
-
-A CMA case file is needed for each reactor model. This fils basically contains the list of subsequent needed files (flows and scalar)
-
 ## Flows
 
 Each flow is bidirectional and is described with:
@@ -23,6 +19,7 @@ Each flow is bidirectional and is described with:
 
 Flows are stored as binary data with a structure that can be described as "flow-oriented data". Having this file format is very modular because modelers have the ability to either add or remove flows independently from others.
 
+
 The raw file structure is as follows:
 
 - Header:
@@ -33,8 +30,14 @@ The raw file structure is as follows:
 
 ## Scalars
 
-Scalar fields are more standard files, they contains the value of the considered sclar for each zone of our grid, id for each compartment. 
+Scalar fields are more standard files, they contains the value of the considered sclar for each zone of our grid, id for each compartment.
 - Header:
   - Number of compartments
 - Body:
   - List of values:
+
+
+
+## Case
+
+A CMA case file is needed for each reactor model. This fils basically contains the list of subsequent needed files (flows and scalar)
