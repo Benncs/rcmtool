@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use clap::{Parser, Subcommand};
 use cmtool::CmtoolError;
 use std::fmt::Write;

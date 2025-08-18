@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone, Copy)]
 pub enum CMAExportType {
@@ -32,7 +34,7 @@ impl From<PhaseCM> for String
        match val{
             PhaseCM::Liquid => String::from("liquid"),
             PhaseCM::Gas => String::from("gas")
-        } 
+        }
     }
 }
 

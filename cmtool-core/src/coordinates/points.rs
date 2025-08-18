@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use super::Coords3;
 
 //TODO: Clean wrapper for non owing point/vec
@@ -46,4 +48,3 @@ impl From<CylindricalCoordinates> for CartesianCoordinates {
         CartesianCoordinates::from(&value)
     }
 }
-

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::{CMAExportType, DataError};
 use serde::{Deserialize, Serialize};
 use std::io::{BufReader, Read, Write};

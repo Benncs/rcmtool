@@ -5,15 +5,10 @@ version.workspace = true
 authors.workspace = true
 description.workspace = true
 documentation.workspace = true
-
+license.workspace = true
 [dependencies]
 ndarray = "0.16.1"
-serde.workspace=true
-serde_cbor.workspace=true
-serde_json.workspace=true
-thiserror.workspace =true
-
-
-
-
-
+serde.workspace = true
+serde_cbor.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

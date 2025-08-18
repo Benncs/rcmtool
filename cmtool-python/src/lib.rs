@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use cmtool_data::RawData;
 use numpy::ndarray::{self};
 use numpy::PyArray1;

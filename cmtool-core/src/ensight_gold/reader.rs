@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -40,7 +42,7 @@ pub struct Reader<const N: usize> {
 
 impl<const N: usize> Reader<N> {
     pub fn new(path: impl AsRef<Path>) -> std::io::Result<Self> {
-        let filepath = path.as_ref().to_path_buf(); 
+        let filepath = path.as_ref().to_path_buf();
         let fd = File::open(filepath.clone())?;
         Ok(Reader {
             filepath,
@@ -119,7 +121,7 @@ impl<const N: usize> Reader<N> {
     let float_buf: Vec<f32> = raw_buf
         .chunks_exact(4)
         .map(|bytes| {
-            let array = bytes.try_into().unwrap(); 
+            let array = bytes.try_into().unwrap();
             f32::from_le_bytes(array)
         })
         .collect();

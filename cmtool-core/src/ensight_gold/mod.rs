@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 mod reader;
 use std::{
     path::Path,
@@ -31,7 +33,7 @@ pub trait RawField: Sized {
 mod test {
     use crate::ensight_gold::case::{Case, VariableInfo};
 
-    
+
     use std::env;
     use std::fs::File;
     use std::io::Write;

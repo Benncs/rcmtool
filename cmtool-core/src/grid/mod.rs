@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 mod collections;
 use collections::*;
 pub use collections::{AxisDescriptor, CylindricalAxis, cylindrical_index};
@@ -398,7 +400,7 @@ impl CompartmentMeshManip for MeshCylindrical {
         let interfaces_theta = nr * (ntheta - 1) * nz;
         let interfaces_z = nr * ntheta * (nz - 1);
 
-        let wrap = nr * nz; //Wrap-in for connection between theta=-pi and theta=pi 
+        let wrap = nr * nz; //Wrap-in for connection between theta=-pi and theta=pi
 
         interfaces_r + interfaces_theta + interfaces_z + wrap
     }

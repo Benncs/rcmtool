@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::descriptors::{CMExportType, PhaseCM};
 use serde::{Deserialize, Serialize};
 use std::{

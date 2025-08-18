@@ -5,7 +5,7 @@ edition.workspace = true
 authors.workspace = true
 description.workspace = true
 documentation.workspace = true
-
+license.workspace = true
 [package.metadata.maturin]
 bindings = "pyo3"
 
@@ -14,9 +14,6 @@ name = "pycmtool"
 crate-type = ["cdylib"]
 
 [dependencies]
-cmtool-data.workspace=true
+cmtool-data.workspace = true
 numpy = "0.24.0"
-pyo3.workspace=true
-
-
-
+pyo3.workspace = true

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::coordinates::{CartesianCoordinates, Coords3};
 
 #[derive(Clone, Copy)]

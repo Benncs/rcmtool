@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use std::{io::ErrorKind, path::Path, str::FromStr, sync::Arc};
 
 use crate::ensight_gold::{
@@ -33,7 +35,7 @@ impl<T:VarTypeReader> PerElementVariable<T> {
             part_id,
             name: String::new(),
             _marker: std::marker::PhantomData,
-        
+
         }
     }
     pub fn get_name(&self)->&str

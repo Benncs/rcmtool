@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use std::str::FromStr;
 
 
@@ -25,7 +27,7 @@ pub enum VolumeElementTypes {
 
 impl VolumeElementTypes {
     pub const NUMBER_OF_TYPES:usize = 8;//G and non G type count for 1
-   
+
 
     pub fn to_index(&self) -> usize {
         match self {
