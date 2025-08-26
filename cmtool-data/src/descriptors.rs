@@ -27,21 +27,17 @@ impl PhaseCM {
     }
 }
 
-impl From<PhaseCM> for String
-{
-    fn from(val: PhaseCM)->Self
-    {
-       match val{
+impl From<PhaseCM> for String {
+    fn from(val: PhaseCM) -> Self {
+        match val {
             PhaseCM::Liquid => String::from("liquid"),
-            PhaseCM::Gas => String::from("gas")
+            PhaseCM::Gas => String::from("gas"),
         }
     }
 }
 
-impl From<String> for PhaseCM
-{
-    fn from(value:String)->Self
-    {
+impl From<String> for PhaseCM {
+    fn from(value: String) -> Self {
         todo!()
     }
 }
@@ -89,7 +85,7 @@ impl CMExportType {
                 format!("flow{}.raw", g.identifier())
             }
             Self::Volume(g) => {
-                format!("vol{}.raw", g.identifier())
+                format!("vof{}.raw", g.identifier())
             }
             Self::EnergyDissipation => "epsturb.raw".to_string(),
             Self::Kla => "kla.raw".to_string(),
