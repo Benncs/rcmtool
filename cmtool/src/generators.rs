@@ -138,7 +138,7 @@ impl Generator {
         n_compartment: usize,
         length: f64,
         diameter: f64,
-        flow: f64,
+        liquid_flow: f64,
         volume_fraction: f64,
         axial_dispersion: f64,
         gas: bool,
@@ -147,7 +147,7 @@ impl Generator {
         let dx = length / (n_compartment as f64);
         let reactor_section_area = std::f64::consts::PI * diameter.powf(2.) / 4.;
         let compartment_volume = volume_fraction * dx * reactor_section_area;
-        let flow_velocity = flow / reactor_section_area;
+        let flow_velocity = liquid_flow / reactor_section_area;
         let n_flow = n_compartment - 1;
 
         let flow_source_target = reactor_section_area / dx * (flow_velocity + axial_dispersion);
@@ -187,7 +187,8 @@ impl Generator {
         n_compartment: usize,
         length: f64,
         diameter: f64,
-        flow: f64,
+        liquid_flow: f64,
+        gas_flow: f64,
         gas_fraction: f64,
         axial_dispersion: f64,
         dest: Option<String>,
@@ -204,7 +205,7 @@ impl Generator {
             n_compartment,
             length,
             diameter,
-            flow,
+            liquid_flow,
             1.0 - gas_fraction,
             axial_dispersion,
             false,
@@ -216,7 +217,7 @@ impl Generator {
                 n_compartment,
                 length,
                 diameter,
-                flow,
+                gas_flow,
                 1.0 - gas_fraction,
                 axial_dispersion,
                 true,

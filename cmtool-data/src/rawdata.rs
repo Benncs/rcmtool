@@ -57,7 +57,7 @@ pub struct FluxFileHeader {
 /// This struct is used to store individual flux interactions between a source and a target,
 /// including the flux values in both directions.
 #[repr(C)]
-#[derive(Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct RawFlux {
     /// The identifier for the source in the flux interaction.
     pub id_source: u32,
