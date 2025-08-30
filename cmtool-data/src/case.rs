@@ -22,6 +22,7 @@ pub struct CMCase {
     pub description: String,
     pub time_per_flow_map: f64,
     paths: HashMap<CMAExportType, String>,
+    pub recur: bool,
 }
 
 impl CMCase {
@@ -84,7 +85,6 @@ pub struct CMCaseJson;
 
 /// A type responsible for reading and writing `CMCase` instances C comparible (binary) files.
 pub struct CCMCaseInfo;
-
 
 impl CMCaseReader for CMCaseJson {
     fn read_case(path: &Path) -> Result<CMCase, DataError> {
@@ -273,6 +273,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
+            recur: false,
         };
 
         T::write_case(case, path).map_err(|_| ())?;
@@ -291,6 +292,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
+            recur: false,
         };
 
         CMCaseJson::write_case(case, path).expect("Failed to write case");

@@ -24,6 +24,9 @@ pub enum CmtoolError {
     Data(#[from] cmtool_data::DataError),
 
     #[error("Cmtool: {0}")]
+    Core(#[from] cmtool_core::CoreError),
+
+    #[error("Cmtool: {0}")]
     Custom(String),
 }
 

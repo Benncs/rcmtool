@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use cmtool_data::RawData;
-use numpy::ndarray::{self};
+use cmtool_data::{FlowMapDescriptor, RawData};
 use numpy::PyArray1;
+use numpy::ndarray::{self};
 use numpy::{PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 
@@ -49,9 +49,10 @@ fn read_rawscalar(path: &str) -> RawDataScalarWrapper {
 }
 
 #[pyfunction]
-fn read_flowmap(py: Python<'_>, path: &str) -> FlowMapDescriptorWrapper {
+fn read_flowmap(_py: Python<'_>, path: &str, path_2: &str) -> FlowMapDescriptorWrapper {
     let f = cmtool_data::RawDataFlux::read_raw(path).unwrap();
-    let fm = cmtool_data::FlowMapDescriptor::from_raw_data(&f).unwrap();
+    let v = cmtool_data::RawDataScalar::read_raw(path_2).unwrap();
+    let fm = cmtool_data::FlowMapDescriptor::from_raw_data(&f, &v).unwrap();
     FlowMapDescriptorWrapper(fm)
 }
 
@@ -80,6 +81,12 @@ impl FlowMapDescriptorWrapper {
         //
         // - Only expose immutable views or ensure exclusive access if mutations are needed.
         unsafe { PyArray2::borrow_from_array(flowmap, this.into_any()) }
+    }
+
+    #[getter]
+    fn volumes(&self, py: Python<'_>) -> Py<PyArray1<f64>> {
+        let array = ndarray::Array1::from(self.0.volumes.clone());
+        PyArray1::from_owned_array(py, array).unbind()
     }
 }
 

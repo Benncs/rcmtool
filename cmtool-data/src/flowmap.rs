@@ -1,0 +1,95 @@
+use ndarray::Array2;
+
+use crate::{DataError, RawData, RawDataFlux, RawFlux, rawdata};
+
+pub struct FlowMapDescriptor {
+    pub flowmap: Array2<f64>,
+    pub(crate) neighbors: Array2<usize>, //TODO
+    pub volumes: Vec<f64>,
+}
+
+impl FlowMapDescriptor {
+    pub fn from_path(
+        data_flows_path: impl AsRef<std::path::Path>,
+        data_volumes_path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, DataError> {
+        let df = rawdata::RawDataFlux::read_raw(data_flows_path).ok_or(DataError::BadData)?;
+        let dv = rawdata::RawDataScalar::read_raw(data_volumes_path).ok_or(DataError::BadData)?;
+
+        Self::from_raw_data(&df, &dv)
+    }
+
+    pub fn from_raw_data(
+        data_flows: &rawdata::RawDataFlux,
+        data_volumes: &rawdata::RawDataScalar,
+    ) -> Result<Self, DataError> {
+        let n_zone = data_flows.header.n_zone as usize;
+        let mut flowmap = Array2::<f64>::zeros((n_zone, n_zone));
+
+        let mut neighbors: Vec<Vec<usize>> = vec![Vec::new(); n_zone]; //Vec::with_capacity(data.header.n_zone as usize)
+
+        if data_flows.header.n_zone != data_volumes.header.n_zone {
+            return Err(DataError::BadData);
+        }
+
+        for RawFlux {
+            id_source,
+            id_target,
+            flux_source_target,
+            flux_target_source,
+        } in data_flows.fluxes.iter()
+        {
+            let id_source = *id_source as usize;
+            let id_target = *id_target as usize;
+
+            if let Some(g) = flowmap.get_mut((id_source, id_target)) {
+                *g += flux_source_target;
+            }
+
+            if let Some(g) = flowmap.get_mut((id_target, id_source)) {
+                *g += flux_target_source;
+            }
+            neighbors[id_source].push(id_target);
+            neighbors[id_target].push(id_source)
+        }
+
+        let max_size = neighbors
+            .iter()
+            .map(|val| val.len())
+            .max()
+            .ok_or(DataError::BadData)?;
+
+        let mut neighbor_flat = Array2::<usize>::zeros((n_zone, max_size));
+        for (i_zone, neighbors_for_zone) in neighbors.iter().enumerate() {
+            for (i_n, id_neighbor) in neighbors_for_zone.iter().enumerate() {
+                *(neighbor_flat.get_mut((i_zone, i_n)).unwrap()) = *id_neighbor;
+            }
+        }
+        let volumes: Vec<f64> = data_volumes.values.iter().map(|v| v.value).collect();
+
+        Ok(FlowMapDescriptor {
+            flowmap,
+            neighbors: neighbor_flat,
+            volumes,
+        })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn read_descriptor() {
+        let flow_cma = std::env::var("CUVE_SLDMSH_FLOW_PATH").unwrap();
+
+        let volume_cma = std::env::var("CUVE_SLDMSH_VOLUME_PATH").unwrap();
+
+        let descriptor = FlowMapDescriptor::from_path(flow_cma, volume_cma).unwrap();
+
+        assert!(!descriptor.volumes.is_empty());
+        assert!(descriptor.flowmap.is_square());
+        assert!(descriptor.volumes.len() == descriptor.flowmap.ncols());
+        assert!(descriptor.neighbors.nrows() == descriptor.flowmap.ncols());
+    }
+}

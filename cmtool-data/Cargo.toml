@@ -8,7 +8,15 @@ documentation.workspace = true
 license.workspace = true
 [dependencies]
 ndarray = "0.16.1"
+peroxide = { version = "0.40.0", features = ["O3"] }
 serde.workspace = true
 serde_cbor.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
+
+[features]
+probability=[]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(probability)'] }
