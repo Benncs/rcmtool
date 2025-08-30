@@ -14,8 +14,11 @@ def get(path: str, pathvol: str):
 
 
 cpp_ref = "/home/benjamin/Documents/code/cpp/compartment-modelling-tool/cuve_sldmsh_initmrf.vel.vector-raw"
-rust = "/home/benjamin/Documents/code/rust/rcmtool/out/cuve_sldmsh_initmrf/velocity.raw"
-rust_volume = "/home/benjamin/Documents/code/rust/rcmtool/out/cuve_sldmsh_initmrf/total_volume.raw"
+# rust = "/home/benjamin/Documents/code/rust/rcmtool/out/cuve_sldmsh_initmrf/velocity.raw"
+# rust_volume = "/home/benjamin/Documents/code/rust/rcmtool/out/cuve_sldmsh_initmrf/total_volume.raw"
+#
+rust = "/home/benjamin/Documents/thesis/cfd-cma/sanofi/raw/flowL.raw"
+rust_volume = "/home/benjamin/Documents/thesis/cfd-cma/sanofi/raw/vofL.raw"
 
 
 def get_transition_matrix(flows):
@@ -34,6 +37,7 @@ def check_mixing(path, path2):
     f, vol = get(path, path2)
     n_c = f.shape[0]
     M = get_transition_matrix(f)
+    print(M)
     C = np.zeros((1, n_c))
     C[0, 0] = 1
 

@@ -1,6 +1,7 @@
 use crate::{CMCase, DataError, FlowMapDescriptor, RawData, RawDataFlux, states::IterationState};
+use enum_dispatch::enum_dispatch;
 use ndarray::Array2;
-use std::{iter::repeat, ops::Index};
+use std::{iter::repeat, ops::Index, sync::Arc};
 
 pub struct FlowMapBuffer(Vec<FlowMapDescriptor>, Option<Vec<FlowMapDescriptor>>);
 
@@ -37,7 +38,9 @@ impl FlowMapBuffer {
 
 pub trait FlowMapTransitionner {
     fn advance(&mut self, time_step: f64) -> &IterationState;
-    fn need_advance(self, time_step: f64) -> bool;
+    fn advance_arc(&mut self, time_step: f64) -> Arc<IterationState>;
+    fn need_advance(&self, time_step: f64) -> bool;
+    fn get_at(&self, idx: usize) -> Option<Arc<IterationState>>;
     //Start with one dt per flowmap, maybe be improve by using different dt per flowmap if needed
     fn new(time_per_flomap: f64, buffer: FlowMapBuffer) -> Self;
 
@@ -72,18 +75,43 @@ pub trait FlowMapTransitionner {
 
         Ok(Self::new(case.time_per_flow_map, buffer))
     }
-
-    // fn
 }
 
 pub struct DiscontinuousTransitioner {
-    state_buffer: Vec<IterationState>,
+    state_buffer: Vec<Arc<IterationState>>,
     time_per_flomap: f64,
     remaining_time: f64,
     current_index: usize,
 }
 
+pub enum TransitionerType {
+    Discontinuous,
+    None,
+}
+
+pub fn get_transionner(
+    ttype: TransitionerType,
+    root: &str,
+    case: &CMCase,
+) -> Result<impl FlowMapTransitionner, DataError> {
+    match ttype {
+        TransitionerType::Discontinuous => DiscontinuousTransitioner::from_case(root, case),
+        _ => unimplemented!(),
+    }
+}
+
 impl FlowMapTransitionner for DiscontinuousTransitioner {
+    fn advance_arc(&mut self, time_step: f64) -> Arc<IterationState> {
+        if self.remaining_time >= self.time_per_flomap {
+            self.current_index = (self.current_index + 1) % self.state_buffer.len();
+            self.remaining_time = 0.;
+        }
+        self.remaining_time += time_step;
+        self.state_buffer[self.current_index].clone()
+    }
+    fn get_at(&self, idx: usize) -> Option<Arc<IterationState>> {
+        self.state_buffer.get(idx).cloned()
+    }
     fn advance(&mut self, time_step: f64) -> &IterationState {
         if self.remaining_time >= self.time_per_flomap {
             self.current_index = (self.current_index + 1) % self.state_buffer.len();
@@ -93,22 +121,22 @@ impl FlowMapTransitionner for DiscontinuousTransitioner {
         &self.state_buffer[self.current_index]
     }
 
-    fn need_advance(self, time_step: f64) -> bool {
+    fn need_advance(&self, time_step: f64) -> bool {
         (self.remaining_time + time_step) >= self.time_per_flomap
     }
 
     fn new(time_per_flomap: f64, buffer: FlowMapBuffer) -> Self {
-        let state_buffer: Vec<IterationState> = match buffer.1 {
+        let state_buffer: Vec<Arc<IterationState>> = match buffer.1 {
             Some(gas) => buffer
                 .0
                 .into_iter()
                 .zip(gas)
-                .map(|(liq, _gas)| IterationState::new(liq, Some(_gas)))
+                .map(|(liq, _gas)| Arc::new(IterationState::new(liq, Some(_gas))))
                 .collect(),
             None => buffer
                 .0
                 .into_iter()
-                .map(|fd| IterationState::new(fd, None))
+                .map(|fd| Arc::new(IterationState::new(fd, None)))
                 .collect(),
         };
 

@@ -1,27 +1,35 @@
 use crate::FlowMapDescriptor;
-use ndarray::Array2;
+use nalgebra_sparse::CooMatrix;
+use ndarray::{Array2, Axis};
 use peroxide::structure::sparse::SPMatrix;
 
-fn get_transition_from_fm(fm: Array2<f64>) -> peroxide::structure::sparse::SPMatrix {
+fn get_transition_from_fm(fm: Array2<f64>) -> CooMatrix<f64> {
     let n_compartments: usize = fm.nrows();
 
-    let mut transition = peroxide::fuga::zeros(n_compartments, n_compartments);
+    // let row_sum = fm.sum_axis(Axis(1));
+
+    let mut transition = CooMatrix::new(n_compartments, n_compartments);
     let mut row_sum = vec![0.; n_compartments];
 
-    for i_row in 0..n_compartments {
+    (0..n_compartments).for_each(|i_row| {
         for i_col in 0..n_compartments {
             if i_row != i_col {
                 let val = *fm.get((i_row, i_col)).expect("Bad formated flowmap");
-                transition[(i_row, i_col)] = val;
-                row_sum[i_row] = val;
+                if val != 0. {
+                    transition.push(i_row, i_col, val);
+                }
+                row_sum[i_row] += val;
             }
         }
-    }
+    });
 
-    for i_row in 0..n_compartments {
-        transition[(i_row, i_row)] = row_sum[i_row];
-    }
-    SPMatrix::from_dense(&transition)
+    (0..n_compartments).for_each(|i_row| {
+        let val = row_sum[i_row];
+        if val != 0. {
+            transition.push(i_row, i_row, -val);
+        }
+    });
+    transition
 }
 
 #[cfg(probability)]
@@ -30,7 +38,7 @@ fn get_propability_from_fm(fm: &FlowMapDescriptor) -> Array2<f64> {
 }
 
 pub struct HydroState {
-    pub transition: peroxide::structure::sparse::SPMatrix,
+    pub transition: CooMatrix<f64>,
     pub volumes: Vec<f64>,
     pub inverse_volume: Vec<f64>,
 }
@@ -48,11 +56,11 @@ impl From<FlowMapDescriptor> for HydroState {
 }
 
 pub struct IterationState {
-    liquid: HydroState,
-    gas: Option<HydroState>,
-    liquid_neighors: Array2<usize>,
+    pub liquid: HydroState,
+    pub gas: Option<HydroState>,
+    pub liquid_neighors: Array2<usize>,
     #[cfg(probability)]
-    liquid_cumulative_probability: Array2<f64>,
+    pub liquid_cumulative_probability: Array2<f64>,
 }
 
 impl IterationState {

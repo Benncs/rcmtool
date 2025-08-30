@@ -33,6 +33,9 @@ thiserror = "2.0.12"
 enum_dispatch = "0.3.13"
 clap = { version = "4.5.41", features = ["derive"] }
 
+#
+nalgebra = "0.34.0"
+
 # python
 
 pyo3 = { version = "0.24.0" ,features = ["abi3-py310","extension-module"]}
