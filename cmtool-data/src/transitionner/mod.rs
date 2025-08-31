@@ -36,10 +36,36 @@ impl FlowMapBuffer {
     }
 }
 
+fn get_descriptor(
+    root: &str,
+    case: &CMCase,
+) -> Result<(FlowMapDescriptor, Option<FlowMapDescriptor>), DataError> {
+    let liq_flow_path = case
+        .resolve(root, crate::CMAExportType::LiquidFlow)
+        .ok_or(DataError::BadData)?;
+    let liq_vol_path = case
+        .resolve(root, crate::CMAExportType::LiquidVolume)
+        .ok_or(DataError::BadData)?;
+
+    let liquid_descriptor = FlowMapDescriptor::from_path(liq_flow_path, liq_vol_path)?;
+
+    let gas_descriptor = match (
+        case.resolve(root, crate::CMAExportType::GasFlow),
+        case.resolve(root, crate::CMAExportType::GasVolume),
+    ) {
+        (Some(gas_flow), Some(gas_volume)) => {
+            Some(FlowMapDescriptor::from_path(gas_flow, gas_volume)?)
+        }
+        _ => None,
+    };
+
+    Ok((liquid_descriptor, gas_descriptor))
+}
+
 pub trait FlowMapTransitionner {
-    fn advance(&mut self, time_step: f64) -> &IterationState;
-    fn advance_arc(&mut self, time_step: f64) -> Arc<IterationState>;
-    fn need_advance(&self, time_step: f64) -> bool;
+    fn advance(&mut self, current_time: f64, time_step: f64) -> &IterationState;
+    fn advance_arc(&mut self, current_time: f64, time_step: f64) -> Arc<IterationState>;
+    fn need_advance(&self, current_time: f64, time_step: f64) -> bool;
     fn get_at(&self, idx: usize) -> Option<Arc<IterationState>>;
     //Start with one dt per flowmap, maybe be improve by using different dt per flowmap if needed
     fn new(time_per_flomap: f64, buffer: FlowMapBuffer) -> Self;
@@ -48,27 +74,53 @@ pub trait FlowMapTransitionner {
     where
         Self: Sized,
     {
-        let buffer = if case.recur {
-            todo!()
-        } else {
-            let liq_flow_path = case
-                .resolve(root, crate::CMAExportType::LiquidFlow)
-                .ok_or(DataError::BadData)?;
-            let liq_vol_path = case
-                .resolve(root, crate::CMAExportType::LiquidVolume)
-                .ok_or(DataError::BadData)?;
+        let buffer = if case.is_reursive {
+            let mut folders: Vec<String> = std::fs::read_dir(root)
+                .unwrap()
+                .filter_map(|entry| {
+                    if let Ok(dir) = entry {
+                        let file_name = dir.file_name();
+                        let file_name_str = file_name.to_string_lossy();
+                        if let Some(index_str) = file_name_str.strip_prefix("i_") {
+                            if index_str.parse::<usize>().is_ok() {
+                                Some(file_name_str.to_string())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect();
 
-            let liquid_descriptor = FlowMapDescriptor::from_path(liq_flow_path, liq_vol_path)?;
+            folders.sort_by(|a, b| {
+                let index_a: usize = a.trim_start_matches("i_").parse().unwrap_or(0);
+                let index_b: usize = b.trim_start_matches("i_").parse().unwrap_or(0);
+                index_a.cmp(&index_b)
+            });
 
-            let gas_descriptor = match (
-                case.resolve(root, crate::CMAExportType::GasFlow),
-                case.resolve(root, crate::CMAExportType::GasVolume),
-            ) {
-                (Some(gas_flow), Some(gas_volume)) => {
-                    Some(FlowMapDescriptor::from_path(gas_flow, gas_volume)?)
+            let (liquid, gas) = {
+                let mut liquids = Vec::new();
+                let mut gases = Vec::new();
+
+                for folder in folders.iter() {
+                    let (l, g) = get_descriptor(&format!("{}/{}", root, folder), case).unwrap();
+                    liquids.push(l);
+                    if let Some(g_val) = g {
+                        gases.push(g_val);
+                    }
                 }
-                _ => None,
+
+                let gas_vec = if gases.is_empty() { None } else { Some(gases) };
+
+                (liquids, gas_vec)
             };
+            FlowMapBuffer::new(liquid, gas).unwrap()
+        } else {
+            let (liquid_descriptor, gas_descriptor) = get_descriptor(root, case)?;
 
             FlowMapBuffer::new_unique(liquid_descriptor, gas_descriptor)
         };
@@ -76,32 +128,72 @@ pub trait FlowMapTransitionner {
         Ok(Self::new(case.time_per_flow_map, buffer))
     }
 }
-
-pub struct DiscontinuousTransitioner {
+pub enum TransitionerType {
+    Discontinuous,
+    Simple,
+    None,
+}
+pub struct SimpleTransitioner {
     state_buffer: Vec<Arc<IterationState>>,
     time_per_flomap: f64,
     remaining_time: f64,
     current_index: usize,
 }
-
-pub enum TransitionerType {
-    Discontinuous,
-    None,
+pub struct DiscontinuousTransitioner {
+    state_buffer: Vec<Arc<IterationState>>,
+    time_per_flomap: f64,
 }
 
-pub fn get_transionner(
-    ttype: TransitionerType,
-    root: &str,
-    case: &CMCase,
-) -> Result<impl FlowMapTransitionner, DataError> {
-    match ttype {
-        TransitionerType::Discontinuous => DiscontinuousTransitioner::from_case(root, case),
-        _ => unimplemented!(),
+fn get_state_buffer(buffer: FlowMapBuffer) -> Vec<Arc<IterationState>> {
+    match buffer.1 {
+        Some(gas) => buffer
+            .0
+            .into_iter()
+            .zip(gas)
+            .map(|(liq, _gas)| Arc::new(IterationState::new(liq, Some(_gas))))
+            .collect(),
+        None => buffer
+            .0
+            .into_iter()
+            .map(|fd| Arc::new(IterationState::new(fd, None)))
+            .collect(),
     }
 }
 
 impl FlowMapTransitionner for DiscontinuousTransitioner {
-    fn advance_arc(&mut self, time_step: f64) -> Arc<IterationState> {
+    fn advance(&mut self, current_time: f64, _time_step: f64) -> &IterationState {
+        let index_map =
+            (current_time / self.time_per_flomap).floor() as usize % self.state_buffer.len();
+
+        &self.state_buffer[index_map]
+    }
+
+    fn advance_arc(&mut self, current_time: f64, _time_step: f64) -> Arc<IterationState> {
+        let index_map =
+            (current_time / self.time_per_flomap).floor() as usize % self.state_buffer.len();
+
+        self.state_buffer[index_map].clone()
+    }
+
+    fn need_advance(&self, _current_time: f64, _time_step: f64) -> bool {
+        true
+    }
+
+    fn get_at(&self, idx: usize) -> Option<Arc<IterationState>> {
+        self.state_buffer.get(idx).cloned()
+    }
+
+    fn new(time_per_flomap: f64, buffer: FlowMapBuffer) -> Self {
+        let state_buffer = get_state_buffer(buffer);
+        Self {
+            time_per_flomap,
+            state_buffer,
+        }
+    }
+}
+
+impl FlowMapTransitionner for SimpleTransitioner {
+    fn advance_arc(&mut self, _current_time: f64, time_step: f64) -> Arc<IterationState> {
         if self.remaining_time >= self.time_per_flomap {
             self.current_index = (self.current_index + 1) % self.state_buffer.len();
             self.remaining_time = 0.;
@@ -112,7 +204,7 @@ impl FlowMapTransitionner for DiscontinuousTransitioner {
     fn get_at(&self, idx: usize) -> Option<Arc<IterationState>> {
         self.state_buffer.get(idx).cloned()
     }
-    fn advance(&mut self, time_step: f64) -> &IterationState {
+    fn advance(&mut self, _current_time: f64, time_step: f64) -> &IterationState {
         if self.remaining_time >= self.time_per_flomap {
             self.current_index = (self.current_index + 1) % self.state_buffer.len();
             self.remaining_time = 0.;
@@ -121,24 +213,12 @@ impl FlowMapTransitionner for DiscontinuousTransitioner {
         &self.state_buffer[self.current_index]
     }
 
-    fn need_advance(&self, time_step: f64) -> bool {
+    fn need_advance(&self, _current_time: f64, time_step: f64) -> bool {
         (self.remaining_time + time_step) >= self.time_per_flomap
     }
 
     fn new(time_per_flomap: f64, buffer: FlowMapBuffer) -> Self {
-        let state_buffer: Vec<Arc<IterationState>> = match buffer.1 {
-            Some(gas) => buffer
-                .0
-                .into_iter()
-                .zip(gas)
-                .map(|(liq, _gas)| Arc::new(IterationState::new(liq, Some(_gas))))
-                .collect(),
-            None => buffer
-                .0
-                .into_iter()
-                .map(|fd| Arc::new(IterationState::new(fd, None)))
-                .collect(),
-        };
+        let state_buffer = get_state_buffer(buffer);
 
         Self {
             state_buffer,
@@ -148,3 +228,15 @@ impl FlowMapTransitionner for DiscontinuousTransitioner {
         }
     }
 }
+
+// pub fn get_transionner(
+//     ttype: TransitionerType,
+//     root: &str,
+//     case: &CMCase,
+// ) -> Result<impl FlowMapTransitionner, DataError> {
+//     match ttype {
+//         TransitionerType::Simple => SimpleTransitioner::from_case(root, case),
+//         TransitionerType::Discontinuous => DiscontinuousTransitioner::from_case(root, case),
+//         _ => unimplemented!(),
+//     }
+// }

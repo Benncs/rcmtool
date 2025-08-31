@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cmtool_data::{
     CCMCaseInfo, CMCaseReader, DiscontinuousTransitioner, FlowMapDescriptor, FlowMapTransitionner,
-    RawData,
+    RawData, SimpleTransitioner,
 };
 use nalgebra::DMatrix;
 use numpy::PyArray1;
@@ -33,12 +33,12 @@ impl IterationStateWrapper {
 
 #[pymethods]
 impl DiscontinuousTransitionerWrapper {
-    fn advance(&mut self, time_step: f64) -> IterationStateWrapper {
-        IterationStateWrapper(self.0.advance_arc(time_step))
+    fn advance(&mut self, current_time: f64, time_step: f64) -> IterationStateWrapper {
+        IterationStateWrapper(self.0.advance_arc(current_time, time_step))
     }
 
-    fn need_advance(&self, time_step: f64) -> bool {
-        self.0.need_advance(time_step)
+    fn need_advance(&self, current_time: f64, time_step: f64) -> bool {
+        self.0.need_advance(current_time, time_step)
     }
 
     fn get_at(&self, idx: usize) -> IterationStateWrapper {

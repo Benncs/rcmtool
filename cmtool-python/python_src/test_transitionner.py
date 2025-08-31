@@ -19,31 +19,27 @@ def create_sparse_array(row_indices, col_indices, values, shape=None):
     return sparse_array
 
 
-root = "/home/benjamin/Documents/thesis/cfd-cma/cma_data/sanofi/"
-
-
 def check_mixing(fmt):
     it = fmt.get_at(0)
     M = create_sparse_array(*it.flowmap)
     n_c = M.shape[0]
     C = np.zeros((1, n_c))
     C[0, 0] = 1
-    last_t = 0
     vol = it.volumes
+    it = fmt.get_at(19)
+    vol2 = it.volumes
     m0 = C * vol
 
     def wrap(t, x):
-        nonlocal last_t
-        dt = t - last_t
-        last_t = dt
-        it = fmt.advance(dt)
-        M = create_sparse_array(*it.flowmap).toarray()
+        d_t = 0  # Not used for this transitionner
+        it = fmt.advance(t, d_t)
+        M = create_sparse_array(*it.flowmap)
         vol = it.volumes
         _mass = x.reshape((1, n_c))
         C = _mass / vol
         return C @ M
 
-    sol = solve_ivp(wrap, (0, 5000), m0.reshape(-1), method="RK45")
+    sol = solve_ivp(wrap, (0, 50), m0.reshape(-1), method="LSODA")
     y = sol.y.reshape((n_c, -1))
     y = sol.y.reshape((n_c, -1))
 
@@ -55,7 +51,7 @@ def check_mixing(fmt):
     print("Mass final :", np.sum(mt_c))
 
     c_init = (m0_c / vol) / np.mean(m0_c / vol)
-    c_final = (mt_c / vol) / np.mean(mt_c / vol)
+    c_final = (mt_c / vol2) / np.mean(mt_c / vol2)
 
     print("Profil initial:", c_init[:5])
     print("Profil final:", c_final[:5])
@@ -65,5 +61,7 @@ def check_mixing(fmt):
     plt.show()
 
 
+# root = "/home/benjamin/Documents/thesis/cfd-cma/cma_data/sanofi/"
+root = "/home/benjamin/Documents/thesis/cfd-cma/cma_data/b20l/"
 fmt = pycmtool.get_transitionner(root, f"{root}/cma_case")
 check_mixing(fmt)

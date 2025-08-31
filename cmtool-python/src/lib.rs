@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use cmtool_data::{
-    CCMCaseInfo, CMCaseReader, DiscontinuousTransitioner, FlowMapDescriptor, FlowMapTransitionner,
-    RawData,
+    CCMCaseInfo, CMCaseReader, FlowMapDescriptor, FlowMapTransitionner, RawData, SimpleTransitioner,
 };
 use numpy::PyArray1;
 use numpy::ndarray::{self};
