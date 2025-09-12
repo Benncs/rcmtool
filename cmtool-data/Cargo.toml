@@ -5,15 +5,21 @@ version.workspace = true
 authors.workspace = true
 description.workspace = true
 documentation.workspace = true
-
+license.workspace = true
 [dependencies]
+enum_dispatch.workspace = true
+nalgebra.workspace=true
+nalgebra-sparse = "0.11.0"
 ndarray = "0.16.1"
-serde.workspace=true
-serde_cbor.workspace=true
-serde_json.workspace=true
-thiserror.workspace =true
+peroxide = { version = "0.40.0", features = ["O3"] }
+serde.workspace = true
+serde_cbor.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
 
 
+[features]
+probability=[]
 
-
-
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(probability)'] }

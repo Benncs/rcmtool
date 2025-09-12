@@ -1,11 +1,8 @@
-use std::{io::ErrorKind, path::Path, str::FromStr, sync::Arc};
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ensight_gold::{
-    geo::Geometry,
     reader::EnsightGoldReader,
-    types::ElementsType,
     variable::{PerElementVariable, VarTypeReader},
-    RawField, Reader,
 };
 
 
@@ -24,7 +21,7 @@ impl VarTypeReader for ScalarReader {
 pub(crate) type ScalarField = PerElementVariable<ScalarReader>;
 
 impl ScalarField {
-    
+
     #[inline]
     pub fn get_value(&self, i_part: usize, i_mesh_element_type: usize, mesh_cell: usize) -> f32 {
         self.data[i_part][i_mesh_element_type][mesh_cell]

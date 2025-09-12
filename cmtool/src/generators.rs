@@ -22,6 +22,7 @@ use thiserror::Error;
 pub enum CmtoolError {
     #[error("Cmtool: {0}")]
     Data(#[from] cmtool_data::DataError),
+
     #[error("Cmtool: {0}")]
     Core(#[from] cmtool_core::CoreError),
 
@@ -50,17 +51,24 @@ impl Generator {
         }
     }
 
-    fn write_phase(dest: &str, case: &mut CMCase, phase: RawPhase) -> Result<(), CmtoolError> {
+    fn write_phase(
+        dest: &str,
+        case: &mut CMCase,
+        phase: RawPhase,
+        relative_path: Option<String>,
+    ) -> Result<(), CmtoolError> {
         let (flowp, volumep) = phase.write(dest)?;
+        let flowp = match &relative_path {
+            Some(rel) => format!("./{}/{}", rel, flowp),
+            None => format!("./{}", flowp),
+        };
 
-        case.add(
-            CMExportType::Flow(phase.identifier).into(),
-            &format!("./{}", flowp),
-        );
-        case.add(
-            CMExportType::Volume(phase.identifier).into(),
-            &format!("./{}", volumep),
-        );
+        let volumep = match relative_path {
+            Some(rel) => format!("./{}/{}", rel, volumep),
+            None => format!("./{}", volumep),
+        };
+        case.add(CMExportType::Flow(phase.identifier).into(), &flowp);
+        case.add(CMExportType::Volume(phase.identifier).into(), &volumep);
 
         Ok(())
     }
@@ -77,7 +85,7 @@ impl Generator {
         phase.volume.values.push(volume.into());
 
         match dest {
-            Some(s) => Self::write_phase(&s, case, phase),
+            Some(s) => Self::write_phase(&s, case, phase, None),
             None => {
                 self.raw_phase.push(phase);
                 Ok(())
@@ -130,7 +138,7 @@ impl Generator {
         n_compartment: usize,
         length: f64,
         diameter: f64,
-        flow: f64,
+        liquid_flow: f64,
         volume_fraction: f64,
         axial_dispersion: f64,
         gas: bool,
@@ -139,7 +147,7 @@ impl Generator {
         let dx = length / (n_compartment as f64);
         let reactor_section_area = std::f64::consts::PI * diameter.powf(2.) / 4.;
         let compartment_volume = volume_fraction * dx * reactor_section_area;
-        let flow_velocity = flow / reactor_section_area;
+        let flow_velocity = liquid_flow / reactor_section_area;
         let n_flow = n_compartment - 1;
 
         let flow_source_target = reactor_section_area / dx * (flow_velocity + axial_dispersion);
@@ -166,7 +174,7 @@ impl Generator {
         }
 
         if let Some(s) = dest {
-            Self::write_phase(&s, case, phase)?;
+            Self::write_phase(&s, case, phase, None)?;
         } else {
             self.raw_phase.push(phase);
         }
@@ -179,7 +187,8 @@ impl Generator {
         n_compartment: usize,
         length: f64,
         diameter: f64,
-        flow: f64,
+        liquid_flow: f64,
+        gas_flow: f64,
         gas_fraction: f64,
         axial_dispersion: f64,
         dest: Option<String>,
@@ -196,7 +205,7 @@ impl Generator {
             n_compartment,
             length,
             diameter,
-            flow,
+            liquid_flow,
             1.0 - gas_fraction,
             axial_dispersion,
             false,
@@ -208,7 +217,7 @@ impl Generator {
                 n_compartment,
                 length,
                 diameter,
-                flow,
+                gas_flow,
                 1.0 - gas_fraction,
                 axial_dispersion,
                 true,
@@ -289,16 +298,17 @@ impl Generator {
         std::fs::create_dir_all(&path).unwrap(); //FIXME
         let mut case = CMCase::default();
         // case.n_div = n_div;
+        let relative = Some(String::from("merged")); //TODO Clean this
 
         let liquid_connection = connections.as_ref().map(|c| c[0].clone());
         let gas_connection = connections.as_ref().map(|c| c[1].clone());
 
         let phase = Self::merge_phase(liquid_phase, liquid_connection)?;
-        Self::write_phase(&path, &mut case, phase)?;
+        Self::write_phase(&path, &mut case, phase, relative.clone())?;
 
         if !gasphase.is_empty() {
             let phase = Self::merge_phase(gasphase, gas_connection)?;
-            Self::write_phase(&path, &mut case, phase)?;
+            Self::write_phase(&path, &mut case, phase, relative)?;
         }
 
         CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
@@ -394,13 +404,13 @@ impl Generator {
 
         let liquid_connection = connections.as_ref().map(|c| c[0].clone());
         let gas_connection = connections.as_ref().map(|c| c[1].clone());
-
+        //TODO wont working without let relative = Some(String::from("merged"));
         let phase = Self::merge_phase(liquid_phases, liquid_connection)?;
-        Self::write_phase(&path, &mut case, phase)?;
+        Self::write_phase(&path, &mut case, phase, None)?;
 
         if !gas_phases.is_empty() {
             let phase = Self::merge_phase(gas_phases, gas_connection)?;
-            Self::write_phase(&path, &mut case, phase)?;
+            Self::write_phase(&path, &mut case, phase, None)?;
         }
 
         CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
@@ -467,7 +477,7 @@ mod tests {
         let d = 0.2;
         let alpha_g = 0.1;
         let case = Generator::new()
-            .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, Some("/tmp".to_owned()))
+            .generate_1d_from_fraction(10, l, d, 0.01, 0.01, alpha_g, 1e-9, Some("/tmp".to_owned()))
             .expect("case");
         let liquid_volume_path: String = case
             .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
@@ -493,7 +503,16 @@ mod tests {
         let d = 0.2;
         let alpha_g = 0.1;
         let case = Generator::new()
-            .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, Some("/tmp".to_owned()))
+            .generate_1d_from_fraction(
+                10,
+                l,
+                d,
+                0.01,
+                0.001,
+                alpha_g,
+                1e-9,
+                Some("/tmp".to_owned()),
+            )
             .expect("case");
         let liquid_volume_path = case
             .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)

@@ -1,76 +1,11 @@
-use clap::{Args, Parser, Subcommand};
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use cmtool::CmtoolError;
-use cmtool_core::CoreError;
 use std::fmt::Write;
 
 use std::{env, path::Path};
-#[derive(Parser, Clone)]
-struct CommonArgs {
-    n_i: usize,
-    n_j: usize,
-    n_k: usize,
-    /// Verbosity level
-    #[clap(short, long)]
-    verbose: bool,
-
-    /// Output directory
-    #[clap(short, long)]
-    out: Option<String>,
-}
-
-#[derive(Parser, Default, Clone)]
-struct ManualArgs {
-    root: String,
-    geo_file: String,
-    scalars: Vec<String>,
-    vectors: Vec<String>,
-}
-
-#[derive(Parser, Default, Clone)]
-struct AutoArgs {
-    case_path: String,
-}
-
-#[derive(Subcommand, Clone)]
-enum Mode {
-    Manual(ManualArgs),
-    Auto(AutoArgs),
-}
-
-#[derive(Parser, Clone)]
-#[clap(name = "myapp")]
-struct GenArgs {
-    #[clap(flatten)]
-    common: CommonArgs,
-
-    #[clap(subcommand)]
-    mode: Mode,
-}
-
-impl GenArgs {
-    #[cfg(debug_assertions)]
-    fn get() -> Self {
-        GenArgs {
-            common: CommonArgs {
-                n_i: 3,
-                n_j: 3,
-                n_k: 3,
-                out: None,
-                verbose: true,
-            },
-            mode: Mode::Auto(AutoArgs {
-                case_path:
-                    "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.encas"
-                        .to_string(),
-            }),
-        }
-    }
-    #[cfg(not(debug_assertions))]
-    fn get() -> Self {
-        GenArgs::parse()
-    }
-}
-
+mod args;
+use args::*;
 
 fn main() -> Result<(), CmtoolError> {
     let args = GenArgs::get();
@@ -84,7 +19,7 @@ fn main() -> Result<(), CmtoolError> {
 
 fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> {
     let stem = Path::new(&autoargs.case_path)
-        .file_stem() // Gets "mycase" as OsStr
+        .file_stem() // Gets "casename" as OsStr
         .and_then(|s| s.to_str())
         .unwrap(); // Converts OsStr to &str
 

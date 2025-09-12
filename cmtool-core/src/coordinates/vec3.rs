@@ -1,4 +1,6 @@
-use crate::coordinates::{CartesianCoordinates, Coords3, CylindricalCoordinates};
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+use crate::coordinates::{CartesianCoordinates, Coords3};
 
 #[derive(Clone, Copy)]
 pub struct CartesianVec3(pub Coords3);

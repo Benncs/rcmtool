@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use super::Coords3;
 
 //TODO: Clean wrapper for non owing point/vec
@@ -5,7 +7,7 @@ use super::Coords3;
 //#[derive(Clone, Copy)]
 //struct CartesianCoordinateRef<'a>(pub &'a Coords3);
 //
-//// Implement From for easy conversion
+/// Implement From for easy conversion
 //impl<'a> From<CartesianCoordinateRef<'a>> for CartesianCoordinates {
 //fn from(c: CartesianCoordinateRef<'a>) -> Self {
 //CartesianCoordinates(*c.0)
@@ -46,4 +48,3 @@ impl From<CylindricalCoordinates> for CartesianCoordinates {
         CartesianCoordinates::from(&value)
     }
 }
-

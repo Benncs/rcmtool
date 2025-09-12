@@ -1,5 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::{CMAExportType, DataError};
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 use std::io::{BufReader, Read, Write};
 use std::{collections::HashMap, fs, path::Path};
 
@@ -20,11 +23,16 @@ pub struct CMCase {
     pub description: String,
     pub time_per_flow_map: f64,
     paths: HashMap<CMAExportType, String>,
+    pub is_reursive: bool,
 }
 
 impl CMCase {
     pub fn n_compartment(&self) -> u32 {
         self.n_div.iter().product()
+    }
+
+    pub fn toggle_recursive(&mut self) {
+        self.is_reursive = !self.is_reursive;
     }
 
     pub fn add(&mut self, stype: CMAExportType, relative_path: &str) {
@@ -40,6 +48,48 @@ impl CMCase {
             *path = format!("{}/{}", prep, path);
         }
         self
+    }
+
+    fn check(&self) -> bool {
+        let has_gas_volume = self.paths.contains_key(&CMAExportType::GasVolume);
+        let has_gas_flow = self.paths.contains_key(&CMAExportType::GasFlow);
+
+        let has_liq_volume = self.paths.contains_key(&CMAExportType::LiquidVolume);
+        let has_liq_flow = self.paths.contains_key(&CMAExportType::LiquidFlow);
+
+        let ok_gas = if has_gas_volume && !has_gas_flow {
+            false
+        } else if has_gas_flow && !has_gas_volume {
+            false
+        } else {
+            true
+        };
+
+        let ok_liq = if has_liq_volume && !has_liq_flow {
+            false
+        } else if has_liq_flow && !has_liq_volume {
+            false
+        } else {
+            true
+        };
+
+        ok_liq && ok_gas
+    }
+
+    pub fn new(
+        n_div: [u32; 3],
+        time_per_flow_map: f64,
+        description: Option<String>,
+        recursive: bool,
+    ) -> Self {
+        let description = description.unwrap_or(String::from("Case"));
+        Self {
+            n_div,
+            time_per_flow_map,
+            is_reursive: recursive,
+            description,
+            paths: HashMap::new(),
+        }
     }
 }
 
@@ -83,7 +133,6 @@ pub struct CMCaseJson;
 /// A type responsible for reading and writing `CMCase` instances C comparible (binary) files.
 pub struct CCMCaseInfo;
 
-
 impl CMCaseReader for CMCaseJson {
     fn read_case(path: &Path) -> Result<CMCase, DataError> {
         let mut file = std::fs::File::open(path)?;
@@ -97,6 +146,10 @@ impl CMCaseReader for CMCaseJson {
 
 impl CMCaseWriter for CMCaseJson {
     fn write_case(case: CMCase, path: &Path) -> Result<(), DataError> {
+        if !case.check() {
+            return Err(DataError::BadData);
+        }
+
         let json_string = serde_json::to_string(&case).map_err(|_| DataError::Serde)?;
         let mut file = std::fs::File::create(path)?;
         file.write_all(json_string.as_bytes())?;
@@ -107,6 +160,22 @@ impl CMCaseWriter for CMCaseJson {
 
 impl CMCaseReader for CCMCaseInfo {
     fn read_case(path: &Path) -> Result<CMCase, DataError> {
+        //C Caseformat do not have recursive flag, manual detection here:
+
+        let root = path.parent().unwrap();
+        let is_recursive = if root.is_dir() {
+            std::fs::read_dir(root).unwrap().any(|entry| {
+                if let Ok(dir) = entry {
+                    let file_name = dir.file_name();
+                    let file_name_str = file_name.to_string_lossy();
+                    return file_name_str.starts_with("i_");
+                }
+                false
+            })
+        } else {
+            false
+        };
+
         let file = fs::File::open(path)?;
         let mut buffer = BufReader::new(file);
 
@@ -115,7 +184,9 @@ impl CMCaseReader for CCMCaseInfo {
         let mut buffer_8bytes = [0u8; 8];
 
         let mut case = CMCase::default();
-
+        if is_recursive {
+            case.toggle_recursive();
+        }
         for i in &mut case.n_div {
             buffer.read_exact(&mut buf)?;
             *i = u32::from_le_bytes(buf);
@@ -156,6 +227,10 @@ impl CMCaseReader for CCMCaseInfo {
 
 impl CMCaseWriter for CCMCaseInfo {
     fn write_case(case: CMCase, path: &Path) -> Result<(), DataError> {
+        if !case.check() {
+            return Err(DataError::BadData);
+        }
+
         let mut file = std::fs::File::create(path)?;
 
         for &div in &case.n_div {
@@ -271,6 +346,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
+            is_reursive: false,
         };
 
         T::write_case(case, path).map_err(|_| ())?;
@@ -289,6 +365,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
+            is_reursive: false,
         };
 
         CMCaseJson::write_case(case, path).expect("Failed to write case");

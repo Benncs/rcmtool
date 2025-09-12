@@ -1,17 +1,22 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 mod case;
 mod descriptors;
+mod flowmap;
 mod rawdata;
+mod states;
+mod transitionner;
 pub use case::{CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter};
 pub use descriptors::{CMAExportType, CMExportType, PhaseCM};
+pub use flowmap::FlowMapDescriptor;
 pub use rawdata::{
     FluxFileHeader, RawData, RawDataFlux, RawDataScalar, RawFlux, RawPhase, RawScalar,
     ScalarFileHeader, ScalarValueType,
 };
+pub use states::*;
 use std::io;
-
-use ndarray::Array2;
 use thiserror::Error;
-
+pub use transitionner::*;
 /// Errors that can occur during data operations.
 ///
 /// This enum encapsulates various error conditions that might arise during
@@ -39,6 +44,9 @@ pub enum DataError {
     /// by other variants.
     #[error("An unknown error occurred during data operation")]
     Unknown,
+
+    #[error("Data is illed-format")]
+    BadData,
 }
 
 #[inline(always)]
@@ -49,42 +57,4 @@ fn linear_index_row_major(_n_row: usize, n_col: usize, i: usize, j: usize) -> us
 #[inline(always)]
 fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> usize {
     j * n_row + i
-}
-
-
-pub struct FlowMapDescriptor {
-    pub flowmap: Array2<f64>,
-    neighbors: Vec<Vec<usize>>, //TODO
-}
-
-impl FlowMapDescriptor {
-    pub fn from_raw_data(data: &rawdata::RawDataFlux) -> Result<Self, ()> {
-        let n_zone = data.header.n_zone as usize;
-        let mut flowmap = Array2::<f64>::zeros((n_zone, n_zone));
-
-        let mut neighbors: Vec<Vec<usize>> = vec![Vec::new(); n_zone]; //Vec::with_capacity(data.header.n_zone as usize)
-
-        for RawFlux {
-            id_source,
-            id_target,
-            flux_source_target,
-            flux_target_source,
-        } in data.fluxes.iter()
-        {
-            let id_source = *id_source as usize;
-            let id_target = *id_target as usize;
-
-            if let Some(g) = flowmap.get_mut((id_source, id_target)) {
-                *g += flux_source_target;
-            }
-
-            if let Some(g) = flowmap.get_mut((id_target, id_source)) {
-                *g += flux_target_source;
-            }
-            neighbors[id_source].push(id_target);
-            neighbors[id_target].push(id_source)
-        }
-
-        Ok(FlowMapDescriptor { flowmap, neighbors })
-    }
 }

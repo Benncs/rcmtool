@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::{
     ensight_gold::{reader::EnsightGoldReader, types::ElementsType, Reader}, utils,
 };
@@ -33,7 +35,7 @@ impl std::fmt::Display for Part {
         writeln!(f, "  Number of vertices: {}", self.n_vertex)?;
         writeln!(f, "  Vertex coordinates: {}",self.vertex_coordinates.len())?;
         writeln!(f, "  Number of elements: {}", self.elements.len())?;
-       
+
         Ok(())
     }
 }
@@ -50,8 +52,8 @@ impl std::fmt::Display for Geometry {
         {
             writeln!(f, "{}", p)?;
         }
-     
-       
+
+
         Ok(())
     }
 }
@@ -135,7 +137,7 @@ impl Part {
     }
 
     pub fn get_vertex_coordinates_slice(&self, k_vertex: usize) -> &Coords3 {
-      
+
         let offset = k_vertex * 3;
         self.vertex_coordinates[offset..offset+3].try_into().expect("Part slice vertex")
     }
@@ -185,7 +187,7 @@ impl Part {
             }
         }
 
-    
+
         while let Ok(element) = MeshElementType::read(reader, ignore_element_id) {
             current_part.elements.push(element);
         }

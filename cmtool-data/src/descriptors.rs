@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone, Copy)]
 pub enum CMAExportType {
@@ -25,24 +27,21 @@ impl PhaseCM {
     }
 }
 
-impl From<PhaseCM> for String
-{
-    fn from(val: PhaseCM)->Self
-    {
-       match val{
+impl From<PhaseCM> for String {
+    fn from(val: PhaseCM) -> Self {
+        match val {
             PhaseCM::Liquid => String::from("liquid"),
-            PhaseCM::Gas => String::from("gas")
-        } 
+            PhaseCM::Gas => String::from("gas"),
+        }
     }
 }
 
-impl From<String> for PhaseCM
-{
-    fn from(value:String)->Self
-    {
+impl From<String> for PhaseCM {
+    fn from(value: String) -> Self {
         todo!()
     }
 }
+
 pub enum CMExportType {
     Flow(PhaseCM),
     Volume(PhaseCM),
@@ -87,7 +86,7 @@ impl CMExportType {
                 format!("flow{}.raw", g.identifier())
             }
             Self::Volume(g) => {
-                format!("vol{}.raw", g.identifier())
+                format!("vof{}.raw", g.identifier())
             }
             Self::EnergyDissipation => "epsturb.raw".to_string(),
             Self::Kla => "kla.raw".to_string(),

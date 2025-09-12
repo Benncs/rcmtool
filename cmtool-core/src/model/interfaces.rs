@@ -1,9 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::coordinates::*;
 use crate::grid::NeighborDirection;
 use crate::model::CMGeometry;
 use crate::utils::compute_intersection_area;
 
-use super::geometry;
 
 #[derive(Default, Clone)]
 pub struct InterfaceInfo {

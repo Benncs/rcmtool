@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::{
     coordinates::*,
     ensight_gold::types::{ElementsType, VolumeElementTypes},
