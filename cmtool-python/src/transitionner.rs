@@ -41,6 +41,11 @@ impl DiscontinuousTransitionerWrapper {
         self.0.need_advance(current_time, time_step)
     }
 
+    #[getter]
+    fn n_flowmaps(&self) -> usize {
+        self.0.size()
+    }
+
     fn get_at(&self, idx: usize) -> IterationStateWrapper {
         if let Some(opt) = self.0.get_at(idx) {
             IterationStateWrapper(opt)

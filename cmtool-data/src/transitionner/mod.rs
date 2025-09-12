@@ -67,6 +67,7 @@ pub trait FlowMapTransitionner {
     fn advance_arc(&mut self, current_time: f64, time_step: f64) -> Arc<IterationState>;
     fn need_advance(&self, current_time: f64, time_step: f64) -> bool;
     fn get_at(&self, idx: usize) -> Option<Arc<IterationState>>;
+    fn size(&self) -> usize;
     //Start with one dt per flowmap, maybe be improve by using different dt per flowmap if needed
     fn new(time_per_flomap: f64, buffer: FlowMapBuffer) -> Self;
 
@@ -133,12 +134,6 @@ pub enum TransitionerType {
     Simple,
     None,
 }
-pub struct SimpleTransitioner {
-    state_buffer: Vec<Arc<IterationState>>,
-    time_per_flomap: f64,
-    remaining_time: f64,
-    current_index: usize,
-}
 pub struct DiscontinuousTransitioner {
     state_buffer: Vec<Arc<IterationState>>,
     time_per_flomap: f64,
@@ -167,6 +162,9 @@ impl FlowMapTransitionner for DiscontinuousTransitioner {
 
         &self.state_buffer[index_map]
     }
+    fn size(&self) -> usize {
+        return self.state_buffer.len();
+    }
 
     fn advance_arc(&mut self, current_time: f64, _time_step: f64) -> Arc<IterationState> {
         let index_map =
@@ -190,6 +188,12 @@ impl FlowMapTransitionner for DiscontinuousTransitioner {
             state_buffer,
         }
     }
+}
+pub struct SimpleTransitioner {
+    state_buffer: Vec<Arc<IterationState>>,
+    time_per_flomap: f64,
+    remaining_time: f64,
+    current_index: usize,
 }
 
 impl FlowMapTransitionner for SimpleTransitioner {
@@ -215,6 +219,9 @@ impl FlowMapTransitionner for SimpleTransitioner {
 
     fn need_advance(&self, _current_time: f64, time_step: f64) -> bool {
         (self.remaining_time + time_step) >= self.time_per_flomap
+    }
+    fn size(&self) -> usize {
+        self.state_buffer.len()
     }
 
     fn new(time_per_flomap: f64, buffer: FlowMapBuffer) -> Self {

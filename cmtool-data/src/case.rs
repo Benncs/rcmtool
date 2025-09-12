@@ -2,6 +2,7 @@
 
 use crate::{CMAExportType, DataError};
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 use std::io::{BufReader, Read, Write};
 use std::{collections::HashMap, fs, path::Path};
 
@@ -47,6 +48,48 @@ impl CMCase {
             *path = format!("{}/{}", prep, path);
         }
         self
+    }
+
+    fn check(&self) -> bool {
+        let has_gas_volume = self.paths.contains_key(&CMAExportType::GasVolume);
+        let has_gas_flow = self.paths.contains_key(&CMAExportType::GasFlow);
+
+        let has_liq_volume = self.paths.contains_key(&CMAExportType::LiquidVolume);
+        let has_liq_flow = self.paths.contains_key(&CMAExportType::LiquidFlow);
+
+        let ok_gas = if has_gas_volume && !has_gas_flow {
+            false
+        } else if has_gas_flow && !has_gas_volume {
+            false
+        } else {
+            true
+        };
+
+        let ok_liq = if has_liq_volume && !has_liq_flow {
+            false
+        } else if has_liq_flow && !has_liq_volume {
+            false
+        } else {
+            true
+        };
+
+        ok_liq && ok_gas
+    }
+
+    pub fn new(
+        n_div: [u32; 3],
+        time_per_flow_map: f64,
+        description: Option<String>,
+        recursive: bool,
+    ) -> Self {
+        let description = description.unwrap_or(String::from("Case"));
+        Self {
+            n_div,
+            time_per_flow_map,
+            is_reursive: recursive,
+            description,
+            paths: HashMap::new(),
+        }
     }
 }
 
@@ -103,6 +146,10 @@ impl CMCaseReader for CMCaseJson {
 
 impl CMCaseWriter for CMCaseJson {
     fn write_case(case: CMCase, path: &Path) -> Result<(), DataError> {
+        if !case.check() {
+            return Err(DataError::BadData);
+        }
+
         let json_string = serde_json::to_string(&case).map_err(|_| DataError::Serde)?;
         let mut file = std::fs::File::create(path)?;
         file.write_all(json_string.as_bytes())?;
@@ -180,6 +227,10 @@ impl CMCaseReader for CCMCaseInfo {
 
 impl CMCaseWriter for CCMCaseInfo {
     fn write_case(case: CMCase, path: &Path) -> Result<(), DataError> {
+        if !case.check() {
+            return Err(DataError::BadData);
+        }
+
         let mut file = std::fs::File::create(path)?;
 
         for &div in &case.n_div {
@@ -295,7 +346,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
-            recur: false,
+            is_reursive: false,
         };
 
         T::write_case(case, path).map_err(|_| ())?;
@@ -314,7 +365,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
-            recur: false,
+            is_reursive: false,
         };
 
         CMCaseJson::write_case(case, path).expect("Failed to write case");

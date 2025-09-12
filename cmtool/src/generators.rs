@@ -477,7 +477,7 @@ mod tests {
         let d = 0.2;
         let alpha_g = 0.1;
         let case = Generator::new()
-            .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, Some("/tmp".to_owned()))
+            .generate_1d_from_fraction(10, l, d, 0.01, 0.01, alpha_g, 1e-9, Some("/tmp".to_owned()))
             .expect("case");
         let liquid_volume_path: String = case
             .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
@@ -503,7 +503,16 @@ mod tests {
         let d = 0.2;
         let alpha_g = 0.1;
         let case = Generator::new()
-            .generate_1d_from_fraction(10, l, d, 0.01, alpha_g, 1e-9, Some("/tmp".to_owned()))
+            .generate_1d_from_fraction(
+                10,
+                l,
+                d,
+                0.01,
+                0.001,
+                alpha_g,
+                1e-9,
+                Some("/tmp".to_owned()),
+            )
             .expect("case");
         let liquid_volume_path = case
             .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)

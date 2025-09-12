@@ -1,4 +1,5 @@
 import pycmtool
+import os
 import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
@@ -10,7 +11,6 @@ def create_sparse_array(row_indices, col_indices, values, shape=None):
         max_row = max(row_indices) if row_indices else 0
         max_col = max(col_indices) if col_indices else 0
         shape = (max_row + 1, max_col + 1)
-
     sparse_array = scipy.sparse.coo_array(
         (values, (row_indices, col_indices)),
         shape=shape,
@@ -26,8 +26,6 @@ def check_mixing(fmt):
     C = np.zeros((1, n_c))
     C[0, 0] = 1
     vol = it.volumes
-    it = fmt.get_at(19)
-    vol2 = it.volumes
     m0 = C * vol
 
     def wrap(t, x):
@@ -39,10 +37,11 @@ def check_mixing(fmt):
         C = _mass / vol
         return C @ M
 
-    sol = solve_ivp(wrap, (0, 50), m0.reshape(-1), method="LSODA")
+    sol = solve_ivp(wrap, (0, 100), m0.reshape(-1), method="LSODA")
     y = sol.y.reshape((n_c, -1))
     y = sol.y.reshape((n_c, -1))
-
+    it = fmt.get_at(fmt.n_flowmaps - 1)
+    vol2 = it.volumes
     m0_c = y[:, 0]
 
     mt_c = y[:, -1]
@@ -61,7 +60,6 @@ def check_mixing(fmt):
     plt.show()
 
 
-# root = "/home/benjamin/Documents/thesis/cfd-cma/cma_data/sanofi/"
-root = "/home/benjamin/Documents/thesis/cfd-cma/cma_data/b20l/"
-fmt = pycmtool.get_transitionner(root, f"{root}/cma_case")
+root = os.environ["EXAMPLE_ROOT"]
+fmt = pycmtool.data.get_transitionner(root, f"{root}/cma_case")
 check_mixing(fmt)
