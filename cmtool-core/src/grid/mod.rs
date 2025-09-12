@@ -6,6 +6,9 @@ pub use collections::{AxisDescriptor, CylindricalAxis, cylindrical_index};
 use enum_dispatch::enum_dispatch;
 use std::f64;
 
+#[cfg(feature = "use_vtk")]
+mod vtk;
+
 use crate::coordinates::*;
 use crate::utils::AxisPoints;
 

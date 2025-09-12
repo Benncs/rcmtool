@@ -10,3 +10,9 @@ license.workspace = true
 cmtool-data.workspace = true
 enum_dispatch.workspace = true
 thiserror.workspace = true
+
+
+vtkio = { version = "0.6.3", optional = true }
+
+[features]
+use_vtk = ["vtkio"]
