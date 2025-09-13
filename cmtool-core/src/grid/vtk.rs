@@ -15,8 +15,7 @@ trait VtkCmWriter {
 }
 
 pub trait VtkCm {
-    fn write(&self, path: impl AsRef<std::path::Path>) -> Result<(), CoreError>;
-    fn read(path: impl AsRef<std::path::Path>) -> Result<Vtk, CoreError>;
+    fn get(&self, path: impl AsRef<std::path::Path>) -> Result<Vtk, CoreError>;
 }
 
 impl VtkCmWriter for Box<dyn CompartmentMesh> {
@@ -101,8 +100,11 @@ impl VtkCmWriter for Box<dyn CompartmentMesh> {
         let points = vtkio::model::IOBuffer::F64(points_vec);
         let cells = vtkio::model::Cells { types, cell_verts };
 
-        let test_data_array = vtkio::model::DataArray::scalars("Random", 1);
-        let rd = (0..self.number_cell()).collect();
+        let test_data_array = vtkio::model::DataArray::scalars("cell_volume_geo", 1);
+        let rd: Vec<f64> = (0..self.number_cell())
+            .map(|e| self.cell_volume(e))
+            .collect();
+
         let test_data_array = test_data_array.with_vec(rd);
 
         let mut data = vtkio::model::Attributes::new();
@@ -119,7 +121,7 @@ impl VtkCmWriter for Box<dyn CompartmentMesh> {
 }
 
 impl VtkCm for Box<dyn CompartmentMesh> {
-    fn write(&self, path: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
+    fn get(&self, path: impl AsRef<std::path::Path>) -> Result<Vtk, CoreError> {
         let version = vtkio::model::Version::new((1, 0));
         let title = String::from("CompartmentMesh");
 
@@ -139,14 +141,7 @@ impl VtkCm for Box<dyn CompartmentMesh> {
             file_path: Some(file_path),
         };
 
-        let mut vtk_bytes = Vec::<u8>::new();
-        vtk.write_xml(&mut vtk_bytes).unwrap();
-        std::fs::write(path, vtk_bytes).unwrap();
-
-        Ok(())
-    }
-    fn read(path: impl AsRef<std::path::Path>) -> Result<Vtk, CoreError> {
-        todo!()
+        Ok(vtk)
     }
 }
 
@@ -157,8 +152,8 @@ mod test {
     const NAX1: usize = 10;
     const MAX_AX1: f64 = 4.;
 
-    const NAX2: usize = 10;
-    const MAX_AX2: f64 = 2.;
+    const NAX2: usize = 50;
+    // const MAX_AX2: f64 = 2.;
 
     const NAX3: usize = 10;
     const MAX_AX3: f64 = 10.;
@@ -173,6 +168,9 @@ mod test {
     #[test]
     fn test() {
         let grid = ref_mesh_cyclindrical();
-        grid.write("/tmp/test.vtu");
+        let vtk = grid.get("/tmp/test.vtu").unwrap();
+        let mut vtk_bytes = Vec::<u8>::new();
+        vtk.write_xml(&mut vtk_bytes).unwrap();
+        std::fs::write("/tmp/test.vtu", vtk_bytes).unwrap();
     }
 }

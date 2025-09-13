@@ -716,6 +716,15 @@ mod test {
             actual_volume,
             expected_volume
         );
+
+        let expected_full_volume = std::f64::consts::PI * 4. * 4. * 2.;
+        let full_volume: f64 = (0..mesh.number_cell()).map(|e| mesh.cell_volume(e)).sum();
+        assert!(
+            (expected_full_volume - full_volume).abs() < 1e-10,
+            "full_volume incorrect: got {}, expected {}",
+            full_volume,
+            expected_full_volume
+        );
     }
 
     #[test]
