@@ -3,14 +3,15 @@ use std::fmt::write;
 
 use super::CompartmentMesh;
 use crate::CoreError;
-use crate::coordinates::CartesianCoordinates;
+use crate::coordinates::{CartesianCoordinates, CylindricalCoordinates};
 use vtkio::Vtk;
 use vtkio::model::{UnstructuredGridPiece, VertexNumbers};
 
 trait VtkCmReader<T: CompartmentMesh> {}
 trait VtkCmWriter {
-    fn set_cells(&self) -> Result<(), CoreError>;
     fn get_grid(&self) -> vtkio::model::UnstructuredGridPiece;
+
+    fn get_cell_coordinates(&self) -> Vec<[f64; 24]>;
 }
 
 pub trait VtkCm {
@@ -19,33 +20,96 @@ pub trait VtkCm {
 }
 
 impl VtkCmWriter for Box<dyn CompartmentMesh> {
-    fn set_cells(&self) -> Result<(), CoreError> {
-        const N_VERTICES: usize = 8; //Cells are cube
-        let mut cell_coordinates =
-            vec![[CartesianCoordinates::default(); N_VERTICES]; self.number_cell()];
+    //Naive c++ adaptation, TODO: find way to improve method
+    fn get_cell_coordinates(&self) -> Vec<[f64; 24]> {
+        let n_cells = self.number_cell();
+        let mut cell_coordinates = Vec::with_capacity(n_cells);
 
-        for i_cell in 0..cell_coordinates.len() {}
+        for cell_id in 0..n_cells {
+            let mut cell_array = [0.0; 24];
 
-        todo!()
+            let indices = self.cell_points(cell_id);
+
+            let vertex_indices = [
+                [0, 0, 0],
+                [1, 0, 0],
+                [1, 1, 0],
+                [0, 1, 0],
+                [0, 0, 1],
+                [1, 0, 1],
+                [1, 1, 1],
+                [0, 1, 1],
+            ];
+
+            for (idx, vertex) in vertex_indices.iter().enumerate() {
+                let x_index = indices[0] + vertex[0];
+                let y_index = indices[1] + vertex[1];
+                let z_index = indices[2] + vertex[2];
+
+                let x = self.get_cell_edge(0, x_index);
+                let y = self.get_cell_edge(1, y_index);
+                let z = self.get_cell_edge(2, z_index);
+                let CartesianCoordinates([x, y, z]) = CylindricalCoordinates([x, y, z]).into();
+
+                let base_index = idx * 3;
+                cell_array[base_index] = x;
+                cell_array[base_index + 1] = y;
+                cell_array[base_index + 2] = z;
+            }
+
+            cell_coordinates.push(cell_array);
+        }
+
+        cell_coordinates
     }
 
     fn get_grid(&self) -> vtkio::model::UnstructuredGridPiece {
+        let n_cells = self.number_cell();
+
+        let mut points_vec = Vec::with_capacity(n_cells * 24);
+        let mut connectivity = Vec::with_capacity(n_cells);
+        let mut offsets = Vec::with_capacity(n_cells);
+
+        let cell_coordinates = self.get_cell_coordinates();
+
+        // for (_cell_id, coordinates) in cell_coordinates.iter().enumerate() {
+        for coordinates in cell_coordinates.iter() {
+            let mut cell_vertex_indices = Vec::new();
+
+            for vertex_idx in 0..8 {
+                let base_index = vertex_idx * 3;
+                let x = coordinates[base_index];
+                let y = coordinates[base_index + 1];
+                let z = coordinates[base_index + 2];
+
+                let point_index = points_vec.len() / 3;
+                points_vec.push(x);
+                points_vec.push(y);
+                points_vec.push(z);
+                cell_vertex_indices.push(point_index as u64);
+            }
+
+            connectivity.extend(cell_vertex_indices);
+            offsets.push((connectivity.len()) as u64);
+        }
+
         let types = vec![vtkio::model::CellType::Hexahedron; self.number_cell()];
-        let types_len = types.len();
-
-        let connectivity: Vec<u64> = (0..types_len * 8).map(|e| (e % 8) as u64).collect();
-
-        let offsets: Vec<u64> = (1..=types_len).map(|e| (e * 8) as u64).collect();
-
         let cell_verts: VertexNumbers = VertexNumbers::XML {
             connectivity,
             offsets,
         };
-
-        let points = vtkio::model::IOBuffer::F64(vec![0.; self.number_cell()]);
+        let points = vtkio::model::IOBuffer::F64(points_vec);
         let cells = vtkio::model::Cells { types, cell_verts };
 
-        let data = vtkio::model::Attributes::default();
+        let test_data_array = vtkio::model::DataArray::scalars("Random", 1);
+        let rd = (0..self.number_cell()).collect();
+        let test_data_array = test_data_array.with_vec(rd);
+
+        let mut data = vtkio::model::Attributes::new();
+
+        data.cell
+            .push(vtkio::model::Attribute::DataArray(test_data_array));
+
         UnstructuredGridPiece {
             points,
             cells,
