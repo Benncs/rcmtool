@@ -227,11 +227,12 @@ pub trait CompartmentMeshManip {
     /// # Arguments
     ///
     /// * `cell_id` - The ID of the cell.
+    /// /// * `axis_project` - Axis index on which the surface is calculated
     ///
     /// # Returns
     ///
     /// The surface area of the cell as a floating-point number.
-    fn cell_surface(&self, cell_id: usize) -> f64;
+    fn cell_surface(&self, cell_id: usize, i_axis: OrientedAxis) -> f64;
 
     /// Computes the volume of a specified cell.
     ///
@@ -267,7 +268,7 @@ pub trait CompartmentMeshManip {
     /// A boolean indicating whether the point is inside the cell.
     fn is_point_inside(&self, cell_id: usize, point_coords: &Coords3) -> bool;
 
-    /// Retrieves the points defining a specified cell.
+    /// Retrieves the points index defining a specified cell.
     ///
     /// # Arguments
     ///
@@ -275,7 +276,7 @@ pub trait CompartmentMeshManip {
     ///
     /// # Returns
     ///
-    /// An `AxisPoints` object containing the points of the cell.
+    /// An `AxisPoints` object containing the indices of points of the cell.
     fn cell_points(&self, cell_1d: usize) -> AxisPoints;
 
     /// Returns the maximum number of interfaces a cell can have in this mesh.
@@ -518,12 +519,47 @@ impl CompartmentMeshManip for MeshCylindrical {
         }
     }
 
-    fn cell_surface(&self, _cell_id: usize) -> f64 {
-        todo!()
+    fn cell_surface(&self, cell_id: usize, i_axis: OrientedAxis) -> f64 {
+        let points_indices = self.cell_points(cell_id);
+
+        let i_axis: CylindricalAxis = oriented_to_cylindrical(i_axis);
+
+        let delta_ijk: Vec<f64> = self
+            .axes
+            .iter()
+            .zip(points_indices.iter())
+            .map(|(ax, cell_p)| ax.edges[cell_p + 1] - ax.edges[*cell_p])
+            .collect();
+
+        let min_max = if points_indices[0] == 0 { 1 } else { 0 };
+
+        let r = self.axes[0].edges[points_indices[0] + min_max];
+        match i_axis {
+            CylindricalAxis::R => r * delta_ijk[1] * delta_ijk[2], // ds=r*dtheta*dz
+            CylindricalAxis::Theta => delta_ijk[0] * delta_ijk[2], // ds = dr*dz
+            CylindricalAxis::Z => {
+                // ds  =r*dr*dtheta
+                // R here is not radius but (r-R)
+                let R = self.axes[0].edges[points_indices[0] + 1];
+                let r2 = self.axes[0].edges[points_indices[0] + 0];
+                0.5 * (R * R - r2 * r2) * delta_ijk[1]
+            }
+        }
     }
 
     fn cell_volume(&self, cell_id: usize) -> f64 {
-        todo!()
+        let points_indices = self.cell_points(cell_id);
+        let delta_ijk: Vec<f64> = self
+            .axes
+            .iter()
+            .zip(points_indices.iter())
+            .map(|(ax, cell_p)| ax.edges[cell_p + 1] - ax.edges[*cell_p])
+            .collect();
+
+        let height_axis: usize = CylindricalAxis::Z.into();
+        let surface_ij = self.cell_surface(cell_id, height_axis.into());
+
+        delta_ijk[height_axis] * surface_ij
     }
 
     fn cell_from_coordinates(&self, coords: &Coords3) -> Option<usize> {
@@ -617,6 +653,72 @@ mod test {
     }
 
     #[test]
+    fn t_cell_surface_cylindrical() {
+        let ax1 = AxisDescriptor::new(0., 4., 10);
+        let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, 10);
+        let ax3 = AxisDescriptor::new(0., 2., 10);
+
+        let mesh = get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3]);
+
+        let r_face_center = 0.4;
+        let dtheta = 2. * std::f64::consts::PI / 10.;
+        let dz = 2. / 10.;
+        let expected_surface = r_face_center * dtheta * dz;
+        let actual_surface = mesh.cell_surface(0, OrientedAxis::I);
+        assert!(
+            (actual_surface - expected_surface).abs() < 1e-10,
+            "Radial face surface incorrect: got {}, expected {}",
+            actual_surface,
+            expected_surface
+        );
+
+        let dr = 4. / 10.; // 0.4
+        let expected_surface = dr * dz;
+        let actual_surface = mesh.cell_surface(0, OrientedAxis::J);
+        assert!(
+            (actual_surface - expected_surface).abs() < 1e-10,
+            "Theta face surface incorrect: got {}, expected {}",
+            actual_surface,
+            expected_surface
+        );
+
+        let r1 = 0.0;
+        let r2 = 0.4;
+        let dtheta = 2. * std::f64::consts::PI / 10.;
+
+        let expected_surface = 0.5 * (r2 * r2 - r1 * r1) * dtheta;
+        let actual_surface = mesh.cell_surface(0, OrientedAxis::K);
+        assert!(
+            (actual_surface - expected_surface).abs() < 1e-10,
+            "Axial face surface incorrect: got {}, expected {}",
+            actual_surface,
+            expected_surface
+        );
+    }
+
+    #[test]
+    fn t_cell_volume_cylindrical() {
+        let ax1 = AxisDescriptor::new(0., 4., 10);
+        let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, 10);
+        let ax3 = AxisDescriptor::new(0., 2., 10);
+        let mesh = get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3]);
+
+        let r1 = 0.0;
+        let r2 = 0.4;
+        let dtheta = 2. * std::f64::consts::PI / 10.;
+        let dz = 2.0 / 10.0;
+
+        let expected_volume = 0.5 * (r2 * r2 - r1 * r1) * dtheta * dz;
+        let actual_volume = mesh.cell_volume(0);
+        assert!(
+            (expected_volume - actual_volume).abs() < 1e-10,
+            "Axial face volume incorrect: got {}, expected {}",
+            actual_volume,
+            expected_volume
+        );
+    }
+
+    #[test]
     fn t_get_mesh() {
         let ax1 = AxisDescriptor::new(0.5, 1., 10);
         let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, 20);
@@ -648,7 +750,7 @@ mod test {
     }
 
     #[test]
-    fn t_identification() {
+    fn t_identification_cylindrical() {
         let mesh = ref_mesh_cyclindrical();
 
         let assert_id = |a: Coords3, expect: usize| {
@@ -680,7 +782,7 @@ mod test {
     }
 
     #[test]
-    fn t_neighbors() {
+    fn t_neighbors_cylindrical() {
         use NeighborDirection::*;
 
         let mesh = ref_mesh_cyclindrical();

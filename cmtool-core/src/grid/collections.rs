@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use crate::utils::AxisPoints;
+
 ///Represent axis absolution direction in a direct-orientied coordinate system
 pub enum OrientedAxis {
     I = 0,
@@ -37,6 +39,17 @@ impl From<OrientedAxis> for usize {
     }
 }
 
+impl From<usize> for OrientedAxis {
+    fn from(axis: usize) -> OrientedAxis {
+        match axis {
+            0 => OrientedAxis::I,
+            1 => OrientedAxis::J,
+            2 => OrientedAxis::K,
+            _ => panic!("Oreitnedaxis conversion from usize is possible for 0,1,2 "),
+        }
+    }
+}
+
 #[inline(always)]
 pub const fn cylindrical_index(axis: CylindricalAxis) -> usize {
     match axis {
@@ -53,6 +66,15 @@ pub const fn index_to_oriented(axis: usize) -> OrientedAxis {
         1 => OrientedAxis::J,
         2 => OrientedAxis::K,
         _ => panic!("index_to_oriented needs index between 0 and 3"),
+    }
+}
+
+#[inline(always)]
+pub const fn oriented_to_cylindrical(axis: OrientedAxis) -> CylindricalAxis {
+    match axis {
+        OrientedAxis::I => CylindricalAxis::R,
+        OrientedAxis::J => CylindricalAxis::Theta,
+        OrientedAxis::K => CylindricalAxis::Z,
     }
 }
 
