@@ -12,5 +12,10 @@ cmtool-core.workspace = true
 cmtool-data.workspace = true
 thiserror.workspace = true
 
+
+[features]
+use_vtk = ["cmtool-core/use_vtk"]
+
+
 [lib]
 path = "src/lib.rs"

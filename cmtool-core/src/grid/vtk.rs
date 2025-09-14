@@ -1,24 +1,21 @@
-use std::cell;
-use std::fmt::write;
-
 use super::CompartmentMesh;
 use crate::CoreError;
 use crate::coordinates::{CartesianCoordinates, CylindricalCoordinates};
+
 use vtkio::Vtk;
 use vtkio::model::{UnstructuredGridPiece, VertexNumbers};
-
 trait VtkCmReader<T: CompartmentMesh> {}
 trait VtkCmWriter {
-    fn get_grid(&self) -> vtkio::model::UnstructuredGridPiece;
+    fn get_vtk_grid(&self) -> vtkio::model::UnstructuredGridPiece;
 
     fn get_cell_coordinates(&self) -> Vec<[f64; 24]>;
 }
 
 pub trait VtkCm {
-    fn get(&self, path: impl AsRef<std::path::Path>) -> Result<Vtk, CoreError>;
+    fn get_vtk(&self, path: impl AsRef<std::path::Path>) -> Result<Vtk, CoreError>;
 }
 
-impl VtkCmWriter for Box<dyn CompartmentMesh> {
+impl VtkCmWriter for &dyn CompartmentMesh {
     //Naive c++ adaptation, TODO: find way to improve method
     fn get_cell_coordinates(&self) -> Vec<[f64; 24]> {
         let n_cells = self.number_cell();
@@ -62,7 +59,7 @@ impl VtkCmWriter for Box<dyn CompartmentMesh> {
         cell_coordinates
     }
 
-    fn get_grid(&self) -> vtkio::model::UnstructuredGridPiece {
+    fn get_vtk_grid(&self) -> vtkio::model::UnstructuredGridPiece {
         let n_cells = self.number_cell();
 
         let mut points_vec = Vec::with_capacity(n_cells * 24);
@@ -100,17 +97,17 @@ impl VtkCmWriter for Box<dyn CompartmentMesh> {
         let points = vtkio::model::IOBuffer::F64(points_vec);
         let cells = vtkio::model::Cells { types, cell_verts };
 
-        let test_data_array = vtkio::model::DataArray::scalars("cell_volume_geo", 1);
+        let volume_array = vtkio::model::DataArray::scalars("cell_volume_geo", 1);
         let rd: Vec<f64> = (0..self.number_cell())
             .map(|e| self.cell_volume(e))
             .collect();
 
-        let test_data_array = test_data_array.with_vec(rd);
+        let volume_array = volume_array.with_vec(rd);
 
         let mut data = vtkio::model::Attributes::new();
 
         data.cell
-            .push(vtkio::model::Attribute::DataArray(test_data_array));
+            .push(vtkio::model::Attribute::DataArray(volume_array));
 
         UnstructuredGridPiece {
             points,
@@ -120,12 +117,12 @@ impl VtkCmWriter for Box<dyn CompartmentMesh> {
     }
 }
 
-impl VtkCm for Box<dyn CompartmentMesh> {
-    fn get(&self, path: impl AsRef<std::path::Path>) -> Result<Vtk, CoreError> {
+impl VtkCm for &dyn CompartmentMesh {
+    fn get_vtk(&self, path: impl AsRef<std::path::Path>) -> Result<Vtk, CoreError> {
         let version = vtkio::model::Version::new((1, 0));
         let title = String::from("CompartmentMesh");
 
-        let grid = self.get_grid();
+        let grid = self.get_vtk_grid();
         let pieces = vtkio::model::Piece::Inline(Box::new(grid));
         let data = vtkio::model::DataSet::UnstructuredGrid {
             meta: None,
@@ -142,6 +139,21 @@ impl VtkCm for Box<dyn CompartmentMesh> {
         };
 
         Ok(vtk)
+    }
+}
+
+pub fn add_celldata_to_vtk(vtk: &mut vtkio::model::Vtk, attr: vtkio::model::Attribute) {
+    match &mut vtk.data {
+        vtkio::model::DataSet::UnstructuredGrid { pieces, .. } => {
+            if let Some(vtkio::model::Piece::Inline(grid)) = pieces.get_mut(0) {
+                grid.data.cell.push(attr);
+            } else {
+                eprintln!("Warning: piece[0] is missing or not Inline.");
+            }
+        }
+        _ => {
+            eprintln!("Error: VTK data is not UnstructuredGrid.");
+        }
     }
 }
 
@@ -168,7 +180,9 @@ mod test {
     #[test]
     fn test() {
         let grid = ref_mesh_cyclindrical();
-        let vtk = grid.get("/tmp/test.vtu").unwrap();
+        let g: &dyn CompartmentMesh = grid.as_ref();
+
+        let vtk = g.get_vtk("/tmp/test.vtu").unwrap();
         let mut vtk_bytes = Vec::<u8>::new();
         vtk.write_xml(&mut vtk_bytes).unwrap();
         std::fs::write("/tmp/test.vtu", vtk_bytes).unwrap();

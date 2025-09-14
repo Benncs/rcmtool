@@ -12,7 +12,7 @@ enum_dispatch.workspace = true
 thiserror.workspace = true
 
 
-vtkio = { version = "0.6.3", optional = false }
+vtkio = { version = "0.6.3", optional = true }
 
-#[features]
-#use_vtk = ["vtkio"]
+[features]
+use_vtk = ["vtkio"]
