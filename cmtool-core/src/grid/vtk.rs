@@ -119,7 +119,7 @@ impl VtkCmWriter for &dyn CompartmentMesh {
 
 impl VtkCm for &dyn CompartmentMesh {
     fn get_vtk(&self, path: impl AsRef<std::path::Path>) -> Result<Vtk, CoreError> {
-        let version = vtkio::model::Version::new((1, 0));
+        let version = vtkio::model::Version::new();
         let title = String::from("CompartmentMesh");
 
         let grid = self.get_vtk_grid();
