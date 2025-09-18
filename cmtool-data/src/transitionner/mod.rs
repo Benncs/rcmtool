@@ -1,7 +1,5 @@
-use crate::{CMCase, DataError, FlowMapDescriptor, RawData, RawDataFlux, states::IterationState};
-use enum_dispatch::enum_dispatch;
-use ndarray::Array2;
-use std::{iter::repeat, ops::Index, sync::Arc};
+use crate::{CMCase, DataError, FlowMapDescriptor, states::IterationState};
+use std::{ops::Index, sync::Arc};
 
 pub struct FlowMapBuffer(Vec<FlowMapDescriptor>, Option<Vec<FlowMapDescriptor>>);
 
@@ -30,11 +28,11 @@ impl Index<usize> for FlowMapBuffer {
     }
 }
 
-impl FlowMapBuffer {
-    fn len(&self) -> usize {
-        return self.0.len();
-    }
-}
+//impl FlowMapBuffer {
+//fn len(&self) -> usize {
+//return self.0.len();
+//}
+//}
 
 fn get_descriptor(
     root: &str,
@@ -129,16 +127,6 @@ pub trait FlowMapTransitionner {
         Ok(Self::new(case.time_per_flow_map, buffer))
     }
 }
-pub enum TransitionerType {
-    Discontinuous,
-    Simple,
-    None,
-}
-pub struct DiscontinuousTransitioner {
-    state_buffer: Vec<Arc<IterationState>>,
-    time_per_flomap: f64,
-}
-
 fn get_state_buffer(buffer: FlowMapBuffer) -> Vec<Arc<IterationState>> {
     match buffer.1 {
         Some(gas) => buffer
@@ -155,6 +143,16 @@ fn get_state_buffer(buffer: FlowMapBuffer) -> Vec<Arc<IterationState>> {
     }
 }
 
+pub enum TransitionerType {
+    Discontinuous,
+    Simple,
+    None,
+}
+pub struct DiscontinuousTransitioner {
+    state_buffer: Vec<Arc<IterationState>>,
+    time_per_flomap: f64,
+}
+
 impl FlowMapTransitionner for DiscontinuousTransitioner {
     fn advance(&mut self, current_time: f64, _time_step: f64) -> &IterationState {
         let index_map =
@@ -163,7 +161,7 @@ impl FlowMapTransitionner for DiscontinuousTransitioner {
         &self.state_buffer[index_map]
     }
     fn size(&self) -> usize {
-        return self.state_buffer.len();
+        self.state_buffer.len()
     }
 
     fn advance_arc(&mut self, current_time: f64, _time_step: f64) -> Arc<IterationState> {

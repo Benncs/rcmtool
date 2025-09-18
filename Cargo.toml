@@ -1,5 +1,5 @@
 [workspace]
-members = ["cmtool-data", "cmtool-core", "cmtool", "cmtool-python"]
+members = ["cmtool-data", "cmtool-core", "cmtool", "cmtool-python", "example"]
 resolver = "3"
 
 [workspace.package]

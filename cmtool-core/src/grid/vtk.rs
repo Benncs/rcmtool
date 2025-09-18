@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use super::CompartmentMesh;
 use crate::CoreError;
 use crate::coordinates::{CartesianCoordinates, CylindricalCoordinates};

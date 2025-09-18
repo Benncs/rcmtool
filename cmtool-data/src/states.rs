@@ -43,6 +43,16 @@ pub struct HydroState {
     pub inverse_volume: Vec<f64>,
 }
 
+impl HydroState {
+    pub fn get_volume(&self) -> &[f64] {
+        &self.volumes
+    }
+
+    pub fn get_transition(&self) -> &CooMatrix<f64> {
+        &self.transition
+    }
+}
+
 impl From<FlowMapDescriptor> for HydroState {
     fn from(value: FlowMapDescriptor) -> Self {
         let inverse = value.volumes.iter().map(|val| 1. / val).collect();

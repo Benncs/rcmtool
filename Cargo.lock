@@ -209,6 +209,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmtool-example"
+version = "0.1.3"
+dependencies = [
+ "cmtool-data",
+ "nalgebra",
+ "nalgebra-sparse",
+ "ndarray",
+]
+
+[[package]]
 name = "cmtool-python"
 version = "0.1.3"
 dependencies = [
