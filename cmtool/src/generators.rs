@@ -423,64 +423,46 @@ impl Generator {
 #[cfg(test)]
 mod tests {
 
-    fn clean(case: CMCase) {
-        std::fs::remove_file(
-            case.resolve("/tmp", cmtool_data::CMAExportType::GasVolume)
-                .expect("path"),
-        )
-        .unwrap();
-        std::fs::remove_file(
-            case.resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
-                .expect("path"),
-        )
-        .unwrap();
-        std::fs::remove_file(
-            case.resolve("/tmp", cmtool_data::CMAExportType::LiquidFlow)
-                .unwrap(),
-        )
-        .unwrap();
-        std::fs::remove_file(
-            case.resolve("/tmp", cmtool_data::CMAExportType::GasFlow)
-                .unwrap(),
-        )
-        .unwrap();
-    }
-
     use super::*;
     #[test]
     fn test_0d() {
+        let path = "/tmp/test_0d";
+        std::fs::create_dir_all(path).unwrap();
+
         let case = Generator::new()
-            .generate_0d_from_fraction(10., 0.2, Some("/tmp".to_owned()))
+            .generate_0d_from_fraction(10., 0.2, Some(path.to_owned()))
             .expect("case");
 
         let liquid_volume_path = case
-            .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
+            .resolve(path, cmtool_data::CMAExportType::LiquidVolume)
             .expect("path");
 
         let liquid_volume =
             cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone()).expect("Liquid error");
         let gas_volume_path = case
-            .resolve("/tmp", cmtool_data::CMAExportType::GasVolume)
+            .resolve(path, cmtool_data::CMAExportType::GasVolume)
             .expect("path");
 
         let gas_volume =
             cmtool_data::RawDataScalar::read_raw(gas_volume_path.clone()).expect("gas_volume");
+        std::fs::remove_dir_all(path).unwrap();
+
         assert_eq!(gas_volume.values.len(), 1);
         assert_eq!(gas_volume.values[0].value, 2.0);
         assert_eq!(liquid_volume.values[0].value, 8.0);
-
-        clean(case);
     }
     #[test]
     fn test_1d() {
+        let path = "/tmp/test_1d";
+        std::fs::create_dir_all(path).unwrap();
         let l = 1.;
         let d = 0.2;
         let alpha_g = 0.1;
         let case = Generator::new()
-            .generate_1d_from_fraction(10, l, d, 0.01, 0.01, alpha_g, 1e-9, Some("/tmp".to_owned()))
+            .generate_1d_from_fraction(10, l, d, 0.01, 0.01, alpha_g, 1e-9, Some(path.to_owned()))
             .expect("case");
         let liquid_volume_path: String = case
-            .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
+            .resolve(path, cmtool_data::CMAExportType::LiquidVolume)
             .expect("path");
 
         let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone())
@@ -489,33 +471,25 @@ mod tests {
             .iter()
             .map(|v| v.value)
             .sum();
-
+        std::fs::remove_dir_all(path).unwrap();
         //volume is h*pi*d^2/4
         let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
 
         assert!(liquid_volume - (1. - alpha_g) * geo_volume < 1e-9);
-        clean(case);
     }
 
     #[test]
     fn test_merge_phase() {
+        let path = "/tmp/test_merge";
+        std::fs::create_dir_all(path).unwrap();
         let l = 1.;
         let d = 0.2;
         let alpha_g = 0.1;
         let case = Generator::new()
-            .generate_1d_from_fraction(
-                10,
-                l,
-                d,
-                0.01,
-                0.001,
-                alpha_g,
-                1e-9,
-                Some("/tmp".to_owned()),
-            )
+            .generate_1d_from_fraction(10, l, d, 0.01, 0.001, alpha_g, 1e-9, Some(path.to_owned()))
             .expect("case");
         let liquid_volume_path = case
-            .resolve("/tmp", cmtool_data::CMAExportType::LiquidVolume)
+            .resolve(path, cmtool_data::CMAExportType::LiquidVolume)
             .expect("path");
 
         let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone())
@@ -527,7 +501,7 @@ mod tests {
 
         //volume is h*pi*d^2/4
         let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
-
+        std::fs::remove_dir_all(path).unwrap();
         assert!(
             liquid_volume - (1. - alpha_g) * geo_volume < 1e-9,
             "liquid_volume {}, alpha {}, geo_volume {}",
@@ -535,6 +509,5 @@ mod tests {
             alpha_g,
             geo_volume
         );
-        clean(case);
     }
 }

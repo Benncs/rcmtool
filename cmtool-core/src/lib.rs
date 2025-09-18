@@ -4,7 +4,6 @@ use std::{path::Path, sync::Arc};
 
 use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 
-use crate::grid::CompartmentMesh;
 
 use crate::model::{CMGeometry, CMModel, Scalar, Vector};
 

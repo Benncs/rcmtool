@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::utils::AxisPoints;
 
 ///Represent axis absolution direction in a direct-orientied coordinate system
 pub enum OrientedAxis {
