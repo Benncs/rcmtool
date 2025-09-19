@@ -65,6 +65,8 @@ pub trait FlowMapTransitionner {
     fn advance_arc(&mut self, current_time: f64, time_step: f64) -> Arc<IterationState>;
     fn need_advance(&self, current_time: f64, time_step: f64) -> bool;
     fn get_at(&self, idx: usize) -> Option<Arc<IterationState>>;
+
+    fn get_current(&self) -> Arc<IterationState>;
     fn size(&self) -> usize;
     //Start with one dt per flowmap, maybe be improve by using different dt per flowmap if needed
     fn new(time_per_flomap: f64, buffer: FlowMapBuffer) -> Self;
@@ -151,23 +153,29 @@ pub enum TransitionerType {
 pub struct DiscontinuousTransitioner {
     state_buffer: Vec<Arc<IterationState>>,
     time_per_flomap: f64,
+    current_index: usize,
 }
 
 impl FlowMapTransitionner for DiscontinuousTransitioner {
     fn advance(&mut self, current_time: f64, _time_step: f64) -> &IterationState {
         let index_map =
             (current_time / self.time_per_flomap).floor() as usize % self.state_buffer.len();
-
+        self.current_index = index_map;
         &self.state_buffer[index_map]
     }
     fn size(&self) -> usize {
         self.state_buffer.len()
     }
 
+    fn get_current(&self) -> Arc<IterationState> {
+        self.state_buffer[self.current_index].clone()
+    }
+
     fn advance_arc(&mut self, current_time: f64, _time_step: f64) -> Arc<IterationState> {
         let index_map =
             (current_time / self.time_per_flomap).floor() as usize % self.state_buffer.len();
 
+        self.current_index = index_map;
         self.state_buffer[index_map].clone()
     }
 
@@ -184,6 +192,7 @@ impl FlowMapTransitionner for DiscontinuousTransitioner {
         Self {
             time_per_flomap,
             state_buffer,
+            current_index: 0,
         }
     }
 }
@@ -213,6 +222,10 @@ impl FlowMapTransitionner for SimpleTransitioner {
         }
         self.remaining_time += time_step;
         &self.state_buffer[self.current_index]
+    }
+
+    fn get_current(&self) -> Arc<IterationState> {
+        self.state_buffer[self.current_index].clone()
     }
 
     fn need_advance(&self, _current_time: f64, time_step: f64) -> bool {

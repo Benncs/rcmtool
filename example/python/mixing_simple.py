@@ -64,16 +64,19 @@ def integration(
         wrap,
         (0, duration),
         mass_0.reshape(-1),
-        method="LSODA",
+        method="BDF",
         vectorized=False,
     )
 
 
-def initial_mass_distribution(n_c):
+def initial_c_distribution(n_c):
     """
-    Generate a random initial mass distribution for a simulation with `n_c` compartments.
+    Generate a random initial concentration distribution for a simulation with `n_c` compartments.
     """
-    return np.random.random((1, n_c))
+    # return np.random.random((1, n_c))
+    m = np.zeros((n_c,))
+    m[0] = 1
+    return m
 
 
 def get_normalized(it, y, i):
@@ -89,40 +92,43 @@ def get_normalized(it, y, i):
 
 
 def check_mixing(fmt, final_time: float):
-    it = fmt.get_at(0)
+    it = fmt.get_current()
     M = pycmtool.sparse_array_from_state(it)
     n_c = M.shape[0]
 
     C = np.zeros((N_SPECIES, n_c))
-    C[0, :] = initial_mass_distribution(n_c)
+    C[0, :] = initial_c_distribution(n_c)
     vol = it.volumes
     m0 = C * vol
 
     sol = integration(fmt, m0, final_time, N_SPECIES)
     y = sol.y.reshape((N_SPECIES, n_c, -1))
-    it = fmt.get_at(fmt.n_flowmaps - 1)
+    it = fmt.get_current()
     m0_c = y[0, :, 0]
     mt_c = y[0, :, -1]
     c_init = get_normalized(fmt.get_at(0), y, 0)
     c_final = get_normalized(fmt.get_at(fmt.n_flowmaps - 1), y, -1)
-    c_mid = get_normalized(fmt.get_at(fmt.n_flowmaps // 2), y, y.shape[2] // 2)
-    print("Inital mass: ", np.sum(m0_c, axis=0))
-    print("Final mass: ", np.sum(mt_c, axis=0))
 
+    m0m = np.sum(m0_c, axis=0)
+    mfm = np.sum(mt_c, axis=0)
+
+    assert abs(m0m - mfm) < 1e-8
+
+    print("Inital mass: ", m0m)
+    print("Final mass: ", mfm)
     print("Initial normalized C: ", c_init[:5])
     print("Final normalized C: ", c_final[:5])
     print("Final variance: ", np.var(c_final, axis=0))
 
     plt.figure()
     plt.plot(c_final)
-    plt.plot(c_mid, label="mid")
     plt.title("Normalized concentration in all compartments")
     plt.legend()
     plt.show()
 
 
 if __name__ == "__main__":
-    final_time = 40
+    final_time = 100
     root = os.environ["EXAMPLE_ROOT"]
     fmt = pycmtool.data.get_transitionner(root, f"{root}/cma_case")
     check_mixing(fmt, final_time)

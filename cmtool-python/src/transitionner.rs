@@ -41,6 +41,10 @@ impl DiscontinuousTransitionerWrapper {
         self.0.need_advance(current_time, time_step)
     }
 
+    fn get_current(&self) -> IterationStateWrapper {
+        IterationStateWrapper(self.0.get_current())
+    }
+
     #[getter]
     fn n_flowmaps(&self) -> usize {
         self.0.size()

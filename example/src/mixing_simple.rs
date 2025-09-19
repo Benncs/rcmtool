@@ -20,7 +20,10 @@
 //! Version:** 1.0
 
 use cmtool_data::*;
-use nalgebra::{DMatrix, DVector};
+use nalgebra::DMatrix;
+
+// We use 2 species to demonstrates that pycmtool can handle different dissolved species
+const N_SPECIES: usize = 2;
 
 fn get_transitionner<T: FlowMapTransitionner>() -> Option<T> {
     let root = std::env::var("EXAMPLE_ROOT").unwrap();
@@ -37,61 +40,81 @@ fn integration<T: FlowMapTransitionner>(
     duration: f64,
 ) -> DMatrix<f64> {
     let mut mass_i = mass_0.clone();
-    let time_step = duration / (n_step as f64);
+    let time_step = duration / ((n_step - 1) as f64);
     let mut current_time = 0.;
     for _ in 0..n_step {
         let it = fm_t.advance(current_time, time_step);
-        let volume_i = it.liquid.get_volume();
+        let inverse_volume_j = &it.liquid.inverse_volume;
         let m = nalgebra::DMatrix::<f64>::from(it.liquid.get_transition());
-        let mut concentration_i = mass_i.clone();
-        for j in 0..concentration_i.ncols() {
-            concentration_i.column_mut(j).scale_mut(1.0 / volume_i[j]);
-        }
-        let dm = concentration_i * m;
-        mass_i += dm.map(|x| x * time_step);
+        let concentration_i = {
+            let mut tmp = mass_i.clone();
+            (0..tmp.ncols()).for_each(|j| {
+                tmp.column_mut(j).scale_mut(inverse_volume_j[j]);
+            });
+
+            tmp
+        };
+        mass_i += time_step * (concentration_i * m);
         current_time += time_step;
     }
     mass_i
 }
 
-fn check_mixing<T: FlowMapTransitionner>(mut fm_t: T) -> Option<()> {
-    let it = fm_t.get_at(0)?;
+fn check_mixing<T: FlowMapTransitionner>(
+    mut fm_t: T,
+    final_time: f64,
+    n_step: usize,
+) -> Option<()> {
+    let it = fm_t.get_current();
 
-    let m = &it.liquid.transition;
-
-    let n_c = m.nrows();
-    let n_species = 2;
+    let n_c = {
+        let m = &it.liquid.transition;
+        m.nrows()
+    };
 
     let mass_0 = {
         let volume_0 = it.liquid.get_volume();
-        let mut concentrations: nalgebra::DMatrix<f64> = nalgebra::DMatrix::zeros(n_species, n_c);
+        let mut concentrations: nalgebra::DMatrix<f64> = nalgebra::DMatrix::zeros(N_SPECIES, n_c);
         concentrations[(0, 0)] = 1.;
-        let volume_0 = nalgebra::DVector::from_row_slice(volume_0);
-        for j in 0..concentrations.ncols() {
+        (0..concentrations.ncols()).for_each(|j| {
             concentrations.column_mut(j).scale_mut(volume_0[j]);
-        }
+        });
         concentrations
     };
 
-    let mass_i = integration(&mut fm_t, &mass_0, 5000, 100.);
+    let mass_i = integration(&mut fm_t, &mass_0, n_step, final_time);
+    let mass_0m = mass_0.column_sum()[0];
+    let mass_im = mass_i.column_sum()[0];
 
-    let it = fm_t.get_at(fm_t.size() - 1).unwrap();
-    let volume_i = nalgebra::DVector::from_row_slice(it.liquid.get_volume());
+    let it = fm_t.get_current();
+    let inverse_volume = &it.liquid.inverse_volume;
 
-    let mut concentration_i = mass_i.clone();
-    for j in 0..concentration_i.ncols() {
-        concentration_i.column_mut(j).scale_mut(1.0 / volume_i[j]);
-    }
+    let concentration_i = {
+        let mut tmp = mass_i.clone();
+        (0..tmp.ncols()).for_each(|j| {
+            tmp.column_mut(j).scale_mut(inverse_volume[j]);
+        });
+        tmp
+    };
 
     let mean_c = concentration_i.column_mean();
     let concentration_i_i_n = concentration_i.map(|x| x / mean_c[0]);
 
-    println!("{:?}", concentration_i_i_n);
-
+    println!("Inital mass: {}", mass_0m);
+    println!("Final mass:  {}", mass_im);
+    println!("Variance {}", concentration_i_i_n.variance());
+    print!("Final normalized C: [");
+    for i in 0..5 {
+        print!("{}, ", concentration_i_i_n[(0, i)]);
+    }
+    println!("]");
+    assert!((mass_0m - mass_im).abs() < 1e-8);
     Some(())
 }
 
 fn main() {
+    let final_time: f64 = 10.;
+    let n_step: usize = 5000;
     let t: DiscontinuousTransitioner = get_transitionner().unwrap();
-    check_mixing(t);
+    check_mixing(t, final_time, n_step);
 }

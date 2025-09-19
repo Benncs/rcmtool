@@ -35,7 +35,7 @@ pub enum Mode {
 }
 
 #[derive(Parser, Clone)]
-#[clap(name = "myapp")]
+#[clap(name = "cmtool")]
 pub struct GenArgs {
     #[clap(flatten)]
     pub common: CommonArgs,
