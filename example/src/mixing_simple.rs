@@ -25,15 +25,16 @@ use nalgebra::DMatrix;
 // We use 2 species to demonstrates that pycmtool can handle different dissolved species
 const N_SPECIES: usize = 2;
 
-fn get_transitionner<T: FlowMapTransitionner>() -> Option<T> {
+fn get_transitionner<T: FlowMapTransitioner>() -> Option<T> {
     let root = std::env::var("EXAMPLE_ROOT").unwrap();
     let case_path = format!("{}/cma_case", root);
     let p = std::path::Path::new(&case_path);
     let case = CCMCaseInfo::read_case(p).unwrap();
+    //Load all the case information into the iterator
     T::from_case(&root, &case).ok()
 }
 
-fn integration<T: FlowMapTransitionner>(
+fn integration<T: FlowMapTransitioner>(
     fm_t: &mut T,
     mass_0: &DMatrix<f64>,
     n_step: usize,
@@ -43,35 +44,38 @@ fn integration<T: FlowMapTransitionner>(
     let time_step = duration / ((n_step - 1) as f64);
     let mut current_time = 0.;
     for _ in 0..n_step {
+        //Advance iterator to the corresponding flowmap (according to current_time or time_step)
         let it = fm_t.advance(current_time, time_step);
+        //Get precalculated volume inverse
         let inverse_volume_j = &it.liquid.inverse_volume;
-        let m = nalgebra::DMatrix::<f64>::from(it.liquid.get_transition());
+        //Convert sparse into dense matrix
+        let transition = nalgebra::DMatrix::<f64>::from(it.liquid.get_transition());
+
+        //Get concentration for mass and volume as C=M/V
         let concentration_i = {
             let mut tmp = mass_i.clone();
             (0..tmp.ncols()).for_each(|j| {
                 tmp.column_mut(j).scale_mut(inverse_volume_j[j]);
             });
-
             tmp
         };
-        mass_i += time_step * (concentration_i * m);
+        //dm/dt = c*m
+        mass_i += time_step * (concentration_i * transition);
         current_time += time_step;
     }
+
     mass_i
 }
 
-fn check_mixing<T: FlowMapTransitionner>(
-    mut fm_t: T,
-    final_time: f64,
-    n_step: usize,
-) -> Option<()> {
+fn check_mixing<T: FlowMapTransitioner>(mut fm_t: T, final_time: f64, n_step: usize) -> Option<()> {
     let it = fm_t.get_current();
 
     let n_c = {
-        let m = &it.liquid.transition;
-        m.nrows()
+        let t = &it.liquid.transition;
+        t.nrows()
     };
 
+    //Get initial mass from volume and concentration
     let mass_0 = {
         let volume_0 = it.liquid.get_volume();
         let mut concentrations: nalgebra::DMatrix<f64> = nalgebra::DMatrix::zeros(N_SPECIES, n_c);
@@ -102,7 +106,7 @@ fn check_mixing<T: FlowMapTransitionner>(
 
     println!("Inital mass: {}", mass_0m);
     println!("Final mass:  {}", mass_im);
-    println!("Variance {}", concentration_i_i_n.variance());
+    println!("Variance {}", concentration_i_i_n.column_variance()[0]);
     print!("Final normalized C: [");
     for i in 0..5 {
         print!("{}, ", concentration_i_i_n[(0, i)]);
@@ -113,8 +117,9 @@ fn check_mixing<T: FlowMapTransitionner>(
 }
 
 fn main() {
-    let final_time: f64 = 10.;
+    let final_time: f64 = 50.;
     let n_step: usize = 5000;
+    //All fonction use generic, specify iterator type here
     let t: DiscontinuousTransitioner = get_transitionner().unwrap();
     check_mixing(t, final_time, n_step);
 }

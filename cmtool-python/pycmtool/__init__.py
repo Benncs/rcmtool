@@ -37,10 +37,10 @@ if hasattr(pycmtool, "__all__"):  # noqa: F405
     __all__ = pycmtool.__all__  # noqa: F405
 
 
-__all__.extend(["sparse_array_from_triplet", "sparse_array_from_it"])
+__all__.extend(["sparse_array_from_triplet", "get_sparse_transition_matrix"])
 
 
-def sparse_array_from_state(it):
+def get_sparse_transition_matrix(it):
     return sparse_array_from_triplet(*it.flowmap)
 
 

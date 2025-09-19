@@ -52,13 +52,17 @@ def integration(
     def wrap(t: float, x: np.ndarray) -> np.ndarray:
         """Wrapper function for ODE integration."""
         d_t = 0  # Not used for this transitioner
+        # Advance iterator to the corresponding flowmap (according to t or dt)
         it = fmt.advance(t, d_t)
-        M = pycmtool.sparse_array_from_state(it)
-        n_c = M.shape[0]  # Number of compartments
+
+        # Get the transition matrix
+        transition = pycmtool.get_sparse_transition_matrix(it)
+
+        n_c = transition.shape[0]  # Number of compartments
         vol = it.volumes  # Volume of each compartment
         _mass = x.reshape((n_species, n_c))  # Reshape to (N_SPECIES, n_compartments)
         C = _mass / vol  # Concentration: mass / volume
-        return (C @ M).reshape(-1)  # Return flattened array for ODE solver
+        return (C @ transition).reshape(-1)  # Return flattened array for ODE solver
 
     return solve_ivp(
         wrap,
@@ -93,8 +97,8 @@ def get_normalized(it, y, i):
 
 def check_mixing(fmt, final_time: float):
     it = fmt.get_current()
-    M = pycmtool.sparse_array_from_state(it)
-    n_c = M.shape[0]
+    transition = pycmtool.get_sparse_transition_matrix(it)
+    n_c = transition.shape[0]
 
     C = np.zeros((N_SPECIES, n_c))
     C[0, :] = initial_c_distribution(n_c)
@@ -130,5 +134,7 @@ def check_mixing(fmt, final_time: float):
 if __name__ == "__main__":
     final_time = 100
     root = os.environ["EXAMPLE_ROOT"]
+    # Let CMTool read and load the full case automatically, ready to iterate
+
     fmt = pycmtool.data.get_transitionner(root, f"{root}/cma_case")
     check_mixing(fmt, final_time)

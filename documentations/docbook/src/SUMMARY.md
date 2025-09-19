@@ -9,3 +9,4 @@
 
 - [Tutorial]()
     - [Basic Compartment Model](./tuto/basic_io.md)
+     - [Basic mixing example](./tuto/basic_mixing.md)

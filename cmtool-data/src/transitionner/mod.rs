@@ -60,7 +60,7 @@ fn get_descriptor(
     Ok((liquid_descriptor, gas_descriptor))
 }
 
-pub trait FlowMapTransitionner {
+pub trait FlowMapTransitioner {
     fn advance(&mut self, current_time: f64, time_step: f64) -> &IterationState;
     fn advance_arc(&mut self, current_time: f64, time_step: f64) -> Arc<IterationState>;
     fn need_advance(&self, current_time: f64, time_step: f64) -> bool;
@@ -156,7 +156,7 @@ pub struct DiscontinuousTransitioner {
     current_index: usize,
 }
 
-impl FlowMapTransitionner for DiscontinuousTransitioner {
+impl FlowMapTransitioner for DiscontinuousTransitioner {
     fn advance(&mut self, current_time: f64, _time_step: f64) -> &IterationState {
         let index_map =
             (current_time / self.time_per_flomap).floor() as usize % self.state_buffer.len();
@@ -203,7 +203,7 @@ pub struct SimpleTransitioner {
     current_index: usize,
 }
 
-impl FlowMapTransitionner for SimpleTransitioner {
+impl FlowMapTransitioner for SimpleTransitioner {
     fn advance_arc(&mut self, _current_time: f64, time_step: f64) -> Arc<IterationState> {
         if self.remaining_time >= self.time_per_flomap {
             self.current_index = (self.current_index + 1) % self.state_buffer.len();

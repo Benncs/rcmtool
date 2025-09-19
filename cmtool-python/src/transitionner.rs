@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use cmtool_data::{
-    CCMCaseInfo, CMCaseReader, DiscontinuousTransitioner, FlowMapDescriptor, FlowMapTransitionner,
+    CCMCaseInfo, CMCaseReader, DiscontinuousTransitioner, FlowMapDescriptor, FlowMapTransitioner,
     RawData, SimpleTransitioner,
 };
 use nalgebra::DMatrix;
