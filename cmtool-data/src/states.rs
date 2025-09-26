@@ -1,7 +1,6 @@
 use crate::FlowMapDescriptor;
 use nalgebra_sparse::CooMatrix;
 use ndarray::{Array2, Axis};
-use peroxide::structure::sparse::SPMatrix;
 
 fn get_transition_from_fm(fm: Array2<f64>) -> CooMatrix<f64> {
     let n_compartments: usize = fm.nrows();

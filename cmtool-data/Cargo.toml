@@ -11,9 +11,8 @@ license.workspace = true
 [dependencies]
 enum_dispatch.workspace = true
 nalgebra.workspace = true
-nalgebra-sparse = "0.11.0"
-ndarray = "0.16.1"
-peroxide = { version = "0.40.0", features = ["O3"] }
+nalgebra-sparse.workspace=true
+ndarray.workspace=true
 serde.workspace = true
 serde_cbor.workspace = true
 serde_json.workspace = true

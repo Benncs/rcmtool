@@ -11,8 +11,8 @@ license.workspace = true
 [dependencies]
 cmtool-data.workspace = true
 nalgebra.workspace = true
-nalgebra-sparse = "0.11.0"
-ndarray = "0.16.1"
+nalgebra-sparse.workspace=true
+ndarray.workspace=true
 
 [[example]]
 path = "src/mixing_simple.rs"
