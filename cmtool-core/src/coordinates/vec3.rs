@@ -29,16 +29,13 @@ impl CartesianVec3 {
 }
 
 impl Vec3 for CartesianVec3 {
-
-    fn add(&self, other: &Self) -> Self{
-         Self([
+    fn add(&self, other: &Self) -> Self {
+        Self([
             self.0[0] + other.0[0],
             self.0[1] + other.0[1],
             self.0[2] + other.0[2],
         ])
     }
-
-
 
     fn sub(&self, other: &Self) -> Self {
         Self([
@@ -98,8 +95,6 @@ impl CylindricalVec3 {
 
         CartesianVec3([vx, vy, vz])
     }
-
-
 }
 
 impl CartesianVec3 {
@@ -125,7 +120,6 @@ impl CartesianVec3 {
 
         CylindricalVec3([vr, vtheta, vz], base_theta)
     }
-
 }
 
 #[cfg(test)]

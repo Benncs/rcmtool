@@ -4,7 +4,6 @@ use std::{path::Path, sync::Arc};
 
 use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 
-
 use crate::model::{CMGeometry, CMModel, Scalar, Vector};
 
 #[cfg(feature = "use_vtk")]

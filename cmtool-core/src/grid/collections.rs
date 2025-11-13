@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
 ///Represent axis absolution direction in a direct-orientied coordinate system
 pub enum OrientedAxis {
     I = 0,

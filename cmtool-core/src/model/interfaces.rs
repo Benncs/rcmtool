@@ -5,7 +5,6 @@ use crate::grid::NeighborDirection;
 use crate::model::CMGeometry;
 use crate::utils::compute_intersection_area;
 
-
 #[derive(Default, Clone)]
 pub struct InterfaceInfo {
     pub source_id: usize,

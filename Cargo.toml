@@ -1,6 +1,7 @@
 [workspace]
 members = ["cmtool-data", "cmtool-core", "cmtool", "cmtool-python", "example"]
 resolver = "3"
+metadata.crane.name = "cmtool"
 
 [workspace.package]
 version = "0.1.3"

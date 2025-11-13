@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use crate::coordinates::*;
 use crate::{
-    ensight_gold::{reader::EnsightGoldReader, types::ElementsType, Reader}, utils,
+    ensight_gold::{Reader, reader::EnsightGoldReader, types::ElementsType},
+    utils,
 };
 use std::{
     io::{Error, ErrorKind},
     path::Path,
     str::FromStr,
 };
-use crate::coordinates::*;
 
 const MAXIMAL_NUMBER_OF_MESH_ELEMENT_TYPE: usize = 20;
 const MAXIMAL_NUMBER_OF_PART: usize = 20;
@@ -33,7 +34,7 @@ impl std::fmt::Display for Part {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Part #{}: {}", self.id, self.name)?;
         writeln!(f, "  Number of vertices: {}", self.n_vertex)?;
-        writeln!(f, "  Vertex coordinates: {}",self.vertex_coordinates.len())?;
+        writeln!(f, "  Vertex coordinates: {}", self.vertex_coordinates.len())?;
         writeln!(f, "  Number of elements: {}", self.elements.len())?;
 
         Ok(())
@@ -48,20 +49,17 @@ pub struct Geometry {
 impl std::fmt::Display for Geometry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Geometry with {} parts", self.parts.len())?;
-        for p in &self.parts
-        {
+        for p in &self.parts {
             writeln!(f, "{}", p)?;
         }
-
 
         Ok(())
     }
 }
 
 impl MeshElementType {
-    pub fn get_vertex(&self,i_element:usize,i_vertex:usize)->usize
-    {
-        self.vertices[i_element*self.n_nodes+i_vertex]
+    pub fn get_vertex(&self, i_element: usize, i_vertex: usize) -> usize {
+        self.vertices[i_element * self.n_nodes + i_vertex]
     }
 
     pub fn read(reader: &mut EnsightGoldReader, ignore_element_id: bool) -> std::io::Result<Self> {
@@ -137,9 +135,10 @@ impl Part {
     }
 
     pub fn get_vertex_coordinates_slice(&self, k_vertex: usize) -> &Coords3 {
-
         let offset = k_vertex * 3;
-        self.vertex_coordinates[offset..offset+3].try_into().expect("Part slice vertex")
+        self.vertex_coordinates[offset..offset + 3]
+            .try_into()
+            .expect("Part slice vertex")
     }
     pub fn set_vertex_coordinates(&mut self, k_vertex: usize, k_xyz: usize, value: f64) {
         self.vertex_coordinates[utils::linear_index_coordinates_matrix(k_vertex, k_xyz)] = value;
@@ -186,7 +185,6 @@ impl Part {
                     reader.read_f32()? as f64;
             }
         }
-
 
         while let Ok(element) = MeshElementType::read(reader, ignore_element_id) {
             current_part.elements.push(element);
