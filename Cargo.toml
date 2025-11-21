@@ -1,5 +1,5 @@
 [workspace]
-members = ["cmtool-data", "cmtool-core", "cmtool", "cmtool-python", "example"]
+members = ["cmtool-data", "cmtool-core", "cmtool", "cmtool-python","cmtool-cxx" ,"example"]
 resolver = "3"
 metadata.crane.name = "cmtool"
 

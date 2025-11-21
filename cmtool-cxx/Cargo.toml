@@ -1,0 +1,25 @@
+[package]
+name = "cmtool-cxx"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+license.workspace = true
+
+
+
+[lib]
+crate-type = ["staticlib"]
+
+
+
+[build-dependencies]
+cxx-build = "1.0"
+
+[dependencies]
+cmtool-data = { path="../cmtool-data" , features = ["probability"]}
+#cmtool-data.workspace = true
+cxx = "1.0"
+nalgebra.workspace = true
+nalgebra-sparse.workspace=true
