@@ -42,7 +42,7 @@ impl DiscontinuousTransitionerWrapper {
     }
 
     fn get_current(&self) -> IterationStateWrapper {
-        IterationStateWrapper(self.0.get_current())
+        IterationStateWrapper(self.0.get_current_arc())
     }
 
     #[getter]

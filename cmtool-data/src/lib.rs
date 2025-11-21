@@ -58,3 +58,11 @@ fn linear_index_row_major(_n_row: usize, n_col: usize, i: usize, j: usize) -> us
 fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> usize {
     j * n_row + i
 }
+
+pub fn get_transitionner<T: FlowMapTransitioner>(root: &str) -> Result<T, DataError> {
+    let case_path = format!("{}/cma_case", root);
+    let p = std::path::Path::new(&case_path);
+    let case = CCMCaseInfo::read_case(p)?;
+    //Load all the case information into the iterator
+    T::from_case(root, &case)
+}

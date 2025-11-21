@@ -25,14 +25,14 @@ use nalgebra::DMatrix;
 // We use 2 species to demonstrates that pycmtool can handle different dissolved species
 const N_SPECIES: usize = 2;
 
-fn get_transitionner<T: FlowMapTransitioner>() -> Option<T> {
-    let root = std::env::var("EXAMPLE_ROOT").unwrap();
-    let case_path = format!("{}/cma_case", root);
-    let p = std::path::Path::new(&case_path);
-    let case = CCMCaseInfo::read_case(p).unwrap();
-    //Load all the case information into the iterator
-    T::from_case(&root, &case).ok()
-}
+// fn get_transitionner<T: FlowMapTransitioner>() -> Option<T> {
+//     let root = std::env::var("EXAMPLE_ROOT").unwrap();
+//     let case_path = format!("{}/cma_case", root);
+//     let p = std::path::Path::new(&case_path);
+//     let case = CCMCaseInfo::read_case(p).unwrap();
+//     //Load all the case information into the iterator
+//     T::from_case(&root, &case).ok()
+// }
 
 fn integration<T: FlowMapTransitioner>(
     fm_t: &mut T,
@@ -120,6 +120,9 @@ fn main() {
     let final_time: f64 = 50.;
     let n_step: usize = 5000;
     //All fonction use generic, specify iterator type here
-    let t: DiscontinuousTransitioner = get_transitionner().unwrap();
+
+    let root = std::env::var("EXAMPLE_ROOT").unwrap();
+
+    let t: DiscontinuousTransitioner = get_transitionner(&root).unwrap();
     check_mixing(t, final_time, n_step);
 }
