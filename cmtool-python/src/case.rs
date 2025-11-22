@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::collections::HashMap;
-
-use cmtool_data::{CMCaseReader, CMCaseWriter};
+use cmtool_data::CMCaseWriter;
 use pyo3::prelude::*;
 
 use crate::PythonError;
@@ -68,21 +66,14 @@ pub fn make_cm_case(
     ))
 }
 
-fn read_cm_case_gen<T: CMCaseReader>(path: &str) -> PyResult<CMCaseWrapper> {
+fn read_cm_case_gen(path: &str) -> PyResult<CMCaseWrapper> {
     let p = std::path::Path::new(path);
-    let ejson = T::read_case(p);
+    let ejson = cmtool_data::read_case(p);
     let c = ejson.map_err(PythonError::from)?;
     Ok(CMCaseWrapper(c))
 }
 
 #[pyfunction]
 pub fn read_cm_case(_py: Python<'_>, path: &str) -> PyResult<CMCaseWrapper> {
-    read_cm_case_gen::<cmtool_data::CMCaseJson>(path)
-}
-
-#[pyfunction]
-#[deprecated(note = "Use Json instead")]
-pub fn c_read_cm_case(_py: Python<'_>, path: &str) -> PyResult<CMCaseWrapper> {
-    eprintln!("C Data format is deprecated");
-    read_cm_case_gen::<cmtool_data::CCMCaseInfo>(path)
+    read_cm_case_gen(path)
 }

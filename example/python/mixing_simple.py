@@ -23,12 +23,12 @@ The core functionality is used for chemical or compartmental mixing simulations.
 **Version:** 1.0
 """
 
-import pycmtool
 import os
-import numpy as np
-from scipy.integrate import solve_ivp
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pycmtool
+from scipy.integrate import solve_ivp
 
 N_SPECIES = 2  # We use 2 species to demonstrates that pycmtool can handle different dissolved species
 
@@ -54,10 +54,8 @@ def integration(
         d_t = 0  # Not used for this transitioner
         # Advance iterator to the corresponding flowmap (according to t or dt)
         it = fmt.advance(t, d_t)
-
         # Get the transition matrix
         transition = pycmtool.get_sparse_transition_matrix(it)
-
         n_c = transition.shape[0]  # Number of compartments
         vol = it.volumes  # Volume of each compartment
         _mass = x.reshape((n_species, n_c))  # Reshape to (N_SPECIES, n_compartments)
@@ -116,8 +114,6 @@ def check_mixing(fmt, final_time: float):
     m0m = np.sum(m0_c, axis=0)
     mfm = np.sum(mt_c, axis=0)
 
-    assert abs(m0m - mfm) < 1e-8
-
     print("Inital mass: ", m0m)
     print("Final mass: ", mfm)
     print("Initial normalized C: ", c_init[:5])
@@ -129,12 +125,13 @@ def check_mixing(fmt, final_time: float):
     plt.title("Normalized concentration in all compartments")
     plt.legend()
     plt.show()
+    assert abs(m0m - mfm) < 1e-8
 
 
 if __name__ == "__main__":
-    final_time = 100
+    final_time = 500
     root = os.environ["EXAMPLE_ROOT"]
     # Let CMTool read and load the full case automatically, ready to iterate
 
-    fmt = pycmtool.data.get_transitionner(root, f"{root}/cma_case")
+    fmt = pycmtool.data.get_transitioner(root)
     check_mixing(fmt, final_time)

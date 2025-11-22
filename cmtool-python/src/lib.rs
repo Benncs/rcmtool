@@ -36,7 +36,7 @@ mod pycmtool {
 
         #[pymodule_export]
         use super::{
-            DiscontinuousTransitionerWrapper, IterationStateWrapper, get_transitionner,
+            DiscontinuousTransitionerWrapper, IterationStateWrapper, get_transitioner,
             read_flowmap, read_rawflow, read_rawscalar,
         };
     }
@@ -44,6 +44,6 @@ mod pycmtool {
     #[pymodule]
     mod case {
         #[pymodule_export]
-        use super::_c::{CMCaseWrapper, c_read_cm_case, make_cm_case, read_cm_case};
+        use super::_c::{CMCaseWrapper, make_cm_case, read_cm_case};
     }
 }

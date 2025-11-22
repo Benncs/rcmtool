@@ -5,7 +5,7 @@ mod descriptors;
 mod flowmap;
 mod rawdata;
 mod states;
-mod transitionner;
+mod transitioner;
 pub use case::{CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter, read_case};
 pub use descriptors::{CMAExportType, CMExportType, PhaseCM};
 pub use flowmap::FlowMapDescriptor;
@@ -16,7 +16,7 @@ pub use rawdata::{
 pub use states::*;
 use std::io;
 use thiserror::Error;
-pub use transitionner::*;
+pub use transitioner::*;
 /// Errors that can occur during data operations.
 ///
 /// This enum encapsulates various error conditions that might arise during
@@ -59,7 +59,7 @@ fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> us
     j * n_row + i
 }
 
-pub fn get_transitionner<T: FlowMapTransitioner>(root: &str) -> Result<T, DataError> {
+pub fn get_transitioner<T: FlowMapTransitioner>(root: &str) -> Result<T, DataError> {
     let case_path = format!("{}/cma_case", root);
     let p = std::path::Path::new(&case_path);
     let case = read_case(p)?;

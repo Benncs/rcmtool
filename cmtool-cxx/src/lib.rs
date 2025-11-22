@@ -1,38 +1,40 @@
-use std::{ptr::null, sync::Arc};
+use std::ptr::null;
 
-use cmtool_data::*;
-use nalgebra_sparse::{CooMatrix, CscMatrix};
+use cmtool_data::{
+    DiscontinuousTransitioner, FlowMapTransitioner, HydroState, IterationState, get_transitioner,
+};
+use nalgebra_sparse::CooMatrix;
 
 #[cxx::bridge]
 mod ffi {
     extern "Rust" {
-        type TransionnerWrapper;
+        type TransitionerWrapper;
         type IterationStateWrapper;
         type HydroStateWrapper;
         type CooMatrixWrap;
 
-        fn get_dtransitionner(root: &str) -> Result<Box<TransionnerWrapper>>;
+        fn get_dtransitioner(root: &str) -> Result<Box<TransitionerWrapper>>;
 
         fn advance(
-            self: &mut TransionnerWrapper,
+            self: &mut TransitionerWrapper,
             _current_time: f64,
             time_step: f64,
         ) -> Box<IterationStateWrapper>;
 
         fn advance_mut(
-            self: &mut TransionnerWrapper,
+            self: &mut TransitionerWrapper,
             boxed_wrapper: &mut Box<IterationStateWrapper>,
             current_time: f64,
             _time_step: f64,
         ) -> bool;
 
-        fn get_current(self: &TransionnerWrapper) -> Box<IterationStateWrapper>;
+        fn get_current(self: &TransitionerWrapper) -> Box<IterationStateWrapper>;
 
-        fn need_advance(self: &TransionnerWrapper, current_time: f64, time_step: f64) -> bool;
+        fn need_advance(self: &TransitionerWrapper, current_time: f64, time_step: f64) -> bool;
 
-        fn get_at(self: &TransionnerWrapper, index: usize) -> Box<IterationStateWrapper>;
+        fn get_at(self: &TransitionerWrapper, index: usize) -> Box<IterationStateWrapper>;
 
-        fn size(self: &TransionnerWrapper) -> usize;
+        fn size(self: &TransitionerWrapper) -> usize;
 
         fn get_liquid(self: &IterationStateWrapper) -> Box<HydroStateWrapper>;
 
@@ -73,7 +75,7 @@ mod ffi {
     }
 }
 
-struct TransionnerWrapper(DiscontinuousTransitioner);
+struct TransitionerWrapper(DiscontinuousTransitioner);
 
 struct IterationStateWrapper(*const IterationState);
 
@@ -103,9 +105,9 @@ impl CooMatrixWrap {
     }
 }
 
-impl TransionnerWrapper {
+impl TransitionerWrapper {
     fn get_current(&self) -> Box<IterationStateWrapper> {
-        Box::new(IterationStateWrapper(&*self.0.get_current()))
+        Box::new(IterationStateWrapper(self.0.get_current()))
     }
 
     fn need_advance(&self, current_time: f64, time_step: f64) -> bool {
@@ -149,9 +151,9 @@ impl TransionnerWrapper {
     }
 }
 
-fn get_dtransitionner(root: &str) -> Result<Box<TransionnerWrapper>, String> {
-    match get_transitionner(root) {
-        Ok(t) => Ok(Box::new(TransionnerWrapper(t))),
+fn get_dtransitioner(root: &str) -> Result<Box<TransitionerWrapper>, String> {
+    match get_transitioner(root) {
+        Ok(t) => Ok(Box::new(TransitionerWrapper(t))),
         Err(d) => Err(format!("{}", d)),
     }
 }

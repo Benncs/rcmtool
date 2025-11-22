@@ -123,6 +123,6 @@ fn main() {
 
     let root = std::env::var("EXAMPLE_ROOT").unwrap();
 
-    let t: DiscontinuousTransitioner = get_transitionner(&root).unwrap();
+    let t: DiscontinuousTransitioner = get_transitioner(&root).unwrap();
     check_mixing(t, final_time, n_step);
 }

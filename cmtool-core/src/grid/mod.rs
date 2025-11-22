@@ -541,7 +541,7 @@ impl CompartmentMeshManip for MeshCylindrical {
                 // ds  =r*dr*dtheta
                 // R here is not radius but (r-R)
                 let R = self.axes[0].edges[points_indices[0] + 1];
-                let r2 = self.axes[0].edges[points_indices[0] + 0];
+                let r2 = self.axes[0].edges[points_indices[0]];
                 0.5 * (R * R - r2 * r2) * delta_ijk[1]
             }
         }

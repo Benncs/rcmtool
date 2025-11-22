@@ -2,7 +2,6 @@
 
 use crate::{CMAExportType, DataError};
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
 use std::io::{BufReader, Read, Write};
 use std::{collections::HashMap, fs, path::Path};
 
@@ -50,6 +49,36 @@ impl CMCase {
         self
     }
 
+    pub fn get_folders(&self, root: &str) -> Vec<String> {
+        let mut folders: Vec<String> = std::fs::read_dir(root)
+            .unwrap()
+            .filter_map(|entry| {
+                if let Ok(dir) = entry {
+                    let file_name = dir.file_name();
+                    let file_name_str = file_name.to_string_lossy();
+                    if let Some(index_str) = file_name_str.strip_prefix("i_") {
+                        if index_str.parse::<usize>().is_ok() {
+                            Some(file_name_str.to_string())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        folders.sort_by(|a, b| {
+            let index_a: usize = a.trim_start_matches("i_").parse().unwrap_or(0);
+            let index_b: usize = b.trim_start_matches("i_").parse().unwrap_or(0);
+            index_a.cmp(&index_b)
+        });
+        folders
+    }
+
     fn check(&self) -> bool {
         let has_gas_volume = self.paths.contains_key(&CMAExportType::GasVolume);
         let has_gas_flow = self.paths.contains_key(&CMAExportType::GasFlow);
@@ -59,18 +88,14 @@ impl CMCase {
 
         let ok_gas = if has_gas_volume && !has_gas_flow {
             false
-        } else if has_gas_flow && !has_gas_volume {
-            false
         } else {
-            true
+            !(has_gas_flow && !has_gas_volume)
         };
 
         let ok_liq = if has_liq_volume && !has_liq_flow {
             false
-        } else if has_liq_flow && !has_liq_volume {
-            false
         } else {
-            true
+            !(has_liq_flow && !has_liq_volume)
         };
 
         ok_liq && ok_gas

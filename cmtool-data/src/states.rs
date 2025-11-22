@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::FlowMapDescriptor;
 use nalgebra_sparse::CooMatrix;
-use ndarray::{Array2, Axis};
+use ndarray::Array2;
 
 macro_rules! non_zero {
     ($i:ident, $eps:expr) => {
