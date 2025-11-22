@@ -6,6 +6,11 @@ use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 
 use crate::model::{CMGeometry, CMModel, Scalar, Vector};
 
+#[cfg(feature = "use_vtk")]
+use crate::grid::vtk::VtkCm;
+#[cfg(feature = "use_vtk")]
+use crate::grid::vtk::add_celldata_to_vtk;
+
 pub mod coordinates;
 pub mod ensight_gold;
 pub mod grid;
@@ -81,6 +86,30 @@ impl CMHandle {
         self.model.compartments_volumes();
 
         todo!()
+    }
+
+    #[cfg(feature = "use_vtk")]
+    pub fn write_vtk(&self, path: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
+        let mesh = self.cm_geometry.get_grid().unwrap();
+        let p = path.as_ref().to_str().unwrap();
+        let mut vtk = mesh.get_vtk(p)?;
+
+        let volumes_data = self.model.get_real_volume();
+
+        let volumes_data_array = vtkio::model::DataArray::scalars("real_volume", 1);
+
+        let volumes_data_array = volumes_data_array.with_vec(volumes_data);
+
+        add_celldata_to_vtk(
+            &mut vtk,
+            vtkio::model::Attribute::DataArray(volumes_data_array),
+        );
+
+        let mut vtk_bytes = Vec::<u8>::new();
+        vtk.write_xml(&mut vtk_bytes).unwrap();
+        std::fs::write(path, vtk_bytes).unwrap();
+
+        Ok(())
     }
 
     pub fn dump_all(

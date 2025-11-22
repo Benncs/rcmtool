@@ -3,11 +3,14 @@
 use std::{io::ErrorKind, path::Path, str::FromStr, sync::Arc};
 
 use crate::ensight_gold::{
-    geo::{Geometry, MeshElementType}, reader::EnsightGoldReader, types::ElementsType, Reader,
+    Reader,
+    geo::{Geometry, MeshElementType},
+    reader::EnsightGoldReader,
+    types::ElementsType,
 };
 
 pub(crate) trait VarTypeReader {
-    type VarType:Clone;
+    type VarType: Clone;
     fn read_elements(
         reader: &mut EnsightGoldReader,
         element: &MeshElementType,
@@ -15,7 +18,7 @@ pub(crate) trait VarTypeReader {
 }
 
 #[derive(Debug)]
-pub(crate) struct PerElementVariable<T:VarTypeReader> {
+pub(crate) struct PerElementVariable<T: VarTypeReader> {
     // data: Vec<f32>,
     // parts: usize,
     // mesh_element_types: usize,
@@ -26,7 +29,7 @@ pub(crate) struct PerElementVariable<T:VarTypeReader> {
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T:VarTypeReader> PerElementVariable<T> {
+impl<T: VarTypeReader> PerElementVariable<T> {
     fn new() -> Self {
         let data = Vec::new();
         let part_id = Vec::new();
@@ -35,11 +38,9 @@ impl<T:VarTypeReader> PerElementVariable<T> {
             part_id,
             name: String::new(),
             _marker: std::marker::PhantomData,
-
         }
     }
-    pub fn get_name(&self)->&str
-    {
+    pub fn get_name(&self) -> &str {
         &self.name
     }
     pub fn init(geometry: Arc<Geometry>, path: impl AsRef<Path>) -> std::io::Result<Self> {

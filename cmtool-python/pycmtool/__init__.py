@@ -20,19 +20,56 @@ Please contact:
 - Casale Benjamin: casale@insa-toulouse.fr
 """
 
-from .pycmtool import *
+from .pycmtool import *  # noqa: F403
+from typing import Iterator, Tuple, Optional
+import scipy.sparse
 
 __doc__ = []
-__doc__.extend([pycmtool.data.__doc__])
+__doc__.extend([pycmtool.data.__doc__])  # noqa: F405
 
 __all__ = []
-__doc__ = pycmtool.__doc__
-if hasattr(pycmtool, "__all__"):
-    __all__ = pycmtool.__all__
+__doc__ = pycmtool.__doc__  # noqa: F405
+if hasattr(pycmtool, "__all__"):  # noqa: F405
+    __all__ = pycmtool.__all__  # noqa: F405
 
 
-if hasattr(pycmtool, "__all__"):
-    __all__ = pycmtool.__all__
+if hasattr(pycmtool, "__all__"):  # noqa: F405
+    __all__ = pycmtool.__all__  # noqa: F405
 
 
-__all__.extend([])
+__all__.extend(["sparse_array_from_triplet", "get_sparse_transition_matrix"])
+
+
+def get_sparse_transition_matrix(it):
+    return sparse_array_from_triplet(*it.flowmap)
+
+
+def sparse_array_from_triplet(
+    row_indices: Tuple[int, ...],
+    col_indices: Tuple[int, ...],
+    values: Tuple[float, ...],
+    shape: Optional[Tuple[int, int]] = None,
+) -> scipy.sparse.coo_array:
+    """
+    Construct a sparse COO array from row indices, column indices, and values.
+
+    Args:
+        row_indices: Array of row indices.
+        col_indices: Array of column indices.
+        values: Array of values.
+        shape: Optional shape of the resulting sparse array. If None, inferred from indices.
+
+    Returns:
+        A scipy.sparse.coo_array constructed from the triplets.
+    """
+    if shape is None:
+        max_row = max(row_indices) if row_indices else 0
+        max_col = max(col_indices) if col_indices else 0
+        shape = (max_row + 1, max_col + 1)
+
+    sparse_array = scipy.sparse.coo_array(
+        (values, (row_indices, col_indices)),
+        shape=shape,
+        copy=False,
+    )
+    return sparse_array

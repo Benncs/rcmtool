@@ -5,8 +5,6 @@ use crate::ensight_gold::{
     variable::{PerElementVariable, VarTypeReader},
 };
 
-
-
 pub(crate) struct ScalarReader;
 
 impl VarTypeReader for ScalarReader {
@@ -21,7 +19,6 @@ impl VarTypeReader for ScalarReader {
 pub(crate) type ScalarField = PerElementVariable<ScalarReader>;
 
 impl ScalarField {
-
     #[inline]
     pub fn get_value(&self, i_part: usize, i_mesh_element_type: usize, mesh_cell: usize) -> f32 {
         self.data[i_part][i_mesh_element_type][mesh_cell]

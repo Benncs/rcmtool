@@ -4,3 +4,10 @@ language = "en"
 src = "src"
 title = "Compartment Modeling Tool"
 heading-split-level = 4
+
+[output.html]
+mathjax-support = true
+
+[preprocessor.toc]
+command = "mdbook-toc"
+renderer = ["html"]

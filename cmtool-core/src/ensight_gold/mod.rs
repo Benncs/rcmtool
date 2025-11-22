@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 mod reader;
-use std::{
-    path::Path,
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 mod geo;
 pub mod types;
 pub use crate::{ensight_gold::reader::Reader, utils};
@@ -32,7 +29,6 @@ pub trait RawField: Sized {
 #[cfg(test)]
 mod test {
     use crate::ensight_gold::case::{Case, VariableInfo};
-
 
     use std::env;
     use std::fs::File;

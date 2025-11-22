@@ -1,6 +1,6 @@
 use ndarray::Array2;
 
-use crate::{DataError, RawData, RawDataFlux, RawFlux, rawdata};
+use crate::{DataError, RawData, RawFlux, rawdata};
 
 pub struct FlowMapDescriptor {
     pub flowmap: Array2<f64>,

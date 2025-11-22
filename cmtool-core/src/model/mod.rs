@@ -47,9 +47,11 @@ impl CMModel {
         let (c_info, interfaces) = volume_element_count.into_reduce();
 
         let n_max_interface = geometry.get_grid().as_ref().unwrap().n_maximum_interface();
+
         if interfaces.n_interfaces() >= n_max_interface {
             unimplemented!("should have intefaces  < n_maximum_interface")
         }
+
         // if interfaces.n_facet.len() != n_max_interface {
         //     eprintln!(
         //         "Intefaces should be n_maximum_interface {} {}",

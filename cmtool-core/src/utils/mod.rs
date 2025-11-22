@@ -267,7 +267,6 @@ mod tests {
 
     #[test]
     fn test_centroid_tetraheadron() {
-
         //for tetra: Centroid=1/4​(A+B+C+D)
 
         let tetrahedron_vertices = [
@@ -281,9 +280,9 @@ mod tests {
 
         let expect_centroid = [1., 1., 1.];
         centroid
-        .0
-        .iter()
-        .zip(expect_centroid)
-        .for_each(|(c, e)| assert!((c - e).abs() < 1e-12, "expected {e}, got {c}"));
+            .0
+            .iter()
+            .zip(expect_centroid)
+            .for_each(|(c, e)| assert!((c - e).abs() < 1e-12, "expected {e}, got {c}"));
     }
 }

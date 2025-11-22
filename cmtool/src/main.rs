@@ -43,6 +43,9 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
         .dump_all(format!("{}/{}", root_dir, stem), &case.root, &case.paths)
         .map_err(CmtoolError::Core)?;
 
+    #[cfg(feature = "use_vtk")]
+    handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
+
     let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
     let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
     let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";

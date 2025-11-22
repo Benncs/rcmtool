@@ -79,7 +79,11 @@ fn sort_points_ccw_3d(points: &Vec<[f64; 3]>, normal: &CartesianVec3) -> Vec<[f6
 fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 {
     let mut intersection_points = vec![];
 
-    let BoundedPlane{normal,origin:point,..}=plane;
+    let BoundedPlane {
+        normal,
+        origin: point,
+        ..
+    } = plane;
 
     let d = -normal.dot(&CartesianVec3::from_point_origin(*point)); // plane offset
     let distances: Vec<f64> = vertices
@@ -89,7 +93,7 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
         .collect();
 
     let mut points_on_plane = vec![];
-    const TOL:f64 =1e-1;
+    const TOL: f64 = 1e-1;
     for (i, dist) in distances.iter().enumerate() {
         if dist.abs() < TOL {
             points_on_plane.push(vertices[i].0);
@@ -115,7 +119,7 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
         }
     }
 
-   if intersection_points.len() < 3 {
+    if intersection_points.len() < 3 {
         if points_on_plane.len() >= 3 {
             let filtered: Vec<_> = points_on_plane
                 .iter()
@@ -190,7 +194,7 @@ pub fn compute_intersection_area(
 #[cfg(test)]
 mod test {
     use super::*;
-      fn make_bounded_plane(normal: CartesianVec3, origin: CartesianCoordinates) -> BoundedPlane {
+    fn make_bounded_plane(normal: CartesianVec3, origin: CartesianCoordinates) -> BoundedPlane {
         // let (u, v) = orthonormal_basis(&normal);
 
         let extent = [-10.0, 10.0];
@@ -200,7 +204,7 @@ mod test {
             origin,
             extent_u: extent,
             extent_v: extent,
-            axis:0,
+            axis: 0,
         }
     }
 
@@ -224,7 +228,7 @@ mod test {
         let expected_area = 0.5
             * (cross_prod.0[0].powi(2) + cross_prod.0[1].powi(2) + cross_prod.0[2].powi(2)).sqrt();
 
-        let plane =  make_bounded_plane(normal, a);
+        let plane = make_bounded_plane(normal, a);
 
         // let area = tetra_area([a, b, c, d], plane);
 
@@ -247,8 +251,7 @@ mod test {
         let c = [0.0, 1.0, 0.0];
         let d = [0.0, 0.0, 1.0];
 
-
-           let normal = CartesianVec3([0., 0., 1.]);
+        let normal = CartesianVec3([0., 0., 1.]);
         let point = CartesianCoordinates([0., 0., 0.5]);
 
         let plane = make_bounded_plane(normal, point);

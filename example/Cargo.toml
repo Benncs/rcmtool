@@ -1,0 +1,19 @@
+[package]
+name = "cmtool-example"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+license.workspace = true
+
+
+[dependencies]
+cmtool-data.workspace = true
+nalgebra.workspace = true
+nalgebra-sparse.workspace=true
+ndarray.workspace=true
+
+[[example]]
+path = "src/mixing_simple.rs"
+name = "mixing_simple"

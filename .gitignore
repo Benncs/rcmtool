@@ -9,4 +9,9 @@ result
 
 /out
 
+__pycache__
+
+
 *.csv
+*.so
+dist/

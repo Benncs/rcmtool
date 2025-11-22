@@ -1,13 +1,8 @@
 use std::sync::Arc;
 
-use cmtool_data::{
-    CCMCaseInfo, CMCaseReader, DiscontinuousTransitioner, FlowMapDescriptor, FlowMapTransitionner,
-    RawData, SimpleTransitioner,
-};
-use nalgebra::DMatrix;
+use cmtool_data::{CCMCaseInfo, CMCaseReader, DiscontinuousTransitioner, FlowMapTransitioner};
 use numpy::PyArray1;
-use numpy::ndarray::{self, Array, Array2};
-use numpy::{PyArray2, PyArrayMethods, PyReadonlyArray2};
+use numpy::ndarray::{self};
 use pyo3::prelude::*;
 
 #[pyclass(name = "DiscontinuousTransitioner")]
@@ -41,6 +36,10 @@ impl DiscontinuousTransitionerWrapper {
         self.0.need_advance(current_time, time_step)
     }
 
+    fn get_current(&self) -> IterationStateWrapper {
+        IterationStateWrapper(self.0.get_current_arc())
+    }
+
     #[getter]
     fn n_flowmaps(&self) -> usize {
         self.0.size()
@@ -56,9 +55,7 @@ impl DiscontinuousTransitionerWrapper {
 }
 
 #[pyfunction]
-pub fn get_transitionner(root: &str, case_path: &str) -> DiscontinuousTransitionerWrapper {
-    let p = std::path::Path::new(case_path);
-    let case = CCMCaseInfo::read_case(p).unwrap();
-    let t = DiscontinuousTransitioner::from_case(root, &case).unwrap();
+pub fn get_transitioner(root: &str) -> DiscontinuousTransitionerWrapper {
+    let t: DiscontinuousTransitioner = cmtool_data::get_transitioner(root).unwrap();
     DiscontinuousTransitionerWrapper(t)
 }
