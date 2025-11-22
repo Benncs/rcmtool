@@ -4,6 +4,13 @@ use cmtool_data::{
     DiscontinuousTransitioner, FlowMapTransitioner, HydroState, IterationState, get_transitioner,
 };
 use nalgebra_sparse::CooMatrix;
+struct TransitionerWrapper(DiscontinuousTransitioner);
+
+struct IterationStateWrapper(*const IterationState);
+
+struct HydroStateWrapper(*const HydroState);
+
+struct CooMatrixWrap(*const CooMatrix<f64>);
 
 #[cxx::bridge]
 mod ffi {
@@ -21,12 +28,12 @@ mod ffi {
             time_step: f64,
         ) -> Box<IterationStateWrapper>;
 
-        fn advance_mut(
-            self: &mut TransitionerWrapper,
-            boxed_wrapper: &mut Box<IterationStateWrapper>,
-            current_time: f64,
-            _time_step: f64,
-        ) -> bool;
+        // fn advance_mut(
+        //     self: &mut TransitionerWrapper,
+        //     boxed_wrapper: &mut Box<IterationStateWrapper>,
+        //     current_time: f64,
+        //     _time_step: f64,
+        // ) -> bool;
 
         fn get_current(self: &TransitionerWrapper) -> Box<IterationStateWrapper>;
 
@@ -75,14 +82,6 @@ mod ffi {
     }
 }
 
-struct TransitionerWrapper(DiscontinuousTransitioner);
-
-struct IterationStateWrapper(*const IterationState);
-
-struct HydroStateWrapper(*const HydroState);
-
-struct CooMatrixWrap(*const CooMatrix<f64>);
-
 impl CooMatrixWrap {
     fn nrows(&self) -> usize {
         unsafe { (*self.0).nrows() }
@@ -106,46 +105,47 @@ impl CooMatrixWrap {
 }
 
 impl TransitionerWrapper {
+    #[inline]
     fn get_current(&self) -> Box<IterationStateWrapper> {
         Box::new(IterationStateWrapper(self.0.get_current()))
     }
 
+    #[inline]
     fn need_advance(&self, current_time: f64, time_step: f64) -> bool {
         self.0.need_advance(current_time, time_step)
     }
 
-    fn advance_mut(
-        &mut self,
-        boxed_wrapper: &mut Box<IterationStateWrapper>,
-        current_time: f64,
-        time_step: f64,
-    ) -> bool {
-        let IterationStateWrapper(ref mut state) = **boxed_wrapper;
+    // fn advance_mut(
+    //     &mut self,
+    //     boxed_wrapper: &mut Box<IterationStateWrapper>,
+    //     current_time: f64,
+    //     time_step: f64,
+    // ) -> bool {
+    //     let IterationStateWrapper(ref mut state) = **boxed_wrapper;
 
-        let new_state = self.0.advance(current_time, time_step);
+    //     let new_state = self.0.advance(current_time, time_step);
 
-        let old_ptr = *state as *const IterationState;
-        let new_ptr = new_state as *const IterationState;
+    //     let old_ptr = *state;
+    //     let new_ptr = new_state as *const IterationState;
 
-        if old_ptr != new_ptr {
-            *state = new_state;
-            true
-        } else {
-            false
-        }
-    }
+    //     if old_ptr != new_ptr {
+    //         *state = new_state;
+    //         true
+    //     } else {
+    //         false
+    //     }
+    // }
 
-    // Now advance returns a raw pointer to IterationState (a reference)
-    fn advance(&mut self, _current_time: f64, time_step: f64) -> Box<IterationStateWrapper> {
-        let state = self.0.advance(_current_time, time_step);
+    fn advance(&mut self, current_time: f64, time_step: f64) -> Box<IterationStateWrapper> {
+        let state = self.0.advance(current_time, time_step);
         // Returning a reference wrapped in a raw pointer
         Box::new(IterationStateWrapper(state))
     }
-
+    #[inline]
     fn size(&self) -> usize {
         self.0.size()
     }
-
+    #[inline]
     fn get_at(&self, index: usize) -> Box<IterationStateWrapper> {
         Box::new(IterationStateWrapper(&*self.0.get_at(index).unwrap()))
     }
