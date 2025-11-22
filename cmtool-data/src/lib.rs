@@ -6,7 +6,7 @@ mod flowmap;
 mod rawdata;
 mod states;
 mod transitionner;
-pub use case::{CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter};
+pub use case::{CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter, read_case};
 pub use descriptors::{CMAExportType, CMExportType, PhaseCM};
 pub use flowmap::FlowMapDescriptor;
 pub use rawdata::{
@@ -62,7 +62,7 @@ fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> us
 pub fn get_transitionner<T: FlowMapTransitioner>(root: &str) -> Result<T, DataError> {
     let case_path = format!("{}/cma_case", root);
     let p = std::path::Path::new(&case_path);
-    let case = CCMCaseInfo::read_case(p)?;
+    let case = read_case(p)?;
     //Load all the case information into the iterator
     T::from_case(root, &case)
 }

@@ -20,7 +20,7 @@ strip = "none"
 panic = "unwind"
 incremental = false
 opt-level = 3
-debug = 1
+debug = 0
 overflow-checks = false
 
 

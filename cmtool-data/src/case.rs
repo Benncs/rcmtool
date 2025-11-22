@@ -110,6 +110,19 @@ pub trait CMCaseReader {
     fn read_case(path: &Path) -> Result<CMCase, DataError>;
 }
 
+pub fn read_case(path: &Path) -> Result<CMCase, DataError> {
+    let mut file = std::fs::File::open(path)?;
+    let mut buffer = [0; 4]; // read the first few bytes
+    let n = file.read(&mut buffer)?;
+
+    // Simple heuristic: if starts with '{' or '[' treat as JSON
+    if n > 0 && (buffer[0] == b'{' || buffer[0] == b'[') {
+        CMCaseJson::read_case(path)
+    } else {
+        CCMCaseInfo::read_case(path)
+    }
+}
+
 /// A trait for writing a `CMCase` to a specified path.
 ///
 /// Implement this trait for types that are capable of writing a case configuration
