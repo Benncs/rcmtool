@@ -1,6 +1,20 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct FeedFlow {
+    pub flow: f64,
+    pub position: usize,
+    pub output_position: Option<usize>,
+}
+
+
+
+#[derive(Default, Clone, Serialize, Deserialize)]
+pub struct ParsedFeeds {
+    pub liq: HashMap<String, FeedFlow>,
+    pub gas: HashMap<String, FeedFlow>,
+}
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct DomainInfo {
     pub compartment_cumsum: HashMap<String, usize>,
@@ -12,6 +26,7 @@ pub struct DomainInfo {
 pub struct DomainData {
     pub connections: Option<[cmtool_data::RawDataFlux; 2]>,
     pub info: DomainInfo,
+    pub feeds: Option<ParsedFeeds>,
 }
 
 

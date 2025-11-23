@@ -2,17 +2,12 @@ use std::path::PathBuf;
 
 pub fn generate(reactor_input_file_name: &str) -> bool {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../out/examples/");
-    let contents = std::fs::read_to_string(reactor_input_file_name).expect("getcontent");
-    let root_dir = path.to_str().unwrap().to_owned();
-    std::fs::create_dir_all(&root_dir).expect("mkdir");
-
-    if let Ok(mut domain) = cmtool_assemble::generate_domain(&root_dir, &contents) {
-        println!("OK");
-        return true;
+    if let Err(msg)=cmtool_assemble::headless_generate(reactor_input_file_name, path){
+        eprintln!("{}",msg);
+        return false;
     }
+    return true;
 
-    eprintln!("Error domain");
-    false
 }
 
 #[cfg(test)]

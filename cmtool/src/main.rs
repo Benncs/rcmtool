@@ -23,12 +23,9 @@ fn main() -> Result<(), CmtoolError> {
 
             Mode::Manual(manual_args) => todo!(),
         },
-        AllModes::XML(xml) => {
+        AllModes::Xml(xml) => {
             let path = PathBuf::from(out_or_default(xml.out_dir));
-            let contents = std::fs::read_to_string(xml.descriptor_path).expect("Read file");
-            let root_dir = path.to_str().unwrap().to_owned();
-            std::fs::create_dir_all(&root_dir).expect("mkdir");
-            cmtool_assemble::generate_domain(&root_dir, &contents)?;
+            cmtool_assemble::headless_generate(&xml.descriptor_path, path)?;
             Ok(())
         }
     }

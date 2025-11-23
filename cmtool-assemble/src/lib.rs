@@ -37,9 +37,21 @@ pub enum CMError {
 
 pub fn generate_domain(root_dir: &str, reactor_content: &str) -> Result<DomainData, CMError> {
     let root = get_root(reactor_content)?;
-    let domain = parse_domain(&root)?;
+    let (domain,mb) = parse_domain(&root)?;
     let root_dir = format!("{}/{}", root_dir, root.run_id);
     std::fs::create_dir_all(root_dir.clone())?;
-    generate_flowmap(&root_dir, &domain, &root.reactors)?;
+    generate_flowmap(&root_dir, &domain, &root.reactors,&mb)?;
     Ok(domain)
+}
+
+
+pub fn headless_generate(
+    reactor_input_file_name: &str,
+    path: impl AsRef<std::path::Path>,
+) -> Result<(),CMError>{
+    let contents = std::fs::read_to_string(reactor_input_file_name)?;
+    let root_dir = path.as_ref().to_str().expect("path str").to_owned();
+    std::fs::create_dir_all(&root_dir)?;
+    generate_domain(&root_dir, &contents)?;
+    Ok(())
 }

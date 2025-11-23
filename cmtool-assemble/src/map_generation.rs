@@ -1,8 +1,9 @@
 use crate::CMError;
 use crate::data::DomainData;
 use crate::generators::{Generator, PFRDescription};
-use crate::parser::generated_domain::{self, Reactor0DType};
-use cmtool_data::CMCaseReader;
+use crate::parser::generated_domain;
+use crate::parser::{PfrGlobalMassBalance,generated_domain::{Reactor0DType}};
+use cmtool_data::{CMCaseReader, PhaseCM};
 use cmtool_data::{CCMCaseInfo, CMCaseWriter, DataError};
 
 fn get_volume(size: &generated_domain::GeneralSizeType) -> f64 {
@@ -54,6 +55,7 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
     root: &str,
     ids: &mut Vec<String>,
     current_pfr: &generated_domain::Reactor1DType,
+    mb: &PfrGlobalMassBalance,
 ) -> Result<(), CMError> {
     ids.push(current_pfr.id.clone());
     let path = format!("{}/{}", root, current_pfr.id);
@@ -75,8 +77,8 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
                 n_compartment: current_pfr.compartments,
                 length: dim.length.content.into(),
                 diameter: dim.diameter.content.into(),
-                liquid_flow: 1.0,
-                gas_flow: 0.0,
+                liquid_flow:  mb.get_flow(&current_pfr.id, PhaseCM::Liquid)?,
+                gas_flow: mb.get_flow(&current_pfr.id, PhaseCM::Gas)?,
                 gas_fraction: current_pfr.volume_fraction.content as f64,
                 axial_dispersion: 1e-9,
             };
@@ -95,6 +97,7 @@ fn generate_partial_flowmap<T: cmtool_data::CMCaseWriter>(
     generator: &mut Generator,
     root: &str,
     reactors: &generated_domain::ReactorsType,
+     mb: &PfrGlobalMassBalance,
 ) -> Result<Vec<String>, CMError> {
     let mut ids = Vec::with_capacity(reactors.content.len());
 
@@ -104,7 +107,7 @@ fn generate_partial_flowmap<T: cmtool_data::CMCaseWriter>(
                 _generate_reactor_0d::<T>(save_intermediate, generator, root, &mut ids, r)?;
             }
             generated_domain::ReactorsTypeContent::Reactor1D(r) => {
-                _generate_reactor_1d::<T>(save_intermediate, generator, root, &mut ids, r)?;
+                _generate_reactor_1d::<T>(save_intermediate, generator, root, &mut ids, r,mb)?;
             }
             generated_domain::ReactorsTypeContent::Reactor3D(reactor3_dtype) => {
                 todo!("{:?}", reactor3_dtype)
@@ -118,6 +121,7 @@ pub fn generate_flowmap(
     root: &str,
     domain: &DomainData,
     reactors: &generated_domain::ReactorsType,
+    mb: &PfrGlobalMassBalance,
 ) -> Result<(), CMError> {
     let mut generator = Generator::new();
     let mut save_intermediate = false;
@@ -126,7 +130,7 @@ pub fn generate_flowmap(
     }
 
     let _ids =
-        generate_partial_flowmap::<CCMCaseInfo>(save_intermediate, &mut generator, root, reactors)?;
+        generate_partial_flowmap::<CCMCaseInfo>(save_intermediate, &mut generator, root, reactors,mb)?;
 
     if _ids.len() > 1 {
         if save_intermediate {

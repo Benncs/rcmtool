@@ -54,11 +54,32 @@ pub struct XMLGenerate {
 #[derive(Subcommand, Clone)]
 pub enum AllModes {
     Cfd(CfdGenerate),
-    XML(XMLGenerate),
+    Xml(XMLGenerate),
 }
 
 #[derive(Parser, Clone)]
-#[clap(name = "cmtool")]
+#[command(
+    name = "CMTool",
+    author,
+    version,
+    about = "Command line interface to generate Compartment Models",
+    help_template = "\
+{name} {version}
+
+{about}
+
+USAGE:
+    {usage}
+
+OPTIONS:
+{options}
+
+COMMANDS:
+{subcommands}
+
+By {author}
+"
+)]
 pub struct GenArgs {
     #[clap(subcommand)]
     pub mode: AllModes,

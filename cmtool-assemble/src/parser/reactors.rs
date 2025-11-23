@@ -1,65 +1,15 @@
 use std::collections::HashMap;
 
+use super::PfrGlobalMassBalance;
 use super::generated_domain;
+use crate::data::FeedFlow;
+use crate::data::ParsedFeeds;
+use crate::parser::generated_domain::FeedFluxType;
 use crate::{
     CMError,
     data::{DomainInfo, FlowDirection},
 };
 use cmtool_data::{PhaseCM, RawDataFlux};
-
-#[derive(Default, Copy, Clone, Debug)]
-struct FlowData {
-    in_flow: f64,
-    out_flow: f64,
-}
-
-#[derive(Copy, Clone, Debug, Default)]
-struct PhaseFlow {
-    gas: FlowData,
-    liquid: FlowData,
-}
-
-// Struct to hold flow data for each ID using a HashMap
-#[derive(Default, Debug)]
-pub(super) struct PfrGlobalMassBalance {
-    flows: HashMap<String, PhaseFlow>,
-}
-
-impl PfrGlobalMassBalance {
-    pub(super) fn new(pfr_names: &[String]) -> Self {
-        let mut flows = HashMap::new();
-        for name in pfr_names {
-            flows.insert(name.clone(), PhaseFlow::default());
-        }
-        PfrGlobalMassBalance { flows }
-    }
-
-    pub(super) fn validate(&self) -> Result<(), CMError> {
-        for (i, flow) in &self.flows {
-            if flow.gas.in_flow != flow.gas.out_flow {
-                return Err(CMError::MassBalance(i.clone(), "gas".to_owned()));
-            }
-            if flow.liquid.in_flow != flow.liquid.out_flow {
-                return Err(CMError::MassBalance(i.clone(), "liquid".to_owned()));
-            }
-        }
-        Ok(())
-    }
-
-    fn update_flow(&mut self, id: &str, phase: PhaseCM, direction: FlowDirection, vflow: f64) {
-        if let Some(phase_flow) = self.flows.get_mut(id) {
-            let flow_data = match phase {
-                PhaseCM::Gas => &mut phase_flow.gas,
-                PhaseCM::Liquid => &mut phase_flow.liquid,
-            };
-
-            match direction {
-                FlowDirection::In => flow_data.in_flow += vflow,
-                FlowDirection::Out => flow_data.out_flow += vflow,
-            }
-        }
-    }
-}
 
 fn connection_per_phase(
     info: &DomainInfo,
@@ -97,6 +47,8 @@ fn connection_per_phase(
                     mass_balance.update_flow(&node.source.id, phase, FlowDirection::Out, flow);
                 }
             }
+        } else {
+            eprintln!("Ignored connection");
         }
     }
     rd
@@ -136,26 +88,76 @@ fn convert_feed_flux_to_flux(feed: generated_domain::FeedFluxType) -> generated_
     }
 }
 
+// pub fn parse_feed(
+//     info: &DomainInfo,
+//     feeds: &generated_domain::FeedsType,
+//     mass_balance: &mut PfrGlobalMassBalance,
+// ) -> Result<(), CMError> {
+//     let liquid_feed: Vec<generated_domain::FluxType> = feeds
+//         .flux
+//         .iter()
+//         .filter(|f| f.phase == *"liquid")
+//         .map(|feed| convert_feed_flux_to_flux(feed.clone()))
+//         .collect();
+//     let gas_feed: Vec<generated_domain::FluxType> = feeds
+//         .flux
+//         .iter()
+//         .filter(|f| f.phase == *"gas")
+//         .map(|feed| convert_feed_flux_to_flux(feed.clone()))
+//         .collect();
+//     connection_per_phase(info, mass_balance, &liquid_feed, PhaseCM::Liquid);
+//     connection_per_phase(info, mass_balance, &gas_feed, PhaseCM::Gas);
+//     Ok(())
+// }
+fn parse_feed_phase(
+    info: &DomainInfo,
+    feeds: &[&FeedFluxType],
+    phase: PhaseCM,
+    mass_balance: &mut PfrGlobalMassBalance,
+) -> HashMap<String, FeedFlow> {
+    let fluxes: Vec<generated_domain::FluxType> = feeds
+        .iter()
+        .map(|feed| generated_domain::FluxType {
+            source: feed.source.clone(),
+            target: feed.target.clone(),
+            phase: feed.phase.clone(),
+            value: feed.value.clone(),
+        })
+        .collect();
+
+    let id: Vec<String> = feeds.iter().map(|feed| feed.id.clone()).collect();
+    let rd = connection_per_phase(info, mass_balance, &fluxes, phase);
+
+    rd.fluxes
+        .iter()
+        .zip(id)
+        .map(|(flux, id)| {
+            (
+                id,
+                FeedFlow {
+                    flow: flux.flux_source_target,
+                    position: flux.id_source as usize,
+                    output_position: None, //TODO
+                },
+            )
+        })
+        .collect()
+}
 pub fn parse_feed(
     info: &DomainInfo,
     feeds: &generated_domain::FeedsType,
     mass_balance: &mut PfrGlobalMassBalance,
-) -> Result<(),CMError> {
-    let liquid_feed: Vec<generated_domain::FluxType> = feeds
+) -> ParsedFeeds {
+    let (liquid_feeds, gas_feeds): (Vec<_>, Vec<_>) = feeds
         .flux
         .iter()
-        .filter(|f| f.phase == *"liquid")
-        .map(|feed| convert_feed_flux_to_flux(feed.clone()))
-        .collect();
-    let gas_feed: Vec<generated_domain::FluxType> = feeds
-        .flux
-        .iter()
-        .filter(|f| f.phase == *"gas")
-        .map(|feed| convert_feed_flux_to_flux(feed.clone()))
-        .collect();
-    connection_per_phase(info, mass_balance, &liquid_feed, PhaseCM::Liquid);
-    connection_per_phase(info, mass_balance, &gas_feed, PhaseCM::Gas);
-    Ok(())
+        .partition(|f| f.phase == *"liquid")
+        .clone();
+
+    ParsedFeeds {
+        liq: parse_feed_phase(info, &liquid_feeds, PhaseCM::Liquid, mass_balance),
+        gas: parse_feed_phase(info, &gas_feeds, PhaseCM::Gas, mass_balance),
+    }
 }
 
 pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<DomainInfo, CMError> {

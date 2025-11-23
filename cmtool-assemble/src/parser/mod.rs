@@ -5,25 +5,30 @@ use crate::{CMError, DomainData};
 mod reactors;
 use reactors::{parse_connection, parse_feed, parse_reactor};
 
-pub fn parse_domain(root: &generated_domain::RootElementType) -> Result<DomainData, CMError> {
+mod pfr_mb;
+pub(super) use pfr_mb::PfrGlobalMassBalance;
+
+pub fn parse_domain(root: &generated_domain::RootElementType) -> Result<(DomainData,PfrGlobalMassBalance), CMError> {
     let info = parse_reactor(&root.reactors)?;
 
-    let mut mass_balance = reactors::PfrGlobalMassBalance::new(&info.pfr_names);
+    let mut mass_balance = PfrGlobalMassBalance::new(&info.pfr_names);
 
     let raw_connections = root
         .connections
         .as_ref()
         .map(|connections| parse_connection(&info, connections, &mut mass_balance));
 
+    let mut pfeeds = None;
     if let Some(feeds) = &root.feeds {
-        let connections = parse_feed(&info, feeds, &mut mass_balance)?; //TODO 
+        pfeeds = Some(parse_feed(&info, feeds, &mut mass_balance)); //TODO
     }
     mass_balance.validate()?;
 
-    Ok(DomainData {
+    Ok((DomainData {
         connections: raw_connections,
         info,
-    })
+        feeds: pfeeds,
+    },mass_balance))
 }
 
 pub fn get_root(content: &str) -> Result<generated_domain::Root, CMError> {
