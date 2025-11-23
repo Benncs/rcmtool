@@ -1,0 +1,39 @@
+#[allow(clippy::all)]
+#[rustfmt::skip]
+pub mod generated_domain;
+use crate::{CMError, DomainData};
+mod reactors;
+use reactors::{parse_connection, parse_feed, parse_reactor};
+
+pub fn parse_domain(root: &generated_domain::RootElementType) -> Result<DomainData, CMError> {
+    let info = parse_reactor(&root.reactors)?;
+
+    let mut mass_balance = reactors::PfrGlobalMassBalance::new(&info.pfr_names);
+
+    let raw_connections = root
+        .connections
+        .as_ref()
+        .map(|connections| parse_connection(&info, connections, &mut mass_balance));
+
+    if let Some(feeds) = &root.feeds {
+        let connections = parse_feed(&info, feeds, &mut mass_balance)?; //TODO 
+    }
+    mass_balance.validate()?;
+
+    Ok(DomainData {
+        connections: raw_connections,
+        info,
+    })
+}
+
+pub fn get_root(content: &str) -> Result<generated_domain::Root, CMError> {
+    // let cursor = Cursor::new(content.as_bytes());
+    // let mut reader = IoReader::new(cursor).with_error_info();
+    // let root = generated_domain::Root::deserialize(&mut reader).unwrap();
+    let root = serde_xml_rs::from_str::<generated_domain::Root>(content)?;
+    eprintln!("WARNING: Some reactor may miss if xml is not parsed correctly");
+    if root.version != 3 {
+        panic!("ALED");
+    }
+    Ok(root)
+}

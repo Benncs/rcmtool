@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<xs:schema
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    elementFormDefault="qualified"
+    attributeFormDefault="unqualified"
+>
+	<xs:complexType name="BaseReactor">
+	<xs:attribute name="id" type="xs:string" use="required" />
+		<xs:sequence>
+			<xs:element name="VolumeFraction" type="VolumeFraction" use="required" />
+			<xs:element name="Size" type="GeneralSize" use="optional" />
+		</xs:sequence>
+	</xs:complexType>
+
+	<xs:complexType name="Reactor0D">
+		<xs:complexContent>
+			<xs:extension base="BaseReactor">
+			</xs:extension>
+		</xs:complexContent>
+	</xs:complexType>
+
+	<xs:complexType name="Reactor1D">
+		<xs:complexContent>
+			<xs:extension base="BaseReactor">
+				<xs:sequence>
+					<xs:element
+                        name="Compartments"
+                        type="xs:positiveInteger"
+                        minOccurs="1"
+                        maxOccurs="1"
+                    />
+					<xs:element
+                        name="Dispersion"
+                        type="DimensionType"
+                        minOccurs="1"
+                        maxOccurs="1"
+                    />
+				</xs:sequence>
+			</xs:extension>
+		</xs:complexContent>
+	</xs:complexType>	<!-- 3D Reactor inherits from BaseReactor -->
+
+
+	<xs:complexType name="Reactor3D">
+		<xs:complexContent>
+			<xs:extension base="BaseReactor">
+				<xs:sequence>
+					<xs:element name="file" type="xs:string" />
+				</xs:sequence>
+			</xs:extension>
+		</xs:complexContent>
+	</xs:complexType>	<!-- A collection of reactors -->
+
+	<!-- 0D, 1D, and 3D reactors can appear in any order -->
+	<xs:complexType name="Reactors">
+		<xs:all>
+			<xs:choice>
+				<xs:element name="Reactor0D" type="Reactor0D" maxOccurs="unbounded" />
+				<xs:element name="Reactor1D" type="Reactor1D" maxOccurs="unbounded" />
+				<xs:element name="Reactor3D" type="Reactor3D" maxOccurs="unbounded" />
+			</xs:choice>
+		</xs:all>
+	</xs:complexType>
+
+
+	<!-- Utils -->
+
+	<xs:complexType name="VolumeFraction">
+		<xs:simpleContent>
+			<xs:extension base="xs:float">
+				<xs:attribute name="phase" type="xs:string" use="optional" />
+			</xs:extension>
+		</xs:simpleContent>
+	</xs:complexType>
+
+	<xs:complexType name="SizeCylindrical">
+		<xs:sequence>
+			<xs:element name="Diameter" type="LengthType" />
+			<xs:element name="Length" type="LengthType" />
+		</xs:sequence>
+	</xs:complexType>
+
+
+
+<xs:complexType name="GeneralSize">
+        <xs:choice>
+            <xs:element
+                name="Volume"
+                type="VolumeType"
+                minOccurs="1"
+                maxOccurs="1"
+            />
+            <xs:element
+                name="Dimension"
+                type="SizeCylindrical"
+                minOccurs="1"
+                maxOccurs="1"
+            />
+        </xs:choice>
+</xs:complexType>
+
+</xs:schema>

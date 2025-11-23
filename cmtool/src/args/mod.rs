@@ -35,8 +35,7 @@ pub enum Mode {
 }
 
 #[derive(Parser, Clone)]
-#[clap(name = "cmtool")]
-pub struct GenArgs {
+pub struct CfdGenerate {
     #[clap(flatten)]
     pub common: CommonArgs,
 
@@ -44,25 +43,47 @@ pub struct GenArgs {
     pub mode: Mode,
 }
 
+#[derive(Parser, Clone)]
+pub struct XMLGenerate {
+    #[clap(short, long)]
+    pub descriptor_path: String,
+    #[clap(short, long)]
+    pub out_dir: Option<String>,
+}
+
+#[derive(Subcommand, Clone)]
+pub enum AllModes {
+    Cfd(CfdGenerate),
+    XML(XMLGenerate),
+}
+
+#[derive(Parser, Clone)]
+#[clap(name = "cmtool")]
+pub struct GenArgs {
+    #[clap(subcommand)]
+    pub mode: AllModes,
+}
+
+
 impl GenArgs {
-    #[cfg(debug_assertions)]
-    pub fn get() -> Self {
-        GenArgs {
-            common: CommonArgs {
-                n_i: 3,
-                n_j: 3,
-                n_k: 3,
-                out: None,
-                verbose: true,
-            },
-            mode: Mode::Auto(AutoArgs {
-                case_path:
-                    "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.encas"
-                        .to_string(),
-            }),
-        }
-    }
-    #[cfg(not(debug_assertions))]
+    // #[cfg(debug_assertions)]
+    // pub fn get() -> Self {
+    //     GenArgs {
+    //         common: CommonArgs {
+    //             n_i: 3,
+    //             n_j: 3,
+    //             n_k: 3,
+    //             out: None,
+    //             verbose: true,
+    //         },
+    //         mode: Mode::Auto(AutoArgs {
+    //             case_path:
+    //                 "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.encas"
+    //                     .to_string(),
+    //         }),
+    //     }
+    // }
+    // #[cfg(not(debug_assertions))]
     pub fn get() -> Self {
         GenArgs::parse()
     }

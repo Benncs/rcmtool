@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<Root run_id="simple_0d1d" version="3">
+  <Reactors>
+    <Reactor1D id="pfr">
+      <Size>
+        <Dimension>
+          <Diameter unit="m">0.01</Diameter>
+          <Length unit="m">1</Length>
+        </Dimension>
+      </Size>
+      <VolumeFraction>0.2</VolumeFraction>
+      <Compartments>66</Compartments>
+      <Dispersion unit="m^2/s">0</Dispersion>
+    </Reactor1D>
+    <Reactor0D id="str">
+      <Size>
+        <Volume>10</Volume>
+      </Size>
+      <VolumeFraction>0.1</VolumeFraction>
+    </Reactor0D>
+  </Reactors>
+
+
+  <Connections>
+    <Flux phase="liquid">
+      <Source id="str" compartment_id="0"></Source>
+      <Target id="pfr" compartment_id="0"></Target>
+      <Value unit="l/min">6.1e-6</Value>
+    </Flux>
+    <Flux phase="liquid">
+      <Source id="pfr" compartment_id="65"></Source>
+      <Target id="str" compartment_id="0"></Target>
+      <Value unit="l/min">6.1e-6</Value>
+    </Flux>
+
+    <Flux phase="gas">
+      <Source id="str" compartment_id="0"></Source>
+      <Target id="pfr" compartment_id="0"></Target>
+      <Value unit="l/min">4.1e-6</Value>
+    </Flux>
+    <Flux phase="gas">
+      <Source id="pfr" compartment_id="65"></Source>
+      <Target id="str" compartment_id="0"></Target>
+      <Value unit="l/min">4.1e-6</Value>
+    </Flux>
+
+  </Connections>
+</Root>

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<Root run_id="simple_1d" version="3">
+    <Reactors>
+        <Reactor1D id="reactor">
+            <Size>
+                <Dimension>
+                    <Diameter unit="m">0.01</Diameter>
+                    <Length unit="m">1</Length>
+                </Dimension>
+            </Size>
+            <VolumeFraction>0.2</VolumeFraction>
+            <Compartments>50</Compartments>
+            <Dispersion unit="m^2/s">1e-9</Dispersion>
+        </Reactor1D>
+    </Reactors>
+    <Feeds>
+        <Flux phase="gas" id="AA">
+            <Source id="reactor" compartment_id="0"></Source>
+            <Target id="reactor" compartment_id="49"></Target>
+            <Value unit="l/min">2.33333333333333E-05</Value>
+        </Flux>
+        <Flux phase="liquid" id="AA">
+            <Source id="reactor" compartment_id="0"></Source>
+            <Target id="reactor" compartment_id="49"></Target>
+            <Value unit="l/min">4.33333333333333E-05</Value>
+        </Flux>
+    </Feeds>
+</Root>
