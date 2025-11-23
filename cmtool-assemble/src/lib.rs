@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+
 mod data;
 mod generators;
 mod map_generation;

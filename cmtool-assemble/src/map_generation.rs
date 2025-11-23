@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+
 use crate::CMError;
 use crate::data::DomainData;
 use crate::generators::{Generator, PFRDescription};
@@ -124,10 +127,8 @@ pub fn generate_flowmap(
     mb: &PfrGlobalMassBalance,
 ) -> Result<(), CMError> {
     let mut generator = Generator::new();
-    let mut save_intermediate = false;
-    if reactors.content.len() == 1 {
-        save_intermediate = true;
-    }
+   
+    let save_intermediate = reactors.content.len() == 1;
 
     let _ids =
         generate_partial_flowmap::<CCMCaseInfo>(save_intermediate, &mut generator, root, reactors,mb)?;

@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+
+
 use crate::fs::File;
 use std::fs;
 use std::io::Write;

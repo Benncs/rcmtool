@@ -1,5 +1,14 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+#[derive(Debug, PartialEq)]
+pub enum FlowDirection {
+    In,
+    Out,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct FeedFlow {
@@ -7,8 +16,6 @@ pub struct FeedFlow {
     pub position: usize,
     pub output_position: Option<usize>,
 }
-
-
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct ParsedFeeds {
@@ -21,16 +28,6 @@ pub struct DomainInfo {
     pub total_number_compartment: usize,
     pub pfr_names: Vec<String>,
 }
-
-#[derive(Clone, Serialize, Deserialize, Default)]
-pub struct DomainData {
-    pub connections: Option<[cmtool_data::RawDataFlux; 2]>,
-    pub info: DomainInfo,
-    pub feeds: Option<ParsedFeeds>,
-}
-
-
-
 impl DomainInfo {
     pub fn get_relative_compartment_number(
         &self,
@@ -43,8 +40,14 @@ impl DomainInfo {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum FlowDirection {
-    In,
-    Out,
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct DomainData {
+    pub connections: Option<[cmtool_data::RawDataFlux; 2]>,
+    pub info: DomainInfo,
+    pub feeds: Option<ParsedFeeds>,
 }
+
+
+
+
+
