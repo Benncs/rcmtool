@@ -71,11 +71,7 @@ fn filter_phase(raw_phase: &[RawPhase], phase: PhaseCM) -> Vec<RawPhase> {
 }
 
 impl Generator {
-    fn f_write(f: impl RawData, r: &str, p: &str) -> Result<(), CMError> {
-        f.write_raw(&format!("{}/{}", r, p))?;
-        Ok(())
-    }
-
+    
     pub fn new() -> Self {
         Self {
             raw_phase: Default::default(),
@@ -315,15 +311,15 @@ impl Generator {
         connections: Option<[RawDataFlux; 2]>,
     ) -> Result<(), CMError> {
         
-
+        const MERGE_FOLDER_NAME:&str = "merged";
         let liquid_phase = filter_phase(&self.raw_phase,PhaseCM::Liquid);
         let gasphase = filter_phase(&self.raw_phase,PhaseCM::Gas);
         
-        let path = format!("{}/merged", dest);
+        let path = format!("{}/{}", dest,MERGE_FOLDER_NAME);
         std::fs::create_dir_all(&path)?; //FIXME
         let mut case = CMCase::default();
         // case.n_div = n_div;
-        let relative = Some(String::from("merged")); //TODO Clean this
+        let relative = Some(String::from(MERGE_FOLDER_NAME));
 
         let liquid_connection = connections.as_ref().map(|c| c[0].clone());
         let gas_connection = connections.as_ref().map(|c| c[1].clone());
@@ -336,8 +332,8 @@ impl Generator {
             Self::write_phase(&path, &mut case, phase, relative)?;
         }
 
-        CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
-        cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)))?;
+        CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/cma_case", dest)))?;
+        // cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)))?;
         Ok(())
     }
 

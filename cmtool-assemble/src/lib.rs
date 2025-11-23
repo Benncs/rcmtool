@@ -12,7 +12,7 @@ pub use crate::data::{DomainData, DomainInfo};
 use crate::parser::{get_root, parse_domain};
 use map_generation::generate_flowmap;
 use thiserror::Error;
-
+pub use data::{FeedFlow,ParsedFeeds};
 #[derive(Error, Debug)]
 pub enum CMError {
     #[error("Cmtool encountered an unknown error. Please check the input and try again.")]
