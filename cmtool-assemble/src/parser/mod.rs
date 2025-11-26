@@ -11,7 +11,9 @@ use reactors::{parse_connection, parse_feed, parse_reactor};
 mod pfr_mb;
 pub(super) use pfr_mb::PfrGlobalMassBalance;
 
-pub fn parse_domain(root: &generated_domain::RootElementType) -> Result<(DomainData,PfrGlobalMassBalance), CMError> {
+pub fn parse_domain(
+    root: &generated_domain::RootElementType,
+) -> Result<(DomainData, PfrGlobalMassBalance), CMError> {
     let info = parse_reactor(&root.reactors)?;
 
     let mut mass_balance = PfrGlobalMassBalance::new(&info.pfr_names);
@@ -27,11 +29,14 @@ pub fn parse_domain(root: &generated_domain::RootElementType) -> Result<(DomainD
     }
     mass_balance.validate()?;
 
-    Ok((DomainData {
-        connections: raw_connections,
-        info,
-        feeds: pfeeds,
-    },mass_balance))
+    Ok((
+        DomainData {
+            connections: raw_connections,
+            info,
+            feeds: pfeeds,
+        },
+        mass_balance,
+    ))
 }
 
 pub fn get_root(content: &str) -> Result<generated_domain::Root, CMError> {

@@ -85,7 +85,6 @@ pub struct GenArgs {
     pub mode: AllModes,
 }
 
-
 impl GenArgs {
     // #[cfg(debug_assertions)]
     // pub fn get() -> Self {

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -46,8 +45,3 @@ pub struct DomainData {
     pub info: DomainInfo,
     pub feeds: Option<ParsedFeeds>,
 }
-
-
-
-
-

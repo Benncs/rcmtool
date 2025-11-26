@@ -156,7 +156,7 @@ impl TransitionerWrapper {
 fn get_dtransitioner(root: &str) -> Result<Box<TransitionerWrapper>, String> {
     match get_transitioner(root) {
         Ok(t) => Ok(Box::new(TransitionerWrapper(t))),
-        Err(d) => Err(format!("{}", d)),
+        Err(d) => Err(format!("Error while reading {}: {}", root, d)),
     }
 }
 

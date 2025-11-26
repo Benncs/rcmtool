@@ -2,12 +2,11 @@ use std::path::PathBuf;
 
 pub fn generate(reactor_input_file_name: &str) -> bool {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../out/examples/");
-    if let Err(msg)=cmtool_assemble::headless_generate(reactor_input_file_name, path){
-        eprintln!("{}",msg);
+    if let Err(msg) = cmtool_assemble::headless_generate(reactor_input_file_name, path) {
+        eprintln!("{}", msg);
         return false;
     }
     return true;
-
 }
 
 #[cfg(test)]

@@ -9,9 +9,8 @@ use std::{env, path::Path};
 mod args;
 use args::*;
 
-fn out_or_default(out:Option<String>)->String{
-    out
-        .unwrap_or(format!("{}/../out/", env!("CARGO_MANIFEST_DIR")))
+fn out_or_default(out: Option<String>) -> String {
+    out.unwrap_or(format!("{}/../out/", env!("CARGO_MANIFEST_DIR")))
 }
 
 fn main() -> Result<(), CmtoolError> {
@@ -37,8 +36,6 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
         .and_then(|s| s.to_str())
         .unwrap(); // Converts OsStr to &str
 
-    
-
     let root_dir = out_or_default(common.out);
 
     let case = cmtool_core::ensight_gold::case::Case::read(&autoargs.case_path)?;
@@ -59,7 +56,7 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
 
     #[cfg(feature = "use_vtk")]
     handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
-
+    return Ok(());
     let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
     let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
     let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
 use std::collections::HashMap;
 
 use cmtool_data::PhaseCM;
@@ -38,7 +37,7 @@ impl PfrGlobalMassBalance {
         }
     }
 
-     pub(super) fn validate(&mut self) -> Result<(), CMError> {
+    pub(super) fn validate(&mut self) -> Result<(), CMError> {
         for (i, flow) in &self.flows {
             if flow.gas.in_flow != flow.gas.out_flow {
                 return Err(CMError::MassBalance(i.clone(), "gas".to_owned()));
@@ -73,7 +72,9 @@ impl PfrGlobalMassBalance {
     }
     pub fn get_flow(&self, id: &str, phase: PhaseCM) -> Result<f64, CMError> {
         if !self.validated {
-            return Err(CMError::Custom("Mass balance needs to be validated before being accessed".to_owned())); 
+            return Err(CMError::Custom(
+                "Mass balance needs to be validated before being accessed".to_owned(),
+            ));
         }
 
         if let Some(phase_flow) = self.flows.get(id) {
@@ -82,7 +83,10 @@ impl PfrGlobalMassBalance {
                 PhaseCM::Liquid => phase_flow.liquid.in_flow,
             });
         }
-        Err(CMError::Custom(format!("Mass balance does not provide {} pfr",id)))
+        Err(CMError::Custom(format!(
+            "Mass balance does not provide {} pfr",
+            id
+        )))
     }
 }
 

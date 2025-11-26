@@ -29,17 +29,29 @@ pub struct CMCase {
 impl std::fmt::Display for CMCase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "CMCase Configuration:")?;
-        writeln!(f, "  - Number of Divisions: [{}x{}x{}]", self.n_div[0], self.n_div[1], self.n_div[2])?;
+        writeln!(
+            f,
+            "  - Number of Divisions: [{}x{}x{}]",
+            self.n_div[0], self.n_div[1], self.n_div[2]
+        )?;
         writeln!(f, "  - Description: {}", self.description)?;
-        writeln!(f, "  - Time per Flow Map: {:.2} seconds", self.time_per_flow_map)?;
-        
+        writeln!(
+            f,
+            "  - Time per Flow Map: {:.2} seconds",
+            self.time_per_flow_map
+        )?;
+
         // Show paths, iterating over the HashMap
         writeln!(f, "  - Export Paths:\n")?;
         for export_type in self.paths.keys() {
             writeln!(f, "    - {:?}\n", export_type)?;
         }
 
-        writeln!(f, "  - Recursive: {}", if self.is_reursive { "Yes" } else { "No" })?;
+        writeln!(
+            f,
+            "  - Recursive: {}",
+            if self.is_reursive { "Yes" } else { "No" }
+        )?;
         Ok(())
     }
 }

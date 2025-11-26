@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
-
 use crate::fs::File;
 use std::fs;
 use std::io::Write;
@@ -54,8 +52,6 @@ fn domain_schema() -> Result<(), Error> {
     file.write_all(code.to_string().as_bytes())?;
     Ok(())
 }
-
-
 
 fn main() -> Result<(), Error> {
     domain_schema()?;

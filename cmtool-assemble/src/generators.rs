@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
 use crate::CMError;
 
 use cmtool_data::{
@@ -71,7 +70,6 @@ fn filter_phase(raw_phase: &[RawPhase], phase: PhaseCM) -> Vec<RawPhase> {
 }
 
 impl Generator {
-    
     pub fn new() -> Self {
         Self {
             raw_phase: Default::default(),
@@ -310,12 +308,11 @@ impl Generator {
         dest: &str,
         connections: Option<[RawDataFlux; 2]>,
     ) -> Result<(), CMError> {
-        
-        const MERGE_FOLDER_NAME:&str = "merged";
-        let liquid_phase = filter_phase(&self.raw_phase,PhaseCM::Liquid);
-        let gasphase = filter_phase(&self.raw_phase,PhaseCM::Gas);
-        
-        let path = format!("{}/{}", dest,MERGE_FOLDER_NAME);
+        const MERGE_FOLDER_NAME: &str = "merged";
+        let liquid_phase = filter_phase(&self.raw_phase, PhaseCM::Liquid);
+        let gasphase = filter_phase(&self.raw_phase, PhaseCM::Gas);
+
+        let path = format!("{}/{}", dest, MERGE_FOLDER_NAME);
         std::fs::create_dir_all(&path)?; //FIXME
         let mut case = CMCase::default();
         // case.n_div = n_div;
