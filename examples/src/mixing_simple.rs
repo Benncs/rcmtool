@@ -119,10 +119,9 @@ fn check_mixing<T: FlowMapTransitioner>(mut fm_t: T, final_time: f64, n_step: us
 fn main() {
     let final_time: f64 = 50.;
     let n_step: usize = 5000;
-    //All fonction use generic, specify iterator type here
 
     let root = std::env::var("EXAMPLE_ROOT").unwrap();
-
+    //All fonctions use generic, specify iterator type here
     let t: DiscontinuousTransitioner = get_transitioner(&root).unwrap();
     check_mixing(t, final_time, n_step);
 }
