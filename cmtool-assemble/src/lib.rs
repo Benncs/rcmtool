@@ -12,6 +12,9 @@ use crate::parser::{generated_domain::RootElementType, get_root, parse_domain};
 pub use data::{FeedFlow, ParsedFeeds};
 use map_generation::generate_flowmap;
 use thiserror::Error;
+
+pub use cmtool_data::PhaseCM; //reexport to have easier dependency 
+
 #[derive(Error, Debug)]
 pub enum CMError {
     #[error("Cmtool encountered an unknown error. Please check the input and try again.")]
@@ -58,16 +61,24 @@ impl Parser {
         Parser(root): Parser,
         root_dir: &str,
     ) -> Result<DomainData, CMError> {
-        let (domain, mb) = parse_domain(&root)?;
-        let root_dir = format!("{}", root_dir);
-        std::fs::create_dir_all(root_dir.clone())?;
-        generate_flowmap(&root_dir, &domain, &root.reactors, &mb)?;
+        let (mut domain, mb) = parse_domain(&root)?;
 
+        let path = if let Some(cm_case) = &domain.info.cm_case_only {
+            cm_case.clone()
+        } else {
+            std::fs::create_dir_all(root_dir)?;
+            generate_flowmap(root_dir, &domain, &root.reactors, &mb)?
+        };  
+
+        domain.case_path = path;
         Ok(domain)
     }
 }
 
-pub fn generate_domain(root_dir: &str, reactor_content: &str) -> Result<DomainData, CMError> {
+pub fn generate_domain(
+    root_dir: &str,
+    reactor_content: &str,
+) -> Result<DomainData, CMError> {
     let (_id, root) = Parser::start_parsing(reactor_content)?;
 
     let domain = Parser::continue_parsing(root, root_dir)?;

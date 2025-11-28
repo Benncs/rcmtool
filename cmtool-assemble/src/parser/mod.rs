@@ -14,6 +14,7 @@ pub(super) use pfr_mb::PfrGlobalMassBalance;
 pub fn parse_domain(
     root: &generated_domain::RootElementType,
 ) -> Result<(DomainData, PfrGlobalMassBalance), CMError> {
+    
     let info = parse_reactor(&root.reactors)?;
 
     let mut mass_balance = PfrGlobalMassBalance::new(&info.pfr_names);
@@ -34,6 +35,7 @@ pub fn parse_domain(
             connections: raw_connections,
             info,
             feeds: pfeeds,
+            case_path:String::new()
         },
         mass_balance,
     ))

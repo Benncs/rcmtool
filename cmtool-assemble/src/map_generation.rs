@@ -114,6 +114,9 @@ fn generate_partial_flowmap<T: cmtool_data::CMCaseWriter>(
             generated_domain::ReactorsTypeContent::Reactor3D(reactor3_dtype) => {
                 todo!("{:?}", reactor3_dtype)
             }
+            generated_domain::ReactorsTypeContent::ReactorFromFile(_)=>{
+                todo!("")
+            }
         }
     }
     Ok(ids)
@@ -124,7 +127,7 @@ pub fn generate_flowmap(
     domain: &DomainData,
     reactors: &generated_domain::ReactorsType,
     mb: &PfrGlobalMassBalance,
-) -> Result<(), CMError> {
+) -> Result<String, CMError> {
     let mut generator = Generator::new();
 
     let save_intermediate = reactors.content.len() == 1;
@@ -136,22 +139,27 @@ pub fn generate_flowmap(
         reactors,
         mb,
     )?;
-
+    //TODO remove returning cm_path  merge and merge_from_memory dont need to return it cause it is 'root'
+    //Same when len(id)==1
     if _ids.len() > 1 {
         if save_intermediate {
             generator.merge(root, &_ids, domain.connections.clone())?;
         } else {
             generator.merge_from_memory(root, domain.connections.clone())?;
         }
+        Ok(root.to_owned())
     } else if _ids.len() == 1 && save_intermediate {
         let case_path = format!("{}/{}/cma_case", root, _ids[0]);
         let prep = format!("./{}", _ids[0]);
         let case = CMCaseJson::read_case(std::path::Path::new(&case_path))?.prepend_path(&prep);
-
-        CMCaseJson::write_case(case, std::path::Path::new(&format!("{}/cma_case", root)))?;
+        let path = format!("{}/cma_case", root);
+        CMCaseJson::write_case(case, std::path::Path::new(&path))?;
+        Ok(root.to_owned())
+    }else{
+        Err(CMError::Custom("TODO ".to_owned()))
     }
 
-    Ok(())
+   
 }
 
 // fn parse_generate()

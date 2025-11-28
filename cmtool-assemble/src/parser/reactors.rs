@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::collections::HashMap;
+use std::path::Path;
+use std::path::PathBuf;
 
 use super::PfrGlobalMassBalance;
 use super::generated_domain;
@@ -163,30 +165,50 @@ pub fn parse_feed(
 }
 
 pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<DomainInfo, CMError> {
-    let mut parseinfo = DomainInfo::default();
-
+    let mut domain_info = DomainInfo::default();
+    let mut cm_case_only = None;
     let mut in_place_cumsum = 0;
     for reactor in &reactors.content {
         match reactor {
             generated_domain::ReactorsTypeContent::Reactor0D(reactor0_dtype) => {
-                parseinfo
+                domain_info
                     .compartment_cumsum
                     .insert(reactor0_dtype.id.clone(), in_place_cumsum);
-                parseinfo.total_number_compartment += 1;
+                domain_info.total_number_compartment += 1;
                 in_place_cumsum += 1;
             }
             generated_domain::ReactorsTypeContent::Reactor1D(current_pfr) => {
-                parseinfo
+                domain_info
                     .compartment_cumsum
                     .insert(current_pfr.id.clone(), in_place_cumsum);
-                parseinfo.total_number_compartment += current_pfr.compartments;
-                parseinfo.pfr_names.push(current_pfr.id.clone());
-                in_place_cumsum += current_pfr.compartments;
+                let n_c = current_pfr.compartments;
+                domain_info.total_number_compartment += n_c;
+                domain_info.pfr_names.push(current_pfr.id.clone());
+                in_place_cumsum += n_c;
+            }
+            generated_domain::ReactorsTypeContent::ReactorFromFile(reactor_from_file)=>{
+                let path = PathBuf::from(reactor_from_file.path.clone());
+                let case = cmtool_data::read_case(path.as_path())?;
+                // case.n_compartment()
+                domain_info.compartment_cumsum.insert(reactor_from_file.id.clone(),in_place_cumsum);
+                let n_c = case.n_compartment() as usize;
+                domain_info.total_number_compartment+=n_c;
+                in_place_cumsum+=n_c;
+
+                if cm_case_only.is_none()
+                {
+                    cm_case_only = Some(reactor_from_file.path.clone());
+                }  else{
+                    todo!("Existing flowmap merge")
+                } 
+                
+                
             }
             generated_domain::ReactorsTypeContent::Reactor3D(reactor3_dtype) => {
                 todo!("{:?}", reactor3_dtype)
             }
         }
     }
-    Ok(parseinfo)
+    domain_info.cm_case_only = cm_case_only;
+    Ok(domain_info)
 }

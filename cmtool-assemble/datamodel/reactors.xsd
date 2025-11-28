@@ -15,6 +15,11 @@
 		</xs:sequence>
 	</xs:complexType>
 
+	<xs:complexType name="ReactorFromFile">
+		<xs:attribute name="id" type="xs:string" use="required" />
+		<xs:attribute name="Path" type="xs:string" use="required"/>
+	</xs:complexType>
+
 	<xs:complexType name="Reactor0D">
 		<xs:complexContent>
 			<xs:extension base="BaseReactor">
@@ -61,6 +66,7 @@
 				<xs:element name="Reactor0D" type="Reactor0D" maxOccurs="unbounded" />
 				<xs:element name="Reactor1D" type="Reactor1D" maxOccurs="unbounded" />
 				<xs:element name="Reactor3D" type="Reactor3D" maxOccurs="unbounded" />
+				<xs:element name="ReactorFromFile" type="ReactorFromFile" maxOccurs="unbounded" />
 			</xs:choice>
 		</xs:all>
 	</xs:complexType>
