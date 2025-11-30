@@ -15,7 +15,13 @@ pub fn parse_domain(
     root: &generated_domain::RootElementType,
 ) -> Result<(DomainData, PfrGlobalMassBalance), CMError> {
     
+    if root.reactors.content.is_empty()
+    {
+        return Err(CMError::Parse(serde_xml_rs::Error::Custom("At least one reactor required".to_owned())));
+    } 
+
     let info = parse_reactor(&root.reactors)?;
+
 
     let mut mass_balance = PfrGlobalMassBalance::new(&info.pfr_names);
 
@@ -26,7 +32,7 @@ pub fn parse_domain(
 
     let mut pfeeds = None;
     if let Some(feeds) = &root.feeds {
-        pfeeds = Some(parse_feed(&info, feeds, &mut mass_balance)); //TODO
+        pfeeds = parse_feed(&info, feeds, &mut mass_balance); 
     }
     mass_balance.validate()?;
 

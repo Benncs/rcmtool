@@ -27,6 +27,7 @@ pub struct DomainInfo {
     pub total_number_compartment: usize,
     pub pfr_names: Vec<String>,
     pub cm_case_only:Option<String>,
+    pub is_two_phase_flow:bool
 }
 impl DomainInfo {
     pub fn get_relative_compartment_number(

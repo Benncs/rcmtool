@@ -17,7 +17,10 @@
 
 	<xs:complexType name="ReactorFromFile">
 		<xs:attribute name="id" type="xs:string" use="required" />
-		<xs:attribute name="Path" type="xs:string" use="required"/>
+		<xs:sequence>
+			<xs:element name="Path" type="xs:string"/>		
+		</xs:sequence>
+		
 	</xs:complexType>
 
 	<xs:complexType name="Reactor0D">

@@ -58,11 +58,19 @@ impl std::fmt::Display for CMCase {
 
 impl CMCase {
     pub fn n_compartment(&self) -> u32 {
+        if self.n_div.iter().find(|e| **e==0).is_some()
+        {
+            return 1;
+        }
         self.n_div.iter().product()
     }
 
     pub fn toggle_recursive(&mut self) {
         self.is_reursive = !self.is_reursive;
+    }
+
+    pub fn is_two_phase_flow(&self)->bool{
+        self.paths.contains_key(&CMAExportType::GasVolume)
     }
 
     pub fn add(&mut self, stype: CMAExportType, relative_path: &str) {
