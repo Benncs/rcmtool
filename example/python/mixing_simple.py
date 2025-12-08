@@ -54,10 +54,11 @@ def integration(
         d_t = 0  # Not used for this transitioner
         # Advance iterator to the corresponding flowmap (according to t or dt)
         it = fmt.advance(t, d_t)
+        n_c = it.n_compartments
+        liquid_state = it.liquid
         # Get the transition matrix
-        transition = pycmtool.get_sparse_transition_matrix(it)
-        n_c = transition.shape[0]  # Number of compartments
-        vol = it.volumes  # Volume of each compartment
+        transition = pycmtool.get_sparse_transition_matrix(liquid_state)
+        vol = liquid_state.volumes  # Volume of each compartment
         _mass = x.reshape((n_species, n_c))  # Reshape to (N_SPECIES, n_compartments)
         C = _mass / vol  # Concentration: mass / volume
         return (C @ transition).reshape(-1)  # Return flattened array for ODE solver
@@ -88,19 +89,18 @@ def get_normalized(it, y, i):
     The normalization is performed by dividing each compartment's concentration by the mean concentration
     of the species across all compartments. This is useful for comparing relative concentrations.
     """
-    vol = it.volumes
+    vol = it.liquid.volumes
     m0_c = y[0, :, i]
     return (m0_c / vol) / np.mean(m0_c / vol, axis=0)
 
 
 def check_mixing(fmt, final_time: float):
     it = fmt.get_current()
-    transition = pycmtool.get_sparse_transition_matrix(it)
-    n_c = transition.shape[0]
+    n_c = it.n_compartments
 
     C = np.zeros((N_SPECIES, n_c))
     C[0, :] = initial_c_distribution(n_c)
-    vol = it.volumes
+    vol = it.liquid.volumes
     m0 = C * vol
 
     sol = integration(fmt, m0, final_time, N_SPECIES)
