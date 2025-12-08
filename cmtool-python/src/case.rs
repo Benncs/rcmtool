@@ -48,6 +48,9 @@ impl CMCaseWrapper {
         cmtool_data::CMCaseJson::write_case(c, p).map_err(PythonError::from)?;
         Ok(())
     }
+    pub fn resolve(&self, root: &str, stype: CMExportTypeWrapper) -> Option<String> {
+        self.0.resolve(root, stype.into())
+    }
 }
 
 #[pyfunction]

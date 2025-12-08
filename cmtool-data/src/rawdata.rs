@@ -193,11 +193,18 @@ impl RawDataScalar {
 
 impl From<Vec<f64>> for RawDataScalar {
     fn from(value: Vec<f64>) -> Self {
+        value.as_slice().into()
+    }
+}
+
+impl From<&[f64]> for RawDataScalar {
+    fn from(value: &[f64]) -> Self {
+        let len: u32 = value.len().try_into().unwrap_or_else(|_| {
+            panic!("Array length is too large to convert into u32");
+        });
         Self {
-            header: ScalarFileHeader {
-                n_zone: value.len().try_into().unwrap(),
-            },
-            values: value.into_iter().map(|i| i.into()).collect(),
+            header: ScalarFileHeader { n_zone: len },
+            values: value.iter().copied().map(Into::into).collect(),
         }
     }
 }

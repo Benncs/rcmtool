@@ -37,7 +37,7 @@ mod pycmtool {
         #[pymodule_export]
         use super::{
             DiscontinuousTransitionerWrapper, IterationStateWrapper, get_transitioner,
-            read_flowmap, read_rawflow, read_rawscalar,
+            read_flowmap, read_rawflow, read_rawscalar, scalar_from_data,
         };
     }
 

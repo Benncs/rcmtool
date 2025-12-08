@@ -1,10 +1,13 @@
 use cmtool_data::RawData;
+use cmtool_data::RawDataScalar;
 use numpy::PyArray1;
 use numpy::PyArray2;
-use numpy::ndarray::{self};
+use numpy::PyUntypedArrayMethods;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+/* Scalar */
 
-#[pyclass(name = "RawDataScalar")]
+#[pyclass(name = "RawDataScalar", frozen)]
 pub struct RawDataScalarWrapper(cmtool_data::RawDataScalar);
 #[pymethods]
 impl RawDataScalarWrapper {
@@ -16,12 +19,53 @@ impl RawDataScalarWrapper {
     #[getter]
     pub fn data(&self, py: Python<'_>) -> Py<PyArray1<f64>> {
         let values: Vec<f64> = self.0.values.iter().map(|f| f.value).collect();
-
-        let array = ndarray::Array1::from(values);
-
+        //from does not perform copy
+        let array = numpy::ndarray::Array1::from(values);
         PyArray1::from_owned_array(py, array).unbind()
     }
 }
+
+#[pyfunction]
+pub fn read_rawscalar(path: &str) -> PyResult<RawDataScalarWrapper> {
+    if let Some(sc) = cmtool_data::RawDataScalar::read_raw(path) {
+        Ok(RawDataScalarWrapper(sc))
+    } else {
+        Err(PyValueError::new_err("Scalar not found"))
+    }
+}
+
+#[pyfunction]
+pub fn scalar_from_data<'py>(
+    _py: Python<'py>,
+    x: numpy::PyReadonlyArrayDyn<'py, f64>,
+) -> PyResult<RawDataScalarWrapper> {
+    if x.shape().len() != 1 {
+        return Err(PyValueError::new_err("Input array must be 1D."));
+    }
+
+    if !x.is_contiguous() {
+        return Err(PyValueError::new_err(
+            "Input array must be contiguous in memory.",
+        ));
+    }
+
+    match x.as_slice() {
+        Ok(slice) => {
+            if slice.len() != 1 {
+                return Err(PyValueError::new_err(
+                    "Input array must contain exactly one element.",
+                ));
+            }
+            let scalar = RawDataScalar::from(slice);
+            Ok(RawDataScalarWrapper(scalar))
+        }
+        Err(_) => Err(PyValueError::new_err(
+            "Failed to convert the array to a contiguous slice.",
+        )),
+    }
+}
+
+/* Flows */
 
 #[pyclass(name = "RawDataFlux")]
 pub struct RawDataFluxWrapper(cmtool_data::RawDataFlux);
@@ -36,11 +80,6 @@ impl RawDataFluxWrapper {
 #[pyfunction]
 pub fn read_rawflow(path: &str) -> RawDataFluxWrapper {
     RawDataFluxWrapper(cmtool_data::RawDataFlux::read_raw(path).unwrap())
-}
-
-#[pyfunction]
-pub fn read_rawscalar(path: &str) -> RawDataScalarWrapper {
-    RawDataScalarWrapper(cmtool_data::RawDataScalar::read_raw(path).unwrap())
 }
 
 #[pyclass(name = "FlowMapDescriptor")]
@@ -73,7 +112,7 @@ impl FlowMapDescriptorWrapper {
 
     #[getter]
     pub fn volumes(&self, py: Python<'_>) -> Py<PyArray1<f64>> {
-        let array = ndarray::Array1::from(self.0.volumes.clone());
+        let array = numpy::ndarray::Array1::from(self.0.volumes.clone());
         PyArray1::from_owned_array(py, array).unbind()
     }
 }
