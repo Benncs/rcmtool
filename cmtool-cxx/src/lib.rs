@@ -51,6 +51,8 @@ mod ffi {
 
         unsafe fn get_misc<'a>(self: &'a IterationStateWrapper, key: &str) -> &'a [f64];
 
+        fn has_misc(self: &IterationStateWrapper, key: &str) -> bool;
+
         fn flat_neighobrs(self: &IterationStateWrapper) -> &[usize];
 
         fn n_compartments(self: &IterationStateWrapper) -> usize;
@@ -172,6 +174,9 @@ impl IterationStateWrapper {
             Some(t) => Box::new(HydroStateWrapper(t)),
             None => Box::new(HydroStateWrapper(null())),
         }
+    }
+    fn has_misc(self: &IterationStateWrapper, key: &str) -> bool {
+        unsafe { &*self.0 }.get(key).is_some()
     }
 
     fn get_misc(self: &IterationStateWrapper, key: &str) -> &[f64] {
