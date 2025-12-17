@@ -41,7 +41,7 @@ __all__.extend(["sparse_array_from_triplet", "get_sparse_transition_matrix"])
 
 
 def get_sparse_transition_matrix(it):
-    return sparse_array_from_triplet(*it.flowmap)
+    return sparse_array_from_triplet(*it.transition)
 
 
 def sparse_array_from_triplet(

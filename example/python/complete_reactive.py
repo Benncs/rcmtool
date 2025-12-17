@@ -179,17 +179,16 @@ def check_mixing(fmt, n_s, final_time: float, reaction_rate):
 
 if __name__ == "__main__":
     final_time = 15 * 3600
-    root = "/home_pers/casale/Documents/thesis/cfd/sanofi"  # os.environ["EXAMPLE_ROOT"]
+    root =  os.environ["EXAMPLE_ROOT"]
 
-    # root="/home-local/casale/Documents/code/rbiomc/examples/cma_data/0d_gas/"
     N_SPECIES = 3
-
-    # Let CMTool read and load the full case automatically, ready to iterate
     def _reaction_rate(Cl):
         mum = 0.8 / 3600
         K_S = 0.1
         r = np.zeros_like(Cl)
-        mu = mum * Cl[0, :, :] / (Cl[0, :, :] + K_S)*Cl[2, :, :] / (Cl[2, :, :] + 1e-6)
+        mu = (
+            mum * Cl[0, :, :] / (Cl[0, :, :] + K_S) * Cl[2, :, :] / (Cl[2, :, :] + 1e-6)
+        )
         dx = Cl[1, :, :] * mu
         r[0, :, :] = -dx
         r[1, :, :] = dx / 2
@@ -201,5 +200,6 @@ if __name__ == "__main__":
         # r[1,:,i]=dx/2
         return r
 
+    # Let CMTool read and load the full case automatically, ready to iterate
     fmt = pycmtool.data.get_transitioner(root)
     check_mixing(fmt, N_SPECIES, final_time, _reaction_rate)
