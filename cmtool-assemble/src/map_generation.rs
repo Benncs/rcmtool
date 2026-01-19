@@ -114,7 +114,7 @@ fn generate_partial_flowmap<T: cmtool_data::CMCaseWriter>(
             generated_domain::ReactorsTypeContent::Reactor3D(reactor3_dtype) => {
                 todo!("{:?}", reactor3_dtype)
             }
-            generated_domain::ReactorsTypeContent::ReactorFromFile(_)=>{
+            generated_domain::ReactorsTypeContent::ReactorFromFile(_) => {
                 todo!("")
             }
         }
@@ -155,11 +155,9 @@ pub fn generate_flowmap(
         let path = format!("{}/cma_case", root);
         CMCaseJson::write_case(case, std::path::Path::new(&path))?;
         Ok(root.to_owned())
-    }else{
+    } else {
         Err(CMError::Custom("TODO ".to_owned()))
     }
-
-   
 }
 
 // fn parse_generate()

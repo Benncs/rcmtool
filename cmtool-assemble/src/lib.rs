@@ -68,17 +68,14 @@ impl Parser {
         } else {
             std::fs::create_dir_all(root_dir)?;
             generate_flowmap(root_dir, &domain, &root.reactors, &mb)?
-        };  
+        };
 
         domain.case_path = path;
         Ok(domain)
     }
 }
 
-pub fn generate_domain(
-    root_dir: &str,
-    reactor_content: &str,
-) -> Result<DomainData, CMError> {
+pub fn generate_domain(root_dir: &str, reactor_content: &str) -> Result<DomainData, CMError> {
     let (_id, root) = Parser::start_parsing(reactor_content)?;
 
     let domain = Parser::continue_parsing(root, root_dir)?;

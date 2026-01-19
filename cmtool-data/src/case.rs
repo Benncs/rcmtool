@@ -58,8 +58,7 @@ impl std::fmt::Display for CMCase {
 
 impl CMCase {
     pub fn n_compartment(&self) -> u32 {
-        if self.n_div.iter().find(|e| **e==0).is_some()
-        {
+        if self.n_div.iter().find(|e| **e == 0).is_some() {
             return 1;
         }
         self.n_div.iter().product()
@@ -69,7 +68,7 @@ impl CMCase {
         self.is_reursive = !self.is_reursive;
     }
 
-    pub fn is_two_phase_flow(&self)->bool{
+    pub fn is_two_phase_flow(&self) -> bool {
         self.paths.contains_key(&CMAExportType::GasVolume)
     }
 
