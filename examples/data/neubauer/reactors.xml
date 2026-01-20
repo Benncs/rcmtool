@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<Root run_id="neubauer_1995" version="3">
+    <Reactors>
+        <Reactor1D id="pfr">
+            <Size>
+                <Dimension>
+                    <Diameter unit="m">0.0192</Diameter>
+                    <Length unit="m">3</Length>
+                </Dimension>
+            </Size>
+            <VolumeFraction>0.2</VolumeFraction>
+            <Compartments>100</Compartments>
+            <Dispersion unit="m^2/s">0</Dispersion>
+        </Reactor1D>
+
+        <Reactor0D id="0d">
+            <Size>
+                <Volume>9.305e-3</Volume>
+            </Size>
+            <VolumeFraction>0.37</VolumeFraction>
+        </Reactor0D>
+    </Reactors>
+    <Connections>
+        <Flux phase="liquid">
+            <Source id="0d" compartment_id="0"></Source>
+            <Target id="pfr" compartment_id="0"></Target>
+            <Value unit="l/min">6.1e-6</Value>
+        </Flux>
+        <Flux phase="liquid">
+            <Source id="pfr" compartment_id="99"></Source>
+            <Target id="0d" compartment_id="0"></Target>
+            <Value unit="l/min">6.1e-6</Value>
+        </Flux>
+    </Connections>
+    <Feeds>
+        <Flux phase="gas" id="AA">
+            <Source id="pfr" compartment_id="0"></Source>
+            <Target id="pfr" compartment_id="99"></Target>
+            <Value unit="l/min">2.33333333333333E-05</Value>
+        </Flux>
+        <Flux phase="gas" id="AAA">
+            <Source id="0d" compartment_id="0"></Source>
+            <Target id="0d" compartment_id="0"></Target>
+            <Value unit="l/min">6.66666666666667E-05</Value>
+        </Flux>
+    </Feeds>
+</Root>

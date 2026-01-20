@@ -7,6 +7,7 @@ mod rawdata;
 mod states;
 mod transitioner;
 pub use case::{CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter, read_case};
+use core::f64;
 pub use descriptors::{CMAExportType, CMExportType, PhaseCM};
 pub use flowmap::FlowMapDescriptor;
 pub use rawdata::{
@@ -63,6 +64,36 @@ pub fn get_transitioner<T: FlowMapTransitioner>(root: &str) -> Result<T, DataErr
     let case_path = format!("{}/cma_case", root);
     let p = std::path::Path::new(&case_path);
     let case = read_case(p)?;
+
     //Load all the case information into the iterator
     T::from_case(root, &case)
+}
+
+pub fn get_min_residence_time<T: FlowMapTransitioner>(fmt: &T) -> f64 {
+    let n_states = fmt.size();
+    let mut min_all = f64::MAX;
+
+    for i_state in 0..n_states {
+        let state = fmt
+            .get_at(i_state)
+            .expect("Transitioner error: n_state != real stored states");
+
+        if state.liquid.out_flows.len() != state.liquid.volumes.len() {
+            panic!("Mismatched lengths between out_flows and volumes.");
+        }
+
+        let min_i = state
+            .liquid
+            .out_flows
+            .iter()
+            .zip(state.liquid.volumes.iter())
+            .map(|(&f, &v)| f / v)
+            .filter(|&x| x.is_finite())
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Greater))
+            .expect("Should exist a minimum for the state");
+
+        min_all = f64::min(min_all, min_i);
+    }
+
+    min_all
 }

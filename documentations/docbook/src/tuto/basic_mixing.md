@@ -35,7 +35,7 @@ Our Python wrapper offers an easy-to-use interface for out-of-the-box simulation
 
 
 ```python
-{{#include ../../../../example/python/mixing_simple.py}}
+{{#include ../../../example/python/mixing_simple.py}}
 ```
 
 
@@ -48,5 +48,5 @@ Here is an example of how to implement this in Rust. The **CMTool** components a
 Using Rust is advisable for building complete simulation tools. Rust allows developers to focus on writing performant code and provides more control over data, although it may require more development effort.
 
 ```rust
-{{#include ../../../../example/src/mixing_simple.rs}}
+{{#include ../../../example/src/mixing_simple.rs}}
 ```

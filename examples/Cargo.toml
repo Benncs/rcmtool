@@ -13,7 +13,27 @@ cmtool-data.workspace = true
 nalgebra.workspace = true
 nalgebra-sparse.workspace=true
 ndarray.workspace=true
-
+cmtool-assemble.workspace = true
 [[example]]
 path = "src/mixing_simple.rs"
 name = "mixing_simple"
+
+
+
+[[example]]
+name = "case_0d1d"
+path = "src/map_generation/case_0d1d.rs"
+
+[[example]]
+name = "simple_0d"
+path = "src/map_generation/simple_0d.rs"
+
+[[example]]
+name = "simple_1d"
+path = "src/map_generation/simple_1d.rs"
+
+[[example]]
+name = "neubauer"
+path = "src/map_generation/neubauer.rs"
+
+

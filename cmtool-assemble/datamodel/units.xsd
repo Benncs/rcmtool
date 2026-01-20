@@ -1,0 +1,96 @@
+<!-- 
+ SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema elementFormDefault="qualified"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+    <xs:complexType name="DimensionType">
+        <xs:simpleContent>
+            <xs:extension base="xs:float">
+                <xs:attribute name="unit" type="xs:string" use="optional"/>
+            </xs:extension>
+        </xs:simpleContent>
+    </xs:complexType>
+
+    <xs:complexType name="SizeSpecification">
+        <xs:choice>
+            <xs:element name="Volume" type="DimensionType"/>
+            <xs:element name="CylindricalDimensions">
+                <xs:complexType>
+                    <xs:all>
+                        <xs:element name="Diameter" type="DimensionType"/>
+                        <xs:element name="Length" type="DimensionType"/>
+                    </xs:all>
+                </xs:complexType>
+            </xs:element>
+        </xs:choice>
+    </xs:complexType>
+
+
+
+<xs:complexType name="LengthType">
+    <xs:simpleContent>
+        <xs:restriction base="DimensionType">
+            <xs:attribute name="unit" use="optional">
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:enumeration value="m"/>
+                        <xs:enumeration value="cm"/>
+                        <xs:enumeration value="mm"/>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute>
+        </xs:restriction>
+    </xs:simpleContent>
+</xs:complexType>
+
+<xs:complexType name="VolumeType">
+    <xs:complexContent>
+        <xs:restriction base="DimensionType">
+            <xs:attribute name="unit" use="optional">
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:enumeration value="m3"/>
+                        <xs:enumeration value="L"/>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute>
+        </xs:restriction>
+    </xs:complexContent>
+</xs:complexType>
+
+
+
+<xs:complexType name="FlowType">
+    <xs:simpleContent>
+        <xs:restriction base="DimensionType">
+            <xs:attribute name="unit" use="optional">
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:enumeration value="m3/s"/>
+                        <xs:enumeration value="l/min"/>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute>
+        </xs:restriction>
+    </xs:simpleContent>
+</xs:complexType>
+
+<xs:complexType name="TimeType">
+    <xs:simpleContent>
+        <xs:restriction base="DimensionType">
+            <xs:attribute name="unit" use="optional">
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:enumeration value="h"/>
+                        <xs:enumeration value="s"/>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute>
+        </xs:restriction>
+    </xs:simpleContent>
+</xs:complexType>
+
+
+</xs:schema>

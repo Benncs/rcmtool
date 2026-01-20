@@ -10,6 +10,7 @@ license.workspace = true
 clap.workspace = true
 cmtool-core.workspace = true
 cmtool-data.workspace = true
+cmtool-assemble.workspace = true
 thiserror.workspace = true
 
 
