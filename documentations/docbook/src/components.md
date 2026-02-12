@@ -5,7 +5,7 @@ This crates aims to provides different feature to perform complete simulation us
 - Unified data type that can easily be written and read 
 - A Modeler to generate predefined simple model 
 - A CFD-to-CMA generator to use CFD results exported in Ensight-Gold Format 
-
+- Assemble flowmaps seamlessly
 
 # Crate organization 
 
@@ -31,4 +31,4 @@ Python bindings, namely binds cmtool-core generation from Ensight case, FlowmapT
 
 ## cmtool-cxx
 
-Bindings for c++ use, expose FlowMapTranstioner API 
+Bindings for c++ use, expose FlowMapTranstioner API
