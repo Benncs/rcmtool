@@ -15,6 +15,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 cmtool-data.workspace = true
-numpy = "0.24.0"
+numpy.workspace = true
 pyo3.workspace = true
-nalgebra.workspace=true
+nalgebra.workspace = true

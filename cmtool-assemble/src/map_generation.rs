@@ -5,8 +5,8 @@ use crate::data::DomainData;
 use crate::generators::{Generator, PFRDescription};
 use crate::parser::generated_domain;
 use crate::parser::{PfrGlobalMassBalance, generated_domain::Reactor0DType};
-use cmtool_data::{CCMCaseInfo, CMCaseWriter, DataError};
 use cmtool_data::{CMCaseJson, CMCaseReader, PhaseCM};
+use cmtool_data::{CMCaseWriter, DataError};
 
 fn get_volume(size: &generated_domain::GeneralSizeType) -> f64 {
     match &size {

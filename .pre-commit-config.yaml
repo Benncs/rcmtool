@@ -1,10 +1,18 @@
+fail_fast: false
 repos:
--   repo: https://github.com/doublify/pre-commit-rust
+  - repo: https://github.com/doublify/pre-commit-rust
     rev: v1.0
+
     hooks:
-    # -   id: cargo-check
-    #     args: ["--workspace"]
-    -   id: fmt
+      - id: cargo-check
+        args: ["--workspace"]
+      - id: fmt
         args: ["--", "--check"]
-    # -   id: clippy
-    #     args: ["--", "-D", "warnings"]
+      - id: clippy
+        args: ["--", "-D", "warnings"]
+
+  - repo: https://github.com/EmbarkStudios/cargo-deny
+    rev: 0.19.0
+    hooks:
+      - id: cargo-deny
+        args: ["--all-features", "check", "ban", "licenses", "sources"]

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::collections::HashMap;
-use std::path::Path;
 use std::path::PathBuf;
 
 use super::PfrGlobalMassBalance;

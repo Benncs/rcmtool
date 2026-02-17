@@ -134,7 +134,7 @@ impl Generator {
             self.generate_0d_phase(&mut case, gas_volume, PhaseCM::Gas, dest)?;
         }
 
-        if let Some(scalars) = fields {
+        if let Some(_scalars) = fields {
             todo!("Scalar field")
         }
 

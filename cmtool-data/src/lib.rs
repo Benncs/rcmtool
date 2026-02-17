@@ -51,11 +51,13 @@ pub enum DataError {
 }
 
 #[inline(always)]
+#[allow(unused)]
 fn linear_index_row_major(_n_row: usize, n_col: usize, i: usize, j: usize) -> usize {
     i * n_col + j
 }
 
 #[inline(always)]
+#[allow(unused)]
 fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> usize {
     j * n_row + i
 }

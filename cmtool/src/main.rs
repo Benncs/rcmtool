@@ -4,7 +4,6 @@ use cmtool::CmtoolError;
 use std::fmt::Write;
 
 use std::path::PathBuf;
-use std::process::ExitCode;
 use std::{env, path::Path};
 mod args;
 use args::*;

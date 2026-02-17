@@ -227,7 +227,7 @@ pub trait CompartmentMeshManip {
     /// # Arguments
     ///
     /// * `cell_id` - The ID of the cell.
-    /// /// * `axis_project` - Axis index on which the surface is calculated
+    /// * `axis_project` - Axis index on which the surface is calculated
     ///
     /// # Returns
     ///

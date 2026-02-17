@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use cmtool_data::{CCMCaseInfo, CMCaseReader, DiscontinuousTransitioner, FlowMapTransitioner};
+use cmtool_data::{DiscontinuousTransitioner, FlowMapTransitioner};
 use numpy::PyArray1;
-use numpy::ndarray::{self};
 use pyo3::prelude::*;
 
 #[pyclass(name = "DiscontinuousTransitioner")]

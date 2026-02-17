@@ -49,6 +49,11 @@ fn domain_schema() -> Result<(), Error> {
     cfg.generator.flags.insert(GeneratorFlags::all());
     let code = generate(cfg).expect("Failed to generate Rust code from XSD");
     let mut file = File::create("src/parser/generated_domain.rs")?;
+    file.write_all(
+        b"#![allow(clippy::all)]\n
+    #![allow(dead_code)]\n
+    #![allow(unused_imports)]\n\n\n",
+    )?;
     file.write_all(code.to_string().as_bytes())?;
     Ok(())
 }

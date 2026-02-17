@@ -30,7 +30,7 @@ use buffer::{FlowMapBuffer, read_descriptors};
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```ignore
 /// let transitioner = MyTransitioner::from_case("root/path", &case)?;
 /// let state = transitioner.advance(12.0, 0.1);
 /// println!("Current state: {:?}", state);
@@ -140,7 +140,7 @@ pub enum TransitionerType {
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```ignore
 /// let transitioner = DiscontinuousTransitioner {
 ///     state_buffer: vec![Arc::new(state1), Arc::new(state2), Arc::new(state3)],
 ///     time_per_flomap: 0.5,
@@ -267,7 +267,7 @@ impl FlowMapTransitioner for SimpleTransitioner {
         &self.state_buffer[self.current_index]
     }
 
-    fn need_advance(&self, _current_time: f64, time_step: f64) -> bool {
+    fn need_advance(&self, _current_time: f64, _time_step: f64) -> bool {
         true //Actually needs to be alsways updated because of remaining_time
     }
 

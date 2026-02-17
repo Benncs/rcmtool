@@ -24,7 +24,7 @@ fn sort_polygon_ccw(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
     sorted
 }
 
-fn project_points_to_plane_2d(points: &Vec<[f64; 3]>, normal: &CartesianVec3) -> Vec<[f64; 2]> {
+fn project_points_to_plane_2d(points: &[[f64; 3]], normal: &CartesianVec3) -> Vec<[f64; 2]> {
     let n = normal.normalized();
     let arbitrary = CartesianVec3::from_point_origin(if n.0[0].abs() < 0.9 {
         CartesianCoordinates([1.0, 0.0, 0.0])
@@ -42,7 +42,7 @@ fn project_points_to_plane_2d(points: &Vec<[f64; 3]>, normal: &CartesianVec3) ->
         .collect()
 }
 
-fn sort_points_ccw_3d(points: &Vec<[f64; 3]>, normal: &CartesianVec3) -> Vec<[f64; 3]> {
+fn sort_points_ccw_3d(points: &[[f64; 3]], normal: &CartesianVec3) -> Vec<[f64; 3]> {
     let projected = project_points_to_plane_2d(points, normal);
     let sorted_2d = sort_polygon_ccw(&projected);
 

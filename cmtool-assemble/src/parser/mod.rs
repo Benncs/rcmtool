@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 
-#[allow(clippy::all)]
+
 #[rustfmt::skip]
 pub mod generated_domain;
 use crate::{CMError, DomainData};

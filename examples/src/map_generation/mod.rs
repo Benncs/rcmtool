@@ -6,7 +6,7 @@ pub fn generate(reactor_input_file_name: &str) -> bool {
         eprintln!("{}", msg);
         return false;
     }
-    return true;
+    true
 }
 
 #[cfg(test)]

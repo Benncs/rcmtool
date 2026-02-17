@@ -2,7 +2,6 @@
 
 use crate::{CMAExportType, DataError};
 use serde::{Deserialize, Serialize};
-use std::ffi::os_str::Display;
 use std::io::{BufReader, Read, Write};
 use std::{collections::HashMap, fs, path::Path};
 
@@ -58,8 +57,8 @@ impl std::fmt::Display for CMCase {
 
 impl CMCase {
     pub fn n_compartment(&self) -> u32 {
-        if self.n_div.iter().find(|e| **e == 0).is_some() {
-            return 1;
+        if self.n_div.contains(&0) {
+            return 1; //FIXME
         }
         self.n_div.iter().product()
     }
@@ -127,13 +126,15 @@ impl CMCase {
         let ok_gas = if has_gas_volume && !has_gas_flow {
             false
         } else {
-            !(has_gas_flow && !has_gas_volume)
+            // !(has_gas_flow && !has_gas_volume)
+            !has_gas_flow || has_gas_volume
         };
 
         let ok_liq = if has_liq_volume && !has_liq_flow {
             false
         } else {
-            !(has_liq_flow && !has_liq_volume)
+            // !(has_liq_flow && !has_liq_volume)
+            !has_liq_flow || has_liq_volume
         };
 
         ok_liq && ok_gas
