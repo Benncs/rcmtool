@@ -51,6 +51,7 @@ mod ffi {
 
         fn has_gas(self: &IterationStateWrapper) -> bool;
 
+        #[allow(clippy::needless_lifetimes)]
         unsafe fn get_misc<'a>(self: &'a IterationStateWrapper, key: &str) -> &'a [f64];
 
         fn has_misc(self: &IterationStateWrapper, key: &str) -> bool;

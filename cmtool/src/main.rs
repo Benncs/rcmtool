@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use cmtool::CmtoolError;
-use std::fmt::Write;
+use cmtool_data::{RawData, RawDataFlux};
+// use std::fmt::Write;
 
+// use std::fs;
 use std::path::PathBuf;
 use std::{env, path::Path};
 mod args;
@@ -35,6 +37,15 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
         .and_then(|s| s.to_str())
         .unwrap(); // Converts OsStr to &str
 
+    // let mut f = cmtool::check_flows(
+    //     &RawDataFlux::read_raw("./out/cuve_sldmsh_initmrf/velocity.raw").unwrap(),
+    // )
+    // .unwrap();
+
+    // println!("{}", f);
+
+    // return Ok(());
+
     let root_dir = out_or_default(common.out);
 
     let case = cmtool_core::ensight_gold::case::Case::read(&autoargs.case_path)?;
@@ -56,21 +67,29 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
     #[cfg(feature = "use_vtk")]
     handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
 
-    let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
-    let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
-    let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";
-    //
-    let export = handle
-        .dump_vector_from_scalar(format!("{}/flowL", root_dir), p1, p2, p3)
-        .unwrap();
-
-    if let Some(mut check_csv) = cmtool::check_flows(&export) {
-        check_csv
-            .write_str(&format!("sanitize_{}.csv", stem))
-            .unwrap();
-    };
-
+    let f = cmtool::check_flows(
+        &RawDataFlux::read_raw("./out/cuve_sldmsh_initmrf/velocity.raw").unwrap(),
+    )
+    .unwrap();
+    println!("{}", f);
+    // return Ok(());
     Ok(())
+
+    // let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
+    // let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
+    // let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";
+    // //
+    // let export = handle
+    //     .dump_vector_from_scalar(format!("{}/flowL", root_dir), p1, p2, p3)
+    //     .unwrap();
+
+    // if let Some(mut check_csv) = cmtool::check_flows(&export) {
+    //     check_csv
+    //         .write_str(&format!("sanitize_{}.csv", stem))
+    //         .unwrap();
+    // };
+
+    // Ok(())
 
     //  cmtool::check_flows(&RawDataFlux::read_raw(
     //      "./out/cuve_sldmsh_initmrf/axial_velocity.raw",

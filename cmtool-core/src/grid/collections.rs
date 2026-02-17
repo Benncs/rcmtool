@@ -58,6 +58,7 @@ pub const fn cylindrical_index(axis: CylindricalAxis) -> usize {
 }
 
 #[inline(always)]
+#[allow(unused)] //FIXME
 pub const fn index_to_oriented(axis: usize) -> OrientedAxis {
     match axis {
         0 => OrientedAxis::I,

@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::{path::Path, sync::Arc};
-
-use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
-
-use crate::model::{CMGeometry, CMModel, Scalar, Vector};
-
-#[cfg(feature = "use_vtk")]
-use crate::grid::vtk::VtkCm;
-#[cfg(feature = "use_vtk")]
-use crate::grid::vtk::add_celldata_to_vtk;
-
 pub mod coordinates;
 pub mod ensight_gold;
+mod errors;
 pub mod grid;
 pub mod model;
 pub mod utils;
+pub use errors::CoreError;
+
+#[cfg(feature = "use_vtk")]
+use grid::vtk::VtkCm;
+#[cfg(feature = "use_vtk")]
+use grid::vtk::add_celldata_to_vtk;
+
+use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
+use model::{CMGeometry, CMModel, Scalar, Vector};
+use std::{path::Path, sync::Arc};
+
 pub enum ExportType {
     EnsightGold,
 }
@@ -26,9 +27,6 @@ pub enum ExportType {
 //     fn get_root(&self) -> String;
 //     fn get_geometry_relative_path(&self) -> String;
 // }
-
-mod errors;
-pub use errors::CoreError;
 
 pub struct CMHandle {
     model: Arc<model::CMModel>,
