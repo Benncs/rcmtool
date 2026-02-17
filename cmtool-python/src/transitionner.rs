@@ -47,7 +47,7 @@ unsafe impl Send for HydroStateWrapper {}
 #[pymethods]
 impl HydroStateWrapper {
     #[getter]
-    pub fn transition(&self, py: Python<'_>) -> (&[usize], &[usize], &[f64]) {
+    pub fn transition(&self, _py: Python<'_>) -> (&[usize], &[usize], &[f64]) {
         let t = unsafe { (*self.0).get_transition() };
         (t.row_indices(), t.col_indices(), t.values())
     }

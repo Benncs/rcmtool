@@ -218,12 +218,15 @@ impl Geometry {
             reader.ignore_line()?;
         }
 
-        let node_id_choice = reader.get_line_string()?;
+        let (ignore_node_id, ignore_element_id) = {
+            let _node_id_choice = reader.get_line_string()?;
 
-        let ignore_node_id = false; //TODO find in node_id_choice: assign
+            let ignore_node_id = false; //TODO find in node_id_choice: assign
 
-        let element_id_choice = reader.get_line_string()?;
-        let ignore_element_id = false; //TODO find in element_id_choice: assign
+            let _element_id_choice = reader.get_line_string()?;
+            let ignore_element_id = false; //TODO find in element_id_choice: assign
+            (ignore_node_id, ignore_element_id)
+        };
 
         // println!("{} {}", node_id_choice, element_id_choice);
 

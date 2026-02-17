@@ -82,14 +82,14 @@ pub fn parse_connection(
     ]
 }
 
-fn convert_feed_flux_to_flux(feed: generated_domain::FeedFluxType) -> generated_domain::FluxType {
-    generated_domain::FluxType {
-        source: feed.source,
-        target: feed.target,
-        phase: feed.phase,
-        value: feed.value,
-    }
-}
+// fn convert_feed_flux_to_flux(feed: generated_domain::FeedFluxType) -> generated_domain::FluxType {
+//     generated_domain::FluxType {
+//         source: feed.source,
+//         target: feed.target,
+//         phase: feed.phase,
+//         value: feed.value,
+//     }
+// }
 
 // pub fn parse_feed(
 //     info: &DomainInfo,

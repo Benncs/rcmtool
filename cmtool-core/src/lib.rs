@@ -20,19 +20,19 @@ pub enum ExportType {
     EnsightGold,
 }
 
-trait GeometryInfo {}
+// trait GeometryInfo {}
 
-trait CfdCase {
-    fn get_root(&self) -> String;
-    fn get_geometry_relative_path(&self) -> String;
-}
+// trait CfdCase {
+//     fn get_root(&self) -> String;
+//     fn get_geometry_relative_path(&self) -> String;
+// }
 
 mod errors;
 pub use errors::CoreError;
 
 pub struct CMHandle {
     model: Arc<model::CMModel>,
-    root_result: String,
+    _root_result: String, //TODO EITHER USE IT OR REMOVE
     eg_geometry: Arc<ensight_gold::Geometry>,
     cm_geometry: Arc<CMGeometry>,
 }
@@ -76,7 +76,7 @@ impl CMHandle {
 
         Ok(Self {
             model: Arc::new(CMModel::init(cm_geometry.clone())),
-            root_result: String::from("./test"),
+            _root_result: String::from("./test"),
             eg_geometry,
             cm_geometry,
         })

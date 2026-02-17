@@ -32,7 +32,9 @@ pub struct Generator {
 }
 
 struct Field0D {
+    #[allow(unused)]
     name: String,
+    #[allow(unused)]
     value: f64,
 }
 

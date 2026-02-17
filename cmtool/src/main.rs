@@ -19,7 +19,7 @@ fn main() -> Result<(), CmtoolError> {
         AllModes::Cfd(cfdargs) => match cfdargs.mode {
             Mode::Auto(autoargs) => auto_main(cfdargs.common, autoargs),
 
-            Mode::Manual(manual_args) => todo!(),
+            Mode::Manual(_manual_args) => todo!(),
         },
         AllModes::Xml(xml) => {
             let path = PathBuf::from(out_or_default(xml.out_dir));
@@ -55,7 +55,7 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
 
     #[cfg(feature = "use_vtk")]
     handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
-    return Ok(());
+
     let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
     let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
     let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";

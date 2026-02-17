@@ -539,10 +539,10 @@ impl CompartmentMeshManip for MeshCylindrical {
             CylindricalAxis::Theta => delta_ijk[0] * delta_ijk[2], // ds = dr*dz
             CylindricalAxis::Z => {
                 // ds  =r*dr*dtheta
-                // R here is not radius but (r-R)
-                let R = self.axes[0].edges[points_indices[0] + 1];
+                // rr here is not radius but (r-R)
+                let rr = self.axes[0].edges[points_indices[0] + 1];
                 let r2 = self.axes[0].edges[points_indices[0]];
-                0.5 * (R * R - r2 * r2) * delta_ijk[1]
+                0.5 * (rr * rr - r2 * r2) * delta_ijk[1]
             }
         }
     }
@@ -583,7 +583,7 @@ impl CompartmentMeshManip for MeshCylindrical {
         Some(mesh_id)
     }
 
-    fn is_point_inside(&self, cell_id: usize, point_coords: &Coords3) -> bool {
+    fn is_point_inside(&self, _cell_id: usize, _point_coords: &Coords3) -> bool {
         todo!()
     }
 

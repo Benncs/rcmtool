@@ -73,6 +73,7 @@ impl CMModel {
         model
     }
 
+    #[allow(unused)]
     fn compute_volume_integral_per_zone() -> Vec<f64> {
         todo!()
     }
