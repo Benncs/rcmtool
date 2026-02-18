@@ -3,6 +3,31 @@
 ## 0.1.4
 *Date: *
 
+#### Features:
+
+- Assemble flowmaps
+
+
+#### General Enhancements
+
+- Improve transitioner api and performance
+- Improve documentation 
+- Improve python bindings
+
+#### Build System Changes
+
+#### Breaking Changes
+
+#### Deprecations
+- C Case Reader
+
+#### Bug Fixes
+
+#### Known Issue
+
+- CFD generated model does not compute flows correctly
+
+
 
 ## 0.1.3 
 *Date: 11/23/2025*

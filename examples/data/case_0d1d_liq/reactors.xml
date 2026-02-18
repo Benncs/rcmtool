@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" ?>
 <Root run_id="case_1d0d_liq" version="3">
   <Reactors>
     <Reactor1D id="pfr">
@@ -21,30 +21,26 @@
   </Reactors>
   <Connections>
     <Flux phase="liquid">
-      <Source id="str" compartment_id="0"></Source>
-      <Target id="pfr" compartment_id="0"></Target>
+      <Source id="str" compartment_id="0" />
+      <Target id="pfr" compartment_id="0" />
       <Value unit="l/min">1e-6</Value>
     </Flux>
     <Flux phase="liquid">
-      <Source id="pfr" compartment_id="99"></Source>
-      <Target id="str" compartment_id="0"></Target>
+      <Source id="pfr" compartment_id="99" />
+      <Target id="str" compartment_id="0" />
       <Value unit="l/min">1e-6</Value>
     </Flux>
-
   </Connections>
   <Feeds>
-
     <Flux phase="liquid" id="feed_liq_pfr">
-      <Source id="pfr" compartment_id="0"></Source>
-      <Target id="pfr" compartment_id="99"></Target>
+      <Source id="pfr" compartment_id="0" />
+      <Target id="pfr" compartment_id="99" />
       <Value unit="l/min">3e-8</Value>
     </Flux>
-
     <Flux phase="liquid" id="feed_liq_str">
-      <Source id="str" compartment_id="0"></Source>
-      <Target id="str" compartment_id="0"></Target>
+      <Source id="str" compartment_id="0" />
+      <Target id="str" compartment_id="0" />
       <Value unit="l/min">6e-8</Value>
     </Flux>
   </Feeds>
-
 </Root>

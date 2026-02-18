@@ -76,10 +76,10 @@ def initial_c_distribution(n_c):
     """
     Generate a random initial concentration distribution for a simulation with `n_c` compartments.
     """
-    # return np.random.random((1, n_c))
-    m = np.zeros((n_c,))
-    m[0] = 1
-    return m
+    return np.random.random((1, n_c))
+    # m = np.zeros((n_c,))
+    # m[0] = 1
+    # return m
 
 
 def get_normalized(it, y, i):
@@ -121,8 +121,12 @@ def check_mixing(fmt, final_time: float):
     print("Final variance: ", np.var(c_final, axis=0))
 
     plt.figure()
-    plt.plot(c_final)
-    plt.title("Normalized concentration in all compartments")
+    plt.style.use("tableau-colorblind10")
+    plt.plot(c_final, label="final")
+    plt.plot(c_init, "x", markersize=2.5, label="init")
+    plt.title("Normalized concentration in all compartments (1 is the target value)")
+    plt.xlabel("Compartment ID")
+    plt.ylabel("Normalized concentration")
     plt.legend()
     plt.show()
     assert abs(m0m - mfm) < 1e-8

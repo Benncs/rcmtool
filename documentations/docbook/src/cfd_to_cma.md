@@ -1,6 +1,3 @@
 # CFD-To-CMA
 
-## References
-
-- Ensight gold specifications : 
-    - https://dav.lbl.gov/archive/NERSC/Software/ensight/doc/Manuals/UserManual.pdf
+According to @@computational_engineering_international_inc_ensight_2003, ...

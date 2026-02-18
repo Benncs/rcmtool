@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" ?>
 <Root run_id="simple_0d" version="3">
     <Reactors>
         <Reactor0D id="reactor">
@@ -12,6 +12,4 @@
             </VolumeFraction>
         </Reactor0D>
     </Reactors>
-
-    
 </Root>
