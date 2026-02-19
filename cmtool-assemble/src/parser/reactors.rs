@@ -51,7 +51,11 @@ fn connection_per_phase(
                 }
             }
         } else {
-            eprintln!("Ignored connection");
+            eprintln!(
+                "Ignored connection src:{} {}",
+                node.source.id, node.target.id
+            );
+            panic!("TODO: Handle error when flux doesnt work")
         }
     }
     rd
