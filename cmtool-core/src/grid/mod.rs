@@ -287,6 +287,9 @@ pub trait CompartmentMeshManip {
     fn n_maximum_interface(&self) -> usize;
 
     fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (BoundedPlane, usize);
+
+    fn cell_from_ax_points(&self, axis_points: &AxisPoints) -> Option<usize>;
+    fn get_boundary(&self) -> Vec<usize>;
 }
 /// A compartment mesh grid.
 ///
@@ -562,6 +565,23 @@ impl CompartmentMeshManip for MeshCylindrical {
         delta_ijk[height_axis] * surface_ij
     }
 
+    fn cell_from_ax_points(&self, axis_points: &AxisPoints) -> Option<usize> {
+        let mut cell_1d = 0;
+        let mut multiplier = 1;
+
+        for i in (0..self.axes.len()).rev() {
+            let n = self.axes[i].descriptor.n_range;
+            if axis_points[i] >= n {
+                return None;
+            }
+            cell_1d += axis_points[i] * multiplier;
+
+            multiplier *= n;
+        }
+
+        Some(cell_1d)
+    }
+
     fn cell_from_coordinates(&self, coords: &Coords3) -> Option<usize> {
         let mut mesh_id = 0;
         let mut cumulative_product = 1;
@@ -589,7 +609,6 @@ impl CompartmentMeshManip for MeshCylindrical {
 
     fn cell_points(&self, cell_1d: usize) -> AxisPoints {
         let mut axis_points = AxisPoints::default();
-
         let mut p_coeff_up = cell_1d;
 
         // for (current_point, current_axis) in axis_points.iter_mut().zip(&self.axes) {
@@ -607,6 +626,45 @@ impl CompartmentMeshManip for MeshCylindrical {
         }
 
         axis_points
+    }
+
+    fn get_boundary(&self) -> Vec<usize> {
+        let (n_r, n_theta, n_z) = (
+            self.n_points_axis(0),
+            self.n_points_axis(1),
+            self.n_points_axis(2),
+        );
+
+        let expected = n_theta * (n_z - 2) + 2 * n_r * n_z;
+        let mut v = Vec::with_capacity(expected);
+
+        for i in 0..n_r {
+            for j in 0..n_theta {
+                let p = self
+                    .cell_from_ax_points(&[i, j, 0])
+                    .expect("get_boundary: out of bound ");
+                let p2 = self
+                    .cell_from_ax_points(&[i, j, n_z - 1])
+                    .expect("get_boundary: out of bound ");
+                v.push(p);
+                v.push(p2);
+            }
+        }
+
+        for k in 1..n_z - 1 {
+            for j in 0..n_theta {
+                let p = self
+                    .cell_from_ax_points(&[n_r - 1, j, k])
+                    .expect("get_boundary: out of bound ");
+                v.push(p)
+            }
+        }
+
+        if expected != v.len() {
+            panic!("Detected number is not correct {} {}", expected, v.len());
+        }
+
+        v
     }
 }
 
@@ -788,6 +846,31 @@ mod test {
             [max_ax1, std::f64::consts::PI, max_ax3],
             (number_point_ax3 * number_point_ax1 * number_point_ax2) - 1,
         );
+    }
+
+    #[test]
+    fn t_boundary_cylindrical() {
+        let ax1 = AxisDescriptor::new(0., max_ax1, 5);
+        let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, 10);
+        let ax3 = AxisDescriptor::new(0., max_ax3, 10);
+        let mesh = get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3]);
+
+        let mut v = mesh.get_boundary();
+        let w = [
+            0, 9, 10, 19, 20, 29, 30, 39, 40, 49, 50, 59, 60, 69, 70, 79, 80, 89, 90, 99, 100, 109,
+            110, 119, 120, 129, 130, 139, 140, 149, 150, 159, 160, 169, 170, 179, 180, 189, 190,
+            199, 200, 209, 210, 219, 220, 229, 230, 239, 240, 249, 250, 259, 260, 269, 270, 279,
+            280, 289, 290, 299, 300, 309, 310, 319, 320, 329, 330, 339, 340, 349, 350, 359, 360,
+            369, 370, 379, 380, 389, 390, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409,
+            410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426,
+            427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443,
+            444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460,
+            461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477,
+            478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494,
+            495, 496, 497, 498, 499,
+        ];
+        v.sort();
+        assert_eq!(v, w);
     }
 
     #[test]
