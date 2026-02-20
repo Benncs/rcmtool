@@ -111,6 +111,29 @@ impl FlowMapDescriptorWrapper {
     }
 
     #[getter]
+    pub fn neighbors(this: Bound<'_, Self>) -> Bound<'_, PyArray2<usize>> {
+        let flowmap = &this.borrow().0.neighbors;
+        // SAFETY:
+        // - The returned NumPy array shares memory with the internal `flowmap` (Array2<f64>).
+        // - We use `borrow_from_array`, which ties the array's lifetime to the Python object (`this`).
+        // - This guarantees that the underlying Rust memory remains valid as long as Python holds the array.
+        //
+        // Critical Requirements:
+        // - `self.0.flowmap` must not be mutated in a way that causes memory reallocation (e.g., replacing it).
+        //   For example, the following code is unsafe if it runs after `pyobject.flowmap` is accessed:
+        //
+        //     fn drop(&mut self) {
+        //         self.0.flowmap = Array2::zeros((1, 1));  // BAD: reallocates backing buffer
+        //     }
+        //
+        // - Violating this invariant (e.g., replacing the array or shrinking it) while Python holds a reference
+        //   will cause undefined behavior (likely a segmentation fault).
+        //
+        // - Only expose immutable views or ensure exclusive access if mutations are needed.
+        unsafe { PyArray2::borrow_from_array(flowmap, this.into_any()) }
+    }
+
+    #[getter]
     pub fn volumes(&self, py: Python<'_>) -> Py<PyArray1<f64>> {
         let array = numpy::ndarray::Array1::from(self.0.volumes.clone());
         PyArray1::from_owned_array(py, array).unbind()

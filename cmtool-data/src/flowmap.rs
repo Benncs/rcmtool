@@ -4,7 +4,7 @@ use crate::{DataError, RawData, RawFlux, rawdata};
 
 pub struct FlowMapDescriptor {
     pub flowmap: Array2<f64>,
-    pub(crate) neighbors: Array2<usize>, //TODO
+    pub neighbors: Array2<usize>, //TODO
     pub volumes: Vec<f64>,
 }
 
@@ -60,6 +60,9 @@ impl FlowMapDescriptor {
             .ok_or(DataError::BadData)?;
 
         let mut neighbor_flat = Array2::<usize>::zeros((n_zone, max_size));
+
+        neighbor_flat.fill(n_zone + 1); //Any ghost neighbor will have value n+1
+
         for (i_zone, neighbors_for_zone) in neighbors.iter().enumerate() {
             for (i_n, id_neighbor) in neighbors_for_zone.iter().enumerate() {
                 *(neighbor_flat.get_mut((i_zone, i_n)).unwrap()) = *id_neighbor;
