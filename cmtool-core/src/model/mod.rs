@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//We need to expose some grid interface to cfd-assemble
+//TODO: refractor model to put cfd oriented into separated mod and move "reactor model" such as 0d/pfr from assemble to here
+
 use crate::{
     CoreError,
     coordinates::{CartesianCoordinates, CartesianVec3, CylindricalCoordinates},
