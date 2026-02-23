@@ -18,6 +18,7 @@ pub use states::*;
 use std::io;
 use thiserror::Error;
 pub use transitioner::*;
+
 /// Errors that can occur during data operations.
 ///
 /// This enum encapsulates various error conditions that might arise during
@@ -62,6 +63,7 @@ fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> us
     j * n_row + i
 }
 
+///Create transitioner
 pub fn get_transitioner<T: FlowMapTransitioner>(root: &str) -> Result<T, DataError> {
     let case_path = format!("{}/cma_case", root);
     let p = std::path::Path::new(&case_path);
@@ -71,6 +73,7 @@ pub fn get_transitioner<T: FlowMapTransitioner>(root: &str) -> Result<T, DataErr
     T::from_case(root, &case)
 }
 
+///Compute the smallest average residence time in compartment
 pub fn get_min_residence_time<T: FlowMapTransitioner>(fmt: &T) -> f64 {
     let n_states = fmt.size();
     let mut min_all = f64::MAX;

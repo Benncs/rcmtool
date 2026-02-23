@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::ptr::null;
+//!Expose required method to C++
 
 use cmtool_data::{
     DiscontinuousTransitioner, FlowMapTransitioner, HydroState, IterationState, get_transitioner,
 };
 use nalgebra_sparse::CooMatrix;
+
+use std::ptr::null;
+
+//Choice to use raw ptr was made to avoid clone/creating Arc which are useless for our usage
+//All ptr are valid because they are created from rust side
+
 struct TransitionerWrapper(DiscontinuousTransitioner);
 
 struct IterationStateWrapper(*const IterationState);

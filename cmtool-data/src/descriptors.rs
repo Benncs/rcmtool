@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use serde::{Deserialize, Serialize};
+
+///Legacy type of exported type value in a CM model
+// #[deprecated(since = "0.1.4", note = "use CMExportType")]
+//TODO remove where possible
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone, Copy)]
 pub enum CMAExportType {
     LiquidFlow,
@@ -12,6 +16,7 @@ pub enum CMAExportType {
     Other,
 }
 
+///Phase name in compartment model
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone, Copy)]
 pub enum PhaseCM {
     Liquid,
@@ -42,6 +47,7 @@ impl From<String> for PhaseCM {
     }
 }
 
+///Enum-Struct based improvement of 'CMAExportType'
 pub enum CMExportType {
     Flow(PhaseCM),
     Volume(PhaseCM),

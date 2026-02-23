@@ -27,6 +27,7 @@ pub struct PFRDescription {
     pub axial_dispersion: f64,
 }
 
+//TODO improve and change name
 pub struct Generator {
     raw_phase: Vec<RawPhase>,
 }
@@ -37,7 +38,7 @@ struct Field0D {
     #[allow(unused)]
     value: f64,
 }
-
+///wrapper Get absolute path from relative
 fn resolve_path(
     case: &CMCase,
     relative_path: &str,
@@ -47,6 +48,7 @@ fn resolve_path(
         .ok_or(CMError::Custom("Error resolving path".to_string()))
 }
 
+///Create vector of raw phase from raw
 fn get_raw_phase(
     flows: Vec<RawDataFlux>,
     vol: Vec<RawDataScalar>,
@@ -63,6 +65,7 @@ fn get_raw_phase(
         .collect()
 }
 
+///Select specific phase type in a slice of phases
 fn filter_phase(raw_phase: &[RawPhase], phase: PhaseCM) -> Vec<RawPhase> {
     raw_phase
         .iter()
@@ -349,27 +352,28 @@ impl Generator {
 
         let mut n_div = [0, 0, 0];
         for id in ids.iter() {
-            let case = CMCaseJson::read_case(Path::new(&format!("{}/{}/cma_case", dest, id)))?;
+            let partial_case =
+                CMCaseJson::read_case(Path::new(&format!("{}/{}/cma_case", dest, id)))?;
             let relative_path = format!("{}/{}", dest, id);
             let (liquid_flow, liquid_volume) = PAIRS.0;
 
-            let path = resolve_path(&case, &relative_path, liquid_flow)?;
+            let path = resolve_path(&partial_case, &relative_path, liquid_flow)?;
             let rf =
                 RawDataFlux::read_raw(path).ok_or(CMError::Custom("Error reading".to_string()))?;
 
             let n_zone = rf.header.n_zone as usize;
             liquid_flows.push(rf);
-            n_div[0] += case.n_div[0];
-            n_div[1] += case.n_div[1];
-            n_div[2] += case.n_div[2];
+            n_div[0] += partial_case.n_div[0];
+            n_div[1] += partial_case.n_div[1];
+            n_div[2] += partial_case.n_div[2];
 
-            let path = resolve_path(&case, &relative_path, liquid_volume)?;
+            let path = resolve_path(&partial_case, &relative_path, liquid_volume)?;
 
             let sc = RawDataScalar::read_raw(path)
                 .ok_or(CMError::Custom("Error reading".to_string()))?;
             liquid_volumes.push(sc);
             let (gas_flow, gas_volume) = PAIRS.1;
-            let path = resolve_path(&case, &relative_path, gas_flow)?;
+            let path = resolve_path(&partial_case, &relative_path, gas_flow)?;
 
             let rf = match RawDataFlux::read_raw(path) {
                 Some(rf) => rf,
@@ -380,7 +384,7 @@ impl Generator {
             };
             gas_flows.push(rf);
 
-            let path = resolve_path(&case, &relative_path, gas_volume)?;
+            let path = resolve_path(&partial_case, &relative_path, gas_volume)?;
             let rs = match RawDataScalar::read_raw(path) {
                 Some(rs) => rs,
                 None => {

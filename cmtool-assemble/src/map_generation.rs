@@ -3,19 +3,22 @@
 use crate::CMError;
 use crate::data::DomainData;
 use crate::generators::{Generator, PFRDescription};
-use crate::parser::generated_domain;
+use crate::parser::generated_domain::{self, GeneralSizeType};
 use crate::parser::{PfrGlobalMassBalance, generated_domain::Reactor0DType};
 use cmtool_data::{CMCaseJson, CMCaseReader, PhaseCM};
 use cmtool_data::{CMCaseWriter, DataError};
 
-fn get_volume(size: &generated_domain::GeneralSizeType) -> f64 {
-    match &size {
-        generated_domain::GeneralSizeType::Volume(v) => v.content as f64,
-        generated_domain::GeneralSizeType::Dimension(dim) => {
-            (dim.length.content as f64)
-                * (dim.diameter.content.powf(2.) as f64)
-                * std::f64::consts::PI
-                / 4.
+impl GeneralSizeType {
+    ///Returns volume of reactor considering cylindrical shape
+    pub fn get_volume(&self) -> f64 {
+        match self {
+            generated_domain::GeneralSizeType::Volume(v) => v.content as f64,
+            generated_domain::GeneralSizeType::Dimension(dim) => {
+                (dim.length.content as f64)
+                    * (dim.diameter.content.powf(2.) as f64)
+                    * std::f64::consts::PI
+                    / 4.
+            }
         }
     }
 }
@@ -28,7 +31,7 @@ fn _generate_reactor_0d<T: cmtool_data::CMCaseWriter>(
     reactor0d: &Reactor0DType,
 ) -> Result<(), CMError> {
     ids.push(reactor0d.id.clone());
-    let volume = get_volume(&reactor0d.size);
+    let volume = reactor0d.size.get_volume();
     let path = format!("{}/{}", root, reactor0d.id);
 
     let mut opt_path = None;
@@ -115,7 +118,7 @@ fn generate_partial_flowmap<T: cmtool_data::CMCaseWriter>(
                 todo!("{:?}", reactor3_dtype)
             }
             generated_domain::ReactorsTypeContent::ReactorFromFile(_) => {
-                todo!("")
+                todo!("generate_partial_flowmap::ReactorFromFile")
             }
         }
     }

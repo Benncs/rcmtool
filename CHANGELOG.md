@@ -11,10 +11,12 @@
 #### General Enhancements
 
 - Improve transitioner api and performance
-- Improve documentation 
+- Improve documentation and examples
 - Improve python bindings
 
 #### Build System Changes
+
+- Update and clean dependencies
 
 #### Breaking Changes
 

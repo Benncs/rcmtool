@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use crate::{CMError, data::FlowDirection};
+use cmtool_data::PhaseCM;
 use std::collections::HashMap;
 
-use cmtool_data::PhaseCM;
-
-use crate::{CMError, data::FlowDirection};
-
+///Input and output flow for one phase in one pfr
 #[derive(Default, Copy, Clone, Debug)]
 struct FlowData {
     in_flow: f64,
     out_flow: f64,
 }
 
+/// flow data for one pfr
 #[derive(Copy, Clone, Debug, Default)]
 pub struct PhaseFlow {
     gas: FlowData,
     liquid: FlowData,
 }
 
-// Struct to hold flow data for each ID using a HashMap
+/// Struct to hold flow data for each ID using a HashMap
 #[derive(Default, Debug)]
 pub struct PfrGlobalMassBalance {
     flows: HashMap<String, PhaseFlow>,

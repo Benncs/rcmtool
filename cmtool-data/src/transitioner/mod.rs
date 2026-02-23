@@ -107,9 +107,13 @@ pub trait FlowMapTransitioner {
     }
 }
 
+///Type of available transitionner
 pub enum TransitionerType {
+    ///Time based discontinous transition, easier to manipulate
     Discontinuous,
+    ///Index based discontinous transitionner, alway keep current state
     Simple,
+
     None,
 }
 

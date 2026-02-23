@@ -8,6 +8,7 @@ use super::generated_domain;
 use crate::data::FeedFlow;
 use crate::data::ParsedFeeds;
 use crate::parser::generated_domain::FeedFluxType;
+use crate::parser::generated_domain::FluxType;
 use crate::{
     CMError,
     data::{DomainInfo, FlowDirection},
@@ -86,51 +87,27 @@ pub fn parse_connection(
     ]
 }
 
-// fn convert_feed_flux_to_flux(feed: generated_domain::FeedFluxType) -> generated_domain::FluxType {
-//     generated_domain::FluxType {
-//         source: feed.source,
-//         target: feed.target,
-//         phase: feed.phase,
-//         value: feed.value,
-//     }
-// }
+///Flux type is a "derivated" type of flux with all flux information + the flow value
+///Current implementation performs naive copy of common attributes.
+impl From<&FeedFluxType> for FluxType {
+    fn from(feed: &FeedFluxType) -> Self {
+        Self {
+            source: feed.source.clone(),
+            target: feed.target.clone(),
+            phase: feed.phase.clone(),
+            value: feed.value.clone(),
+        }
+    }
+}
 
-// pub fn parse_feed(
-//     info: &DomainInfo,
-//     feeds: &generated_domain::FeedsType,
-//     mass_balance: &mut PfrGlobalMassBalance,
-// ) -> Result<(), CMError> {
-//     let liquid_feed: Vec<generated_domain::FluxType> = feeds
-//         .flux
-//         .iter()
-//         .filter(|f| f.phase == *"liquid")
-//         .map(|feed| convert_feed_flux_to_flux(feed.clone()))
-//         .collect();
-//     let gas_feed: Vec<generated_domain::FluxType> = feeds
-//         .flux
-//         .iter()
-//         .filter(|f| f.phase == *"gas")
-//         .map(|feed| convert_feed_flux_to_flux(feed.clone()))
-//         .collect();
-//     connection_per_phase(info, mass_balance, &liquid_feed, PhaseCM::Liquid);
-//     connection_per_phase(info, mass_balance, &gas_feed, PhaseCM::Gas);
-//     Ok(())
-// }
 fn parse_feed_phase(
     info: &DomainInfo,
     feeds: &[&FeedFluxType],
     phase: PhaseCM,
     mass_balance: &mut PfrGlobalMassBalance,
 ) -> HashMap<String, FeedFlow> {
-    let fluxes: Vec<generated_domain::FluxType> = feeds
-        .iter()
-        .map(|feed| generated_domain::FluxType {
-            source: feed.source.clone(),
-            target: feed.target.clone(),
-            phase: feed.phase.clone(),
-            value: feed.value.clone(),
-        })
-        .collect();
+    let fluxes: Vec<generated_domain::FluxType> =
+        feeds.iter().map(|&feed| FluxType::from(feed)).collect();
 
     let id: Vec<String> = feeds.iter().map(|feed| feed.id.clone()).collect();
     let rd = connection_per_phase(info, mass_balance, &fluxes, phase);
@@ -150,6 +127,7 @@ fn parse_feed_phase(
         })
         .collect()
 }
+
 pub fn parse_feed(
     info: &DomainInfo,
     feeds: &generated_domain::FeedsType,
