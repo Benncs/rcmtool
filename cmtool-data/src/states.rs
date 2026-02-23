@@ -96,6 +96,11 @@ impl HydroState {
     pub fn n_compartments(&self) -> usize {
         self.volumes.len()
     }
+
+    #[inline(always)]
+    pub fn total_volume(&self) -> f64 {
+        self.volumes.iter().sum()
+    }
 }
 
 impl From<FlowMapDescriptor> for HydroState {
