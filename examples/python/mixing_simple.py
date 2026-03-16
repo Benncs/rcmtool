@@ -114,6 +114,7 @@ def check_mixing(fmt, final_time: float):
     m0m = np.sum(m0_c, axis=0)
     mfm = np.sum(mt_c, axis=0)
 
+    print("Total volume: ", np.sum(vol))
     print("Inital mass: ", m0m)
     print("Final mass: ", mfm)
     print("Initial normalized C: ", c_init[:5])
@@ -133,7 +134,7 @@ def check_mixing(fmt, final_time: float):
 
 
 if __name__ == "__main__":
-    final_time = 500
+    final_time = 50
     root = os.environ["EXAMPLE_ROOT"]
     # Let CMTool read and load the full case automatically, ready to iterate
 

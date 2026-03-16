@@ -53,11 +53,11 @@ pub fn check_flows(raw_flows: &cmtool_data::RawDataFlux) -> Option<String> {
     let mean_relative_error = total_relative_error / raw_flows.header.n_zone as f64;
 
     writeln!(&mut f, "metric,value").unwrap();
-    writeln!(&mut f, "total_inflow,{:.6}", total_inflow).unwrap();
-    writeln!(&mut f, "total_outflow,{:.6}", total_outflow).unwrap();
+    writeln!(&mut f, "total_inflow,{:.8}", total_inflow).unwrap();
+    writeln!(&mut f, "total_outflow,{:.8}", total_outflow).unwrap();
     writeln!(
         &mut f,
-        "global_net_error_percent,{:.6}",
+        "global_net_error_percent,{:.8}",
         smape(total_inflow, total_outflow) * 100.0
     )
     .unwrap();

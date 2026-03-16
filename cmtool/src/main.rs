@@ -64,6 +64,8 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
         .dump_all(format!("{}/{}", root_dir, stem), &case.root, &case.paths)
         .map_err(CmtoolError::Core)?;
 
+    handle.dump_real_volume(format!("{}/{}/vofL", root_dir, stem))?;
+
     #[cfg(feature = "use_vtk")]
     handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
 
@@ -72,84 +74,19 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
     )
     .unwrap();
     println!("{}", f);
-    // return Ok(());
+    // std::fs::write("/tmp/checks.csv", f);
+
+    // let mut case = cmtool_data::CMCase::new(
+    //     [common.n_i as u32, common.n_j as u32, common.n_k as u32],
+    //     0.,
+    //     None,
+    //     false,
+    // );
+
+    // cmtool_data::CMCaseJson::write_case(
+    //     case,
+    //     std::path::Path::new(&format!("{}/{}/cma_case", root_dir, stem)),
+    // )?;
+
     Ok(())
-
-    // let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
-    // let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
-    // let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";
-    // //
-    // let export = handle
-    //     .dump_vector_from_scalar(format!("{}/flowL", root_dir), p1, p2, p3)
-    //     .unwrap();
-
-    // if let Some(mut check_csv) = cmtool::check_flows(&export) {
-    //     check_csv
-    //         .write_str(&format!("sanitize_{}.csv", stem))
-    //         .unwrap();
-    // };
-
-    // Ok(())
-
-    //  cmtool::check_flows(&RawDataFlux::read_raw(
-    //      "./out/cuve_sldmsh_initmrf/axial_velocity.raw",
-    //  ).unwrap());
-
-    //    cmtool::check_flows(&RawDataFlux::read_raw(
-    //         "/home/benjamin/Documents/thesis/cfd-cma/sanofi/raw/flowL.raw",
-    //     ).unwrap());
 }
-
-// fn main() {
-//     // #[cfg(debug_assertions)]
-//     let args = GenArgs {
-//         case_path: "/home/benjamin/Documents/thesis/cfd-cma/rushton/cuve_sldmsh_initmrf.encas"
-//             .to_string(),
-//         n_i: 10,
-//         n_j: 10,
-//         n_k: 5,
-//         out: None,
-//     };
-
-//     //#[cfg(not(debug_assertions))]
-//     //let args = GenArgs::parse();
-
-//     let stem = Path::new(&args.case_path)
-//         .file_stem() // Gets "mycase" as OsStr
-//         .and_then(|s| s.to_str())
-//         .unwrap(); // Converts OsStr to &str
-
-//     let case = cmtool_core::ensight_gold::Case::read(&args.case_path).unwrap();
-
-//     let root_dir = args
-//         .out
-//         .unwrap_or(format!("{}/../out/", env!("CARGO_MANIFEST_DIR")));
-
-//     std::fs::create_dir_all(&root_dir).unwrap();
-
-//     let handle = cmtool_core::CMHandle::init(
-//         [args.n_i, args.n_j, args.n_k],
-//         &case.root,
-//         &case.geometry_file_path,
-//         cmtool_core::grid::MeshType::Cylindrical,
-//     )
-//     .unwrap();
-
-//     handle
-//         .dump_all(format!("{}/{}", root_dir, stem), &case.root, &case.paths)
-//         .unwrap();
-//     handle
-//         .dump_real_volume(format!("{}/{}/total_volume", root_dir, stem))
-//         .unwrap();
-//     //     let p1 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl1";
-//     //     let p2 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl2";
-//     //     let p3 = "/home/benjamin/Documents/thesis/cfd-cma/sanofi_cfd/inputs/RESULTS.scl3";
-//     // //
-//     //     let export = handle
-//     //         .dump_vector_from_scalar(format!("{}/flowL", root_dir), p1, p2, p3)
-//     //         .unwrap();
-
-//     //     cmtool::check_flows(&export);
-
-//     cmtool::check_flows(&RawDataFlux::read_raw("./out/cuve_sldmsh_initmrf/velocity.raw").unwrap());
-// }
