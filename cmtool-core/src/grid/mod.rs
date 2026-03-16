@@ -12,30 +12,52 @@ pub(crate) mod vtk;
 use crate::coordinates::*;
 use crate::utils::AxisPoints;
 
-fn get_tangent_plane_at_r(
-    axis: usize,
-    r0: f64,
-    theta: f64,
-    z: f64,
-    extent_u: [f64; 2],
-    extent_v: [f64; 2],
-) -> BoundedPlane {
-    let x0 = r0 * theta.cos();
-    let y0 = r0 * theta.sin();
-    let z0 = z;
+// fn get_tangent_plane_at_r(
+//     axis: usize,
+//     r0: f64,
+//     theta: f64,
+//     z: f64,
+//     extent_u: [f64; 2],
+//     extent_v: [f64; 2],
+// ) -> BoundedPlane {
+//     let x0 = r0 * theta.cos();
+//     let y0 = r0 * theta.sin();
+//     let z0 = z;
 
-    let normal = CartesianVec3([x0 / r0, y0 / r0, 0.0]);
+//     let normal = CartesianVec3([x0 / r0, y0 / r0, 0.0]);
 
-    let origin = CartesianCoordinates([x0, y0, z0]);
+//     let origin = CartesianCoordinates([x0, y0, z0]);
 
-    BoundedPlane {
-        normal,
-        origin,
-        extent_u, // extensités sur theta
-        extent_v, // extensités sur z
-        axis,
-    }
-}
+//     BoundedPlane {
+//         normal,
+//         origin,
+//         extent_u,
+//         extent_v,
+//         axis,
+//     }
+// }
+//
+// fn get_tangent_plane_at_r(
+//     axis: usize,
+//     r0: f64,
+//     theta: f64,
+//     z: f64,
+//     extent_u: [f64; 2], // [theta0, theta1] — will be converted to arc length
+//     extent_v: [f64; 2], // [z0, z1] — already metric
+// ) -> BoundedPlane {
+//     let origin = CartesianCoordinates([r0 * theta.cos(), r0 * theta.sin(), z]);
+//     let normal = CartesianVec3([theta.cos(), theta.sin(), 0.0]);
+
+//     let extent_u_metric = [r0 * extent_u[0], r0 * extent_u[1]];
+
+//     BoundedPlane {
+//         normal,
+//         origin,
+//         extent_u: extent_u_metric,
+//         extent_v, // z is already metric
+//         axis,
+//     }
+// }
 
 /// Represents the type of mesh geometry.
 #[derive(PartialEq, Clone, Copy)]
@@ -412,6 +434,90 @@ impl CompartmentMeshManip for MeshCylindrical {
         interfaces_r + interfaces_theta + interfaces_z + wrap
     }
 
+    // fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (BoundedPlane, usize) {
+    //     let neighbors = self.are_cell_neighbor(cell1_id, cell2_id);
+    //     let axis = neighbors
+    //         .to_coord_index()
+    //         .expect("Cells must be neighbors to get interface plane");
+
+    //     let sign = if neighbors.is_negative() { -1.0 } else { 1.0 };
+    //     let normal_dir = match axis {
+    //         0 => [sign, 0.0, 0.0],
+    //         1 => [0.0, sign, 0.0],
+    //         2 => [0.0, 0.0, sign],
+    //         _ => unreachable!("Axis must be 0, 1, or 2"),
+    //     };
+
+    //     let indices_cell = self.cell_points(cell1_id);
+
+    //     // Cell edges
+    //     let r0 = self.get_cell_edge(0, indices_cell[0]);
+    //     let r1 = self.get_cell_edge(0, indices_cell[0] + 1);
+    //     let theta0 = self.get_cell_edge(1, indices_cell[1]);
+    //     let theta1 = self.get_cell_edge(1, indices_cell[1] + 1);
+    //     let z0 = self.get_cell_edge(2, indices_cell[2]);
+    //     let z1 = self.get_cell_edge(2, indices_cell[2] + 1);
+    //     let pi = std::f64::consts::PI;
+    //     let normalize = |a: f64| -> f64 {
+    //         let mut x = a % (2.0 * pi);
+    //         if x > pi {
+    //             x -= 2.0 * pi;
+    //         }
+    //         if x < -pi {
+    //             x += 2.0 * pi;
+    //         }
+    //         x
+    //     };
+
+    //     // Centers
+    //     let r_center = 0.5 * (r0 + r1);
+
+    //     let z_center = 0.5 * (z0 + z1);
+    //     // let theta_center = 0.5 * (theta0 + theta1);
+    //     let theta_center = {
+    //         let mut dtheta = theta1 - theta0;
+    //         if dtheta > pi {
+    //             dtheta -= 2.0 * pi;
+    //         }
+    //         if dtheta < -pi {
+    //             dtheta += 2.0 * pi;
+    //         }
+    //         normalize(theta0 + 0.5 * dtheta)
+    //     };
+
+    //     // Origin of the plane (on interface)
+    //     let (r, theta, z) = match axis {
+    //         0 => (if sign < 0.0 { r0 } else { r1 }, theta_center, z_center),
+    //         1 => (r_center, if sign < 0.0 { theta0 } else { theta1 }, z_center),
+    //         2 => (r_center, theta_center, if sign < 0.0 { z0 } else { z1 }),
+    //         _ => unreachable!(),
+    //     };
+
+    //     let (extent_u, extent_v) = match axis {
+    //         0 => ([theta0, theta1], [z0, z1]),
+    //         1 => ([r0, r1], [z0, z1]),
+    //         2 => ([r0, r1], [theta0, theta1]),
+    //         _ => unreachable!(),
+    //     };
+
+    //     if axis == 0 {
+    //         let bounded_plane = get_tangent_plane_at_r(axis, r, theta, z, extent_u, extent_v);
+    //         (bounded_plane, axis)
+    //     } else {
+    //         let cyl_normal = CylindricalVec3(normal_dir, theta);
+    //         let normal_cartesian = cyl_normal.to_cartesian_vec();
+    //         let origin = CylindricalCoordinates([r, theta, z]).into();
+    //         let bounded_plane = BoundedPlane {
+    //             normal: normal_cartesian,
+    //             origin,
+    //             extent_u,
+    //             extent_v,
+    //             axis,
+    //         };
+    //         (bounded_plane, axis)
+    //     }
+    // }
+
     fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (BoundedPlane, usize) {
         let neighbors = self.are_cell_neighbor(cell1_id, cell2_id);
         let axis = neighbors
@@ -435,13 +541,34 @@ impl CompartmentMeshManip for MeshCylindrical {
         let theta1 = self.get_cell_edge(1, indices_cell[1] + 1);
         let z0 = self.get_cell_edge(2, indices_cell[2]);
         let z1 = self.get_cell_edge(2, indices_cell[2] + 1);
+        let pi = std::f64::consts::PI;
+        let normalize = |a: f64| -> f64 {
+            let mut x = a % (2.0 * pi);
+            if x > pi {
+                x -= 2.0 * pi;
+            }
+            if x < -pi {
+                x += 2.0 * pi;
+            }
+            x
+        };
 
         // Centers
         let r_center = 0.5 * (r0 + r1);
-        let theta_center = 0.5 * (theta0 + theta1);
-        let z_center = 0.5 * (z0 + z1);
 
-        // Origin of the plane (on interface)
+        let z_center = 0.5 * (z0 + z1);
+        // let theta_center = 0.5 * (theta0 + theta1);
+        let theta_center = {
+            let mut dtheta = theta1 - theta0;
+            if dtheta > pi {
+                dtheta -= 2.0 * pi;
+            }
+            if dtheta < -pi {
+                dtheta += 2.0 * pi;
+            }
+            normalize(theta0 + 0.5 * dtheta)
+        };
+
         let (r, theta, z) = match axis {
             0 => (if sign < 0.0 { r0 } else { r1 }, theta_center, z_center),
             1 => (r_center, if sign < 0.0 { theta0 } else { theta1 }, z_center),
@@ -450,18 +577,24 @@ impl CompartmentMeshManip for MeshCylindrical {
         };
 
         let (extent_u, extent_v) = match axis {
-            0 => ([theta0, theta1], [z0, z1]), // u = theta, v = z
-            1 => ([r0, r1], [z0, z1]),         // u = r, v = z
-            2 => ([r0, r1], [theta0, theta1]), // u = r, v = theta
+            0 => ([theta0, theta1], [z0, z1]),
+            1 => ([r0, r1], [z0, z1]),
+            2 => ([r0, r1], [theta0, theta1]),
             _ => unreachable!(),
         };
 
         if axis == 0 {
-            // axe r -> plan tangent au cylindre
-            let bounded_plane = get_tangent_plane_at_r(axis, r, theta, z, extent_u, extent_v);
+            let normal_cartesian = CartesianVec3([theta.cos(), theta.sin(), 0.0]);
+            let origin = CartesianCoordinates([r * theta.cos(), r * theta.sin(), z]);
+            let bounded_plane = BoundedPlane {
+                normal: normal_cartesian,
+                origin,
+                extent_u,
+                extent_v,
+                axis,
+            };
             (bounded_plane, axis)
         } else {
-            // pour axis 1 et 2 on garde ta méthode normale
             let cyl_normal = CylindricalVec3(normal_dir, theta);
             let normal_cartesian = cyl_normal.to_cartesian_vec();
             let origin = CylindricalCoordinates([r, theta, z]).into();

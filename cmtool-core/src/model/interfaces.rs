@@ -140,38 +140,6 @@ impl AInterfacesInfo {
         global_id_from_interface
     }
 
-    //fn count_interfaces_second_pass(
-    //&mut self,
-    //geometry: &CMGeometry,
-    //interfaces_id_from_cells: &[usize],
-    //) -> Vec<Vec<usize>> {
-    //let mut tmp_element_counter = vec![0; self.n_facet.len()];
-    //let mut global_id_from_interface: Vec<Vec<usize>> = vec![Vec::new(); self.n_facet.len()];
-    //for (element_id, n_element) in global_id_from_interface.iter_mut().zip(self.n_facet.iter())
-    //{
-    //*element_id = vec![0; *n_element];
-    //}
-    //let grid = geometry.get_grid().unwrap();
-    //let n_zones = geometry.n_zone();
-    //let functor = |vol_element_global_id: usize,
-    //interface_cid_0: usize,
-    //interface_cid_k: usize,
-    //k_vertex: usize| {
-    //if k_vertex >= 1
-    //&& grid.are_cell_neighbor(interface_cid_0, interface_cid_k)!= NeighborDirection::NotNeighbors
-    //{
-    //let interface_global_id =
-    //interfaces_id_from_cells[interface_cid_0 * n_zones + interface_cid_k];
-    //let k_element = tmp_element_counter[interface_global_id];
-    //tmp_element_counter[interface_global_id] += 1;
-    //global_id_from_interface[interface_global_id][k_element] = vol_element_global_id;
-    //}
-    //};
-    //geometry.interface_iterator(functor);
-    //
-    //global_id_from_interface
-    //}
-
     fn fill_area(&mut self, geometry: &CMGeometry, planes: &[BoundedPlane]) {
         //This is almost the same algorithm as fill for c_info struct (to compute volume of velem)
         for (i, n) in self.n_facet.iter().enumerate() {
@@ -193,9 +161,7 @@ impl AInterfacesInfo {
 
                 let area = compute_intersection_area(&local_vertices, elem_type, plane)
                     .expect("Area between element");
-                if area == 0. {
-                    println!("{} {}", interface_id, i_facet);
-                }
+
                 self.area[interface_id][i_facet] = area;
             }
         }

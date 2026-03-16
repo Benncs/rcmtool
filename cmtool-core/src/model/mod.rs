@@ -98,18 +98,27 @@ impl CMModel {
             for (global_id, area) in curent_inteface_element.iter().zip(current_interface_area) {
                 let vector_value = CartesianVec3(vector.get_slice_xyz(*global_id).to_owned());
 
-                let coords = if self.geometry.mesh_type == MeshType::Cylindrical {
-                    let CartesianCoordinates(centroid) =
-                        self.geometry.volume_elements.xyz[*global_id];
+                let coords = match self.geometry.mesh_type {
+                    MeshType::Cylindrical => {
+                        let CartesianCoordinates(centroid) =
+                            self.geometry.volume_elements.xyz[*global_id];
 
-                    let CylindricalCoordinates(centroid) = CartesianCoordinates(centroid).into();
+                        let CylindricalCoordinates(centroid) =
+                            CartesianCoordinates(centroid).into();
 
-                    vector_value.to_cylindrical_vec(centroid[1]).0
-                } else {
-                    vector_value.0
+                        let cyl_vec = vector_value.to_cylindrical_vec(centroid[1]).0;
+
+                        let r = (centroid[0].powi(2) + centroid[1].powi(2)).sqrt();
+                        match axis {
+                            1 => [cyl_vec[0], cyl_vec[1] * r, cyl_vec[2]],
+                            _ => cyl_vec,
+                        }
+                    }
+                    _ => vector_value.0,
                 };
 
                 let f = coords[axis] * area;
+
                 if f > 0. {
                     flow.source_flow += f
                 } else if f < 0. {

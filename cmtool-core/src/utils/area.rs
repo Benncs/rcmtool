@@ -76,6 +76,102 @@ fn sort_points_ccw_3d(points: &[[f64; 3]], normal: &CartesianVec3) -> Vec<[f64; 
 //     area.abs() * 0.5
 // }
 
+fn polygon_area_3d(points: &[Coords3], normal: &CartesianVec3) -> f64 {
+    let n = normal.normalized();
+
+    let mut area_vec = CartesianVec3([0.0, 0.0, 0.0]);
+    let n_pts = points.len();
+
+    for i in 0..n_pts {
+        let p1 = CartesianVec3(points[i]);
+        let p2 = CartesianVec3(points[(i + 1) % n_pts]);
+
+        let cross = p1.cross(&p2);
+
+        area_vec = area_vec.add(&cross);
+    }
+    0.5 * (area_vec.dot(&n)).abs()
+}
+
+// fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 {
+//     let mut intersection_points = vec![];
+
+//     let BoundedPlane {
+//         normal,
+//         origin: point,
+//         ..
+//     } = plane;
+
+//     let d = -normal.dot(&CartesianVec3::from_point_origin(*point)); // plane offset
+//     let distances: Vec<f64> = vertices
+//         .iter()
+//         .map(|coords| CartesianVec3::from_point_origin(*coords))
+//         .map(|v| normal.dot(&v) + d)
+//         .collect();
+
+//     let mut points_on_plane = vec![];
+//     let edge_len = (0..4)
+//         .flat_map(|i| (i + 1..4).map(move |j| (i, j)))
+//         .map(|(i, j)| {
+//             let e = [
+//                 vertices[i].0[0] - vertices[j].0[0],
+//                 vertices[i].0[1] - vertices[j].0[1],
+//                 vertices[i].0[2] - vertices[j].0[2],
+//             ];
+//             (e[0] * e[0] + e[1] * e[1] + e[2] * e[2]).sqrt()
+//         })
+//         .fold(0.0_f64, f64::max);
+//     let tol = 1e-4 * edge_len.max(1.0);
+
+//     for (i, dist) in distances.iter().enumerate() {
+//         if dist.abs() < tol {
+//             points_on_plane.push(vertices[i].0);
+//         }
+//     }
+
+//     for i in 0..4 {
+//         for j in (i + 1)..4 {
+//             let d1 = distances[i];
+//             let d2 = distances[j];
+//             if d1.abs() < tol || d2.abs() < tol {
+//                 continue;
+//             }
+//             if d1 * d2 < 0.0 {
+//                 let t = d1 / (d1 - d2);
+//                 let p1 = &vertices[i].0;
+//                 let p2 = &vertices[j].0;
+//                 let intersection = [
+//                     p1[0] + t * (p2[0] - p1[0]),
+//                     p1[1] + t * (p2[1] - p1[1]),
+//                     p1[2] + t * (p2[2] - p1[2]),
+//                 ];
+//                 intersection_points.push(intersection);
+//             }
+//         }
+//     }
+//     intersection_points.extend(points_on_plane.iter().cloned());
+
+//     if intersection_points.len() < 3 {
+//         return 0.0;
+//     }
+
+//     let filtered: Vec<_> = intersection_points
+//         .iter()
+//         .cloned()
+//         .filter(|p| plane.is_point_inside(CartesianCoordinates(*p)))
+//         .collect();
+
+//     if filtered.len() < 3 {
+//         return 0.0;
+//     }
+
+//     let sorted = sort_points_ccw_3d(&intersection_points, normal);
+
+//     //Compute area using shoelace formula
+//     // return polygon_area_2d(&sorted);
+//     polygon_area_3d(&sorted, normal)
+// }
+
 fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 {
     let mut intersection_points = vec![];
 
@@ -93,9 +189,21 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
         .collect();
 
     let mut points_on_plane = vec![];
-    const TOL: f64 = 1e-1;
+    let edge_len = (0..4)
+        .flat_map(|i| (i + 1..4).map(move |j| (i, j)))
+        .map(|(i, j)| {
+            let e = [
+                vertices[i].0[0] - vertices[j].0[0],
+                vertices[i].0[1] - vertices[j].0[1],
+                vertices[i].0[2] - vertices[j].0[2],
+            ];
+            (e[0] * e[0] + e[1] * e[1] + e[2] * e[2]).sqrt()
+        })
+        .fold(0.0_f64, f64::max);
+    let tol = 1e-10 * edge_len.max(1.0);
+
     for (i, dist) in distances.iter().enumerate() {
-        if dist.abs() < TOL {
+        if dist.abs() < tol {
             points_on_plane.push(vertices[i].0);
         }
     }
@@ -104,9 +212,11 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
         for j in (i + 1)..4 {
             let d1 = distances[i];
             let d2 = distances[j];
-
+            if d1.abs() < tol || d2.abs() < tol {
+                continue;
+            }
             if d1 * d2 < 0.0 {
-                let t = d1 / (d1 - d2);
+                let t = d1.abs() / (d1.abs() + d2.abs()); // Correction ici: formule plus stable
                 let p1 = &vertices[i].0;
                 let p2 = &vertices[j].0;
                 let intersection = [
@@ -118,54 +228,24 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
             }
         }
     }
+    intersection_points.extend(points_on_plane.iter().cloned());
 
     if intersection_points.len() < 3 {
-        if points_on_plane.len() >= 3 {
-            let filtered: Vec<_> = points_on_plane
-                .iter()
-                .cloned()
-                .filter(|p| plane.is_point_inside(CartesianCoordinates(*p)))
-                .collect();
-
-            if filtered.len() >= 3 {
-                let sorted = sort_points_ccw_3d(&filtered, normal);
-                return polygon_area_3d(&sorted, normal);
-            } else {
-                return 0.0;
-            }
-        } else {
-            return 0.0;
-        }
+        return 0.0;
     }
 
-    //Project points to 2D plane
-    // let projected = project_points_to_plane_2d(&intersection_points, normal);
+    let filtered: Vec<_> = intersection_points
+        .iter()
+        .cloned()
+        .filter(|p| plane.is_point_inside(CartesianCoordinates(*p)))
+        .collect();
 
-    // //Sort points counterclockwise
-    // let sorted = sort_polygon_ccw(&projected);
+    if filtered.len() < 3 {
+        return 0.0;
+    }
 
     let sorted = sort_points_ccw_3d(&intersection_points, normal);
-
-    //Compute area using shoelace formula
-    // return polygon_area_2d(&sorted);
     polygon_area_3d(&sorted, normal)
-}
-
-fn polygon_area_3d(points: &[Coords3], normal: &CartesianVec3) -> f64 {
-    let n = normal.normalized();
-
-    let mut area_vec = CartesianVec3([0.0, 0.0, 0.0]);
-    let n_pts = points.len();
-
-    for i in 0..n_pts {
-        let p1 = CartesianVec3(points[i]);
-        let p2 = CartesianVec3(points[(i + 1) % n_pts]);
-
-        let cross = p1.cross(&p2);
-
-        area_vec = area_vec.add(&cross);
-    }
-    0.5 * (area_vec.dot(&n)).abs()
 }
 
 pub fn compute_intersection_area(
