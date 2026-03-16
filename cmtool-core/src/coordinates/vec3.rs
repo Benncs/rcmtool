@@ -2,7 +2,7 @@
 
 use crate::coordinates::{CartesianCoordinates, Coords3};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct CartesianVec3(pub Coords3);
 
 #[derive(Clone, Copy)]

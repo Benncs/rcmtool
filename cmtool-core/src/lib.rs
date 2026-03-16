@@ -17,6 +17,13 @@ use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 use model::{CMGeometry, CMModel, Scalar, Vector};
 use std::{path::Path, sync::Arc};
 
+fn resolve_path(
+    root: &impl AsRef<std::path::Path>,
+    relative_path: &str,
+) -> impl AsRef<std::path::Path> {
+    std::path::PathBuf::from(root.as_ref()).join(relative_path)
+}
+
 pub enum ExportType {
     EnsightGold,
 }
@@ -33,13 +40,6 @@ pub struct CMHandle {
     _root_result: String, //TODO EITHER USE IT OR REMOVE
     eg_geometry: Arc<ensight_gold::Geometry>,
     cm_geometry: Arc<CMGeometry>,
-}
-
-fn resolve_path(
-    root: &impl AsRef<std::path::Path>,
-    relative_path: &str,
-) -> impl AsRef<std::path::Path> {
-    std::path::PathBuf::from(root.as_ref()).join(relative_path)
 }
 
 impl CMHandle {
@@ -84,30 +84,6 @@ impl CMHandle {
         self.model.compartments_volumes();
 
         todo!()
-    }
-
-    #[cfg(feature = "use_vtk")]
-    pub fn write_vtk(&self, path: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
-        let mesh = self.cm_geometry.get_grid().unwrap();
-        let p = path.as_ref().to_str().unwrap();
-        let mut vtk = mesh.get_vtk(p)?;
-
-        let volumes_data = self.model.get_real_volume();
-
-        let volumes_data_array = vtkio::model::DataArray::scalars("real_volume", 1);
-
-        let volumes_data_array = volumes_data_array.with_vec(volumes_data);
-
-        add_celldata_to_vtk(
-            &mut vtk,
-            vtkio::model::Attribute::DataArray(volumes_data_array),
-        );
-
-        let mut vtk_bytes = Vec::<u8>::new();
-        vtk.write_xml(&mut vtk_bytes).unwrap();
-        std::fs::write(path, vtk_bytes).unwrap();
-
-        Ok(())
     }
 
     pub fn dump_all(
@@ -248,5 +224,29 @@ impl CMHandle {
 
     pub fn export_geometry_compartments(&self) {
         todo!()
+    }
+
+    #[cfg(feature = "use_vtk")]
+    pub fn write_vtk(&self, path: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
+        let mesh = self.cm_geometry.get_grid().unwrap();
+        let p = path.as_ref().to_str().unwrap();
+        let mut vtk = mesh.get_vtk(p)?;
+
+        let volumes_data = self.model.get_real_volume();
+
+        let volumes_data_array = vtkio::model::DataArray::scalars("real_volume", 1);
+
+        let volumes_data_array = volumes_data_array.with_vec(volumes_data);
+
+        add_celldata_to_vtk(
+            &mut vtk,
+            vtkio::model::Attribute::DataArray(volumes_data_array),
+        );
+
+        let mut vtk_bytes = Vec::<u8>::new();
+        vtk.write_xml(&mut vtk_bytes).unwrap();
+        std::fs::write(path, vtk_bytes).unwrap();
+
+        Ok(())
     }
 }
