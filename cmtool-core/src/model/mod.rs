@@ -32,6 +32,10 @@ pub struct CMModel {
 pub use geometry::CMGeometry;
 
 impl CMModel {
+    pub fn grid(&self) -> &dyn crate::grid::CompartmentMesh {
+        self.geometry.get_grid().unwrap()
+    }
+
     pub fn init(geometry: Arc<CMGeometry>) -> Self {
         println!("Init model with {} compartment", geometry.n_zone());
         let volume_element_count = geometry.get_count_volume_element_first_pass();
@@ -52,7 +56,11 @@ impl CMModel {
         let n_max_interface = geometry.get_grid().as_ref().unwrap().n_maximum_interface();
 
         if interfaces.n_interfaces() >= n_max_interface {
-            unimplemented!("should have intefaces  < n_maximum_interface")
+            unimplemented!(
+                "should have intefaces  < n_maximum_interface {} {}",
+                interfaces.n_interfaces(),
+                n_max_interface
+            )
         }
 
         // if interfaces.n_facet.len() != n_max_interface {
@@ -106,7 +114,9 @@ impl CMModel {
                         let CylindricalCoordinates(centroid) =
                             CartesianCoordinates(centroid).into();
 
-                        let cyl_vec = vector_value.to_cylindrical_vec(centroid[1]).0;
+                        let cyl_vec = vector_value
+                            .to_cylindrical_vec(self.interfaces.interface_theta[i_interface])
+                            .0;
 
                         let r = (centroid[0].powi(2) + centroid[1].powi(2)).sqrt();
                         match axis {

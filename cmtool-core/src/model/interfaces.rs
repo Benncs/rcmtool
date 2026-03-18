@@ -23,6 +23,7 @@ pub struct AInterfacesInfo {
     pub area: Vec<Vec<f64>>,
     pub normal_axis: Vec<usize>,
     pub global_id_from_interface: Vec<Vec<usize>>,
+    pub interface_theta: Vec<f64>,
     // pub plane_coordinates: Vec<f64>,
     // pub planes: Vec<BoundedPlane>,
 }
@@ -37,6 +38,7 @@ impl AInterfacesInfo {
             area: vec![Default::default(); n_interfaces],
             normal_axis: vec![Default::default(); n_interfaces],
             global_id_from_interface: vec![Default::default(); n_interfaces],
+            interface_theta: vec![Default::default(); n_interfaces],
             // plane_coordinates: vec![0.; n_interfaces * 3 * 2], //Extent geometry
             // planes: Vec::new(),
         }
@@ -99,6 +101,10 @@ impl AInterfacesInfo {
                 interfaces_id_from_cells[target_id * n_zones + source_id] = interface_id;
 
                 let (plane, direction_neighbors) = grid.get_interface_plane(source_id, target_id);
+
+                let origin = plane.origin.0;
+                let theta = origin[1].atan2(origin[0]);
+                self.interface_theta[interface_id] = theta;
                 planes.push(plane);
                 self.normal_axis[interface_id] = direction_neighbors;
             }
@@ -122,18 +128,36 @@ impl AInterfacesInfo {
         let grid = geometry.get_grid().unwrap();
         let n_zones = geometry.n_zone();
 
-        for (vol_element_global_id, interface_cid_0, interface_cid_k, k_vertex) in
-            geometry.interface_iter()
-        {
-            if k_vertex >= 1
-                && grid.are_cell_neighbor(interface_cid_0, interface_cid_k)
-                    != NeighborDirection::NotNeighbors
-            {
-                let interface_global_id =
-                    interfaces_id_from_cells[interface_cid_0 * n_zones + interface_cid_k];
-                let k_element = tmp_element_counter[interface_global_id];
-                tmp_element_counter[interface_global_id] += 1;
-                global_id_from_interface[interface_global_id][k_element] = vol_element_global_id;
+        // for (vol_element_global_id, interface_cid_0, interface_cid_k, k_vertex) in
+        //     geometry.interface_iter()
+        // {
+        //     if k_vertex >= 1
+        //         && grid.are_cell_neighbor(interface_cid_0, interface_cid_k)
+        //             != NeighborDirection::NotNeighbors
+        //     {
+        //         let interface_global_id =
+        //             interfaces_id_from_cells[interface_cid_0 * n_zones + interface_cid_k];
+        //         let k_element = tmp_element_counter[interface_global_id];
+        //         tmp_element_counter[interface_global_id] += 1;
+        //         global_id_from_interface[interface_global_id][k_element] = vol_element_global_id;
+        //     }
+        // }
+        for (vol_element_global_id, _, interface_cid_k, k_vertex) in geometry.interface_iter() {
+            if k_vertex >= 1 {
+                for i in 0..k_vertex {
+                    let cid_i = geometry
+                        .volume_elements
+                        .get_list_compartment_id(vol_element_global_id, i);
+                    let neighbors = grid.are_cell_neighbor(cid_i, interface_cid_k);
+                    if neighbors != NeighborDirection::NotNeighbors {
+                        let interface_global_id =
+                            interfaces_id_from_cells[cid_i * n_zones + interface_cid_k];
+                        let k_element = tmp_element_counter[interface_global_id];
+                        tmp_element_counter[interface_global_id] += 1;
+                        global_id_from_interface[interface_global_id][k_element] =
+                            vol_element_global_id;
+                    }
+                }
             }
         }
 
@@ -159,6 +183,11 @@ impl AInterfacesInfo {
 
                 geometry.fill_vertices(volume_element_global_id, n_vertex, &mut local_vertices);
 
+                // let area = compute_intersection_area(&local_vertices, elem_type, plane)
+                //     .expect("Area between element");
+                // let area = area * plane.normal.0[plane.axis].signum();
+                // self.area[interface_id][i_facet] = area;
+                //
                 let area = compute_intersection_area(&local_vertices, elem_type, plane)
                     .expect("Area between element");
 

@@ -37,15 +37,6 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
         .and_then(|s| s.to_str())
         .unwrap(); // Converts OsStr to &str
 
-    // let mut f = cmtool::check_flows(
-    //     &RawDataFlux::read_raw("./out/cuve_sldmsh_initmrf/velocity.raw").unwrap(),
-    // )
-    // .unwrap();
-
-    // println!("{}", f);
-
-    // return Ok(());
-
     let root_dir = out_or_default(common.out);
 
     let case = cmtool_core::ensight_gold::case::Case::read(&autoargs.case_path)?;

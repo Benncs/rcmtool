@@ -43,6 +43,10 @@ pub struct CMHandle {
 }
 
 impl CMHandle {
+    pub fn grid(&self) -> &dyn crate::grid::CompartmentMesh {
+        self.model.grid()
+    }
+
     pub fn init(
         n_div: [usize; 3],
         root: &str,
