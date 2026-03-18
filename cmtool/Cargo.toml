@@ -12,7 +12,8 @@ cmtool-core.workspace = true
 cmtool-data.workspace = true
 cmtool-assemble.workspace = true
 thiserror.workspace = true
-
+nalgebra.workspace = true
+nalgebra-sparse.workspace=true
 
 [features]
 use_vtk = ["cmtool-core/use_vtk"]

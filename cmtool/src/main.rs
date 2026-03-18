@@ -56,17 +56,31 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
         .map_err(CmtoolError::Core)?;
 
     handle.dump_real_volume(format!("{}/{}/vofL", root_dir, stem))?;
+    handle.dump_real_volume(format!("{}/{}/vtot", root_dir, stem))?;
+
+    handle.dump_vector_from_scalar(
+        format!("{}/{}/flowL", root_dir, stem),
+        "/tmp/sanofi/inputs/RESULTS.scl1",
+        "/tmp/sanofi/inputs/RESULTS.scl2",
+        "/tmp/sanofi/inputs/RESULTS.scl3",
+    )?;
 
     #[cfg(feature = "use_vtk")]
     handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
 
     let f = cmtool::check_flows(
+        handle.grid(),
         &RawDataFlux::read_raw("./out/cuve_sldmsh_initmrf/velocity.raw").unwrap(),
     )
     .unwrap();
     println!("{}", f);
     // std::fs::write("/tmp/checks.csv", f);
-
+    //
+    // let f = cmtool::divergence_free(
+    //     &RawDataFlux::read_raw("./out/cuve_sldmsh_initmrf/velocity.raw").unwrap(),
+    // );
+    // f.write_raw("./out/cuve_sldmsh_initmrf/velocity2.raw")
+    //     .unwrap();
     // let mut case = cmtool_data::CMCase::new(
     //     [common.n_i as u32, common.n_j as u32, common.n_k as u32],
     //     0.,

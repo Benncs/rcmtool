@@ -201,6 +201,8 @@ dependencies = [
  "cmtool-assemble",
  "cmtool-core",
  "cmtool-data",
+ "nalgebra",
+ "nalgebra-sparse",
  "thiserror",
 ]
 
