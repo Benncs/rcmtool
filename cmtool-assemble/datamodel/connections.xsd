@@ -1,30 +1,35 @@
 <!--
  SPDX-License-Identifier: GPL-3.0-or-later
 -->
-<?xml version="1.0" encoding="utf-8"?>
-<xs:schema elementFormDefault="qualified"
-  xmlns:xs="http://www.w3.org/2001/XMLSchema">
-
+<xs:schema
+    elementFormDefault="qualified"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+>
+<xs:include schemaLocation="units.xsd" />
   <xs:complexType name="Node">
-        <xs:attribute type="xs:string" name="id" use="required"/>
-        <xs:attribute type="xs:nonNegativeInteger" name="compartment_id" use="required" />
+        <xs:attribute type="xs:string" name="id" use="required" />
+        <xs:attribute
+            type="xs:nonNegativeInteger"
+            name="compartment_id"
+            use="required"
+        />
   </xs:complexType>
 
 
 
   <xs:complexType name="Flux">
     <xs:sequence>
-      <xs:element name="Source" type="Node" maxOccurs="1" minOccurs="1"/>
-      <xs:element name="Target" type="Node" maxOccurs="1" minOccurs="1"/>
-      <xs:element name="Value" type="FlowType" maxOccurs="1" minOccurs="1"/>
+      <xs:element name="Source" type="Node" maxOccurs="1" minOccurs="1" />
+      <xs:element name="Target" type="Node" maxOccurs="1" minOccurs="1" />
+      <xs:element name="Value" type="FlowType" maxOccurs="1" minOccurs="1" />
     </xs:sequence>
-    <xs:attribute type="xs:string" name="phase" use="required"/>
+    <xs:attribute type="xs:string" name="phase" use="required" />
   </xs:complexType>
 
   <xs:complexType name="FeedFlux">
     <xs:complexContent>
       <xs:extension base="Flux">
-        <xs:attribute type="xs:string" name="id" use="required"/>
+        <xs:attribute type="xs:string" name="id" use="required" />
       </xs:extension>
     </xs:complexContent>
   </xs:complexType>
@@ -32,7 +37,7 @@
 
   <xs:complexType name="Connections">
     <xs:sequence>
-      <xs:element name="Flux" type="Flux" maxOccurs="unbounded" minOccurs="0"/>
+      <xs:element name="Flux" type="Flux" maxOccurs="unbounded" minOccurs="0" />
     </xs:sequence>
   </xs:complexType>
 
@@ -40,10 +45,10 @@
 <!-- TODO Add AutoFeed: with dilution rate -->
   <xs:complexType name="AutoFeed">
     <xs:sequence>
-      <xs:element name="D" type="Node" maxOccurs="1" minOccurs="1"/>
-      <xs:element name="N" type="Node" maxOccurs="1" minOccurs="1"/>
+      <xs:element name="D" type="Node" maxOccurs="1" minOccurs="1" />
+      <xs:element name="N" type="Node" maxOccurs="1" minOccurs="1" />
     </xs:sequence>
-    <xs:attribute type="xs:string" name="phase" use="required"/>
+    <xs:attribute type="xs:string" name="phase" use="required" />
   </xs:complexType>
 
 
@@ -61,7 +66,12 @@
 
   <xs:complexType name="Feeds">
     <xs:sequence>
-      <xs:element name="Flux" type="FeedFlux" maxOccurs="unbounded" minOccurs="0"/>
+      <xs:element
+                name="Flux"
+                type="FeedFlux"
+                maxOccurs="unbounded"
+                minOccurs="0"
+            />
     </xs:sequence>
   </xs:complexType>
 

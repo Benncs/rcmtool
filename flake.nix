@@ -15,7 +15,7 @@
         overlays = [ fenix.overlays.default ];
         pkgs = import nixpkgs { inherit system overlays; };
         lib = pkgs.lib;
-        
+
         craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.fenix.stable.withComponents [
             "cargo"
             "clippy"
@@ -29,11 +29,11 @@
         src = lib.fileset.toSource {
           root = unfilteredRoot;
           fileset = lib.fileset.unions [
+            (lib.fileset.fileFilter (file: file.hasExt "xsd") unfilteredRoot)
             # Default files from crane (Rust and cargo files)
             (craneLib.fileset.commonCargoSources unfilteredRoot)
-            # Also keep any VTK files, this is a dirty fix for tests which use our example vtk file
-            # TODO: VTK files should be excluded to avoid indexing of residual output files
-            (lib.fileset.fileFilter (file: file.hasExt "vtk") unfilteredRoot)
+
+
           ];
         };
 
@@ -105,10 +105,10 @@
             }
           );
         };
-        
+
         devShells.default = craneLib.devShell {
           checks = self.checks.${system};
-          
+
           packages = with pkgs; [
             cargo-nextest # faster tests
             samply        # profiling

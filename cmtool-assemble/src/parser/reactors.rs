@@ -167,10 +167,10 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
                     .compartment_cumsum
                     .insert(current_pfr.id.clone(), in_place_cumsum);
                 let n_c = current_pfr.compartments;
-                domain_info.total_number_compartment += n_c;
+                domain_info.total_number_compartment += n_c.get();
                 domain_info.is_two_phase_flow = current_pfr.volume_fraction.content != 0.;
                 domain_info.pfr_names.push(current_pfr.id.clone());
-                in_place_cumsum += n_c;
+                in_place_cumsum += n_c.get();
             }
             generated_domain::ReactorsTypeContent::ReactorFromFile(reactor_from_file) => {
                 let path = format!("{}/cma_case", reactor_from_file.path);

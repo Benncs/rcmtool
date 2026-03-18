@@ -5,28 +5,21 @@ use std::fs;
 use std::io::Write;
 use xsd_parser::{
     Config, Error,
-    config::{GeneratorFlags, InterpreterFlags, OptimizerFlags, RenderStep, Schema},
+    config::{GeneratorFlags, InterpreterFlags, OptimizerFlags, ParserFlags, RenderStep, Schema},
     generate,
 };
 
 static ROOT: &str = "./datamodel";
 
-fn domain_schema() -> Result<(), Error> {
-    let files = [
-        format!("{}/units.xsd", ROOT),
-        format!("{}/reactors.xsd", ROOT),
-        format!("{}/connections.xsd", ROOT),
-        format!("{}/main.xsd", ROOT),
-    ];
-
-    let mut cfg = Config::default();
-    cfg.parser.schemas = files
-        .into_iter()
-        .map(|f| {
-            println!("cargo:rerun-if-changed={}", f);
-            Schema::File(f.into())
-        })
-        .collect();
+fn domain_schema() -> Result<(), Box<Error>> {
+    // let files = [
+    //     format!("{}/units.xsd", ROOT),
+    //     format!("{}/reactors.xsd", ROOT),
+    //     format!("{}/connections.xsd", ROOT),
+    //     format!("{}/main.xsd", ROOT),
+    // ];
+    let mut cfg = Config::default().with_schema(Schema::File(format!("{}/main.xsd", ROOT).into()));
+    cfg = cfg.set_parser_flags(ParserFlags::RESOLVE_INCLUDES | ParserFlags::DEFAULT_NAMESPACES);
     cfg = cfg.with_render_steps([
         //RenderStep::Types,
         RenderStep::Defaults,
@@ -40,26 +33,39 @@ fn domain_schema() -> Result<(), Error> {
         // },
         // RenderStep::TypesSerdeQuickXml,
     ]);
-
     cfg = cfg.with_derive(["Debug", "Clone"]);
+
     cfg.interpreter.flags = InterpreterFlags::all()
         - InterpreterFlags::WITH_NUM_BIG_INT
         - InterpreterFlags::WITH_XS_ANY_TYPE;
+
     cfg.optimizer.flags = OptimizerFlags::all();
-    cfg.generator.flags.insert(GeneratorFlags::all());
+
+    cfg.generator.flags = GeneratorFlags::all()
+        - GeneratorFlags::USE_MODULES
+        - GeneratorFlags::USE_NAMESPACE_MODULES
+        - GeneratorFlags::USE_SCHEMA_MODULES;
+
     let code = generate(cfg).expect("Failed to generate Rust code from XSD");
-    let mut file = File::create("src/parser/generated_domain.rs")?;
+
+    let mut file = File::create("src/parser/generated_domain.rs").unwrap();
+
     file.write_all(
-        b"#![allow(clippy::all)]\n
-    #![allow(dead_code)]\n
-    #![allow(unused_imports)]\n\n\n",
-    )?;
-    file.write_all(code.to_string().as_bytes())?;
+        b"
+#![allow(clippy::all)]
+#![allow(dead_code)]
+#![allow(unused_imports)]
+",
+    )
+    .unwrap();
+
+    file.write_all(code.to_string().as_bytes()).unwrap();
     Ok(())
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Box<Error>> {
     domain_schema()?;
+
     println!("cargo:rerun-if-changed=cmtool-assemble/build.rs");
     Ok(())
 }

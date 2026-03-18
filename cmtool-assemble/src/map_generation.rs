@@ -79,7 +79,7 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
             eprintln!("TODO: PFR GENERATION W/O FLOW RATES");
 
             let desc = PFRDescription {
-                n_compartment: current_pfr.compartments,
+                n_compartment: current_pfr.compartments.get(),
                 length: dim.length.content.into(),
                 diameter: dim.diameter.content.into(),
                 liquid_flow: mb.get_flow(&current_pfr.id, PhaseCM::Liquid)?,

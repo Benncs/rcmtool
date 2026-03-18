@@ -1,12 +1,12 @@
-<!-- 
+<!--
  SPDX-License-Identifier: GPL-3.0-or-later
 -->
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <xs:schema
-    xmlns:xs="http://www.w3.org/2001/XMLSchema"
     elementFormDefault="qualified"
-    attributeFormDefault="unqualified"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
 >
+<xs:include schemaLocation="units.xsd" />
 	<xs:complexType name="BaseReactor">
 	<xs:attribute name="id" type="xs:string" use="required" />
 		<xs:sequence>
@@ -18,9 +18,9 @@
 	<xs:complexType name="ReactorFromFile">
 		<xs:attribute name="id" type="xs:string" use="required" />
 		<xs:sequence>
-			<xs:element name="Path" type="xs:string"/>		
+			<xs:element name="Path" type="xs:string"/>
 		</xs:sequence>
-		
+
 	</xs:complexType>
 
 	<xs:complexType name="Reactor0D">

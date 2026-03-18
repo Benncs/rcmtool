@@ -1,14 +1,17 @@
-<!-- 
+<!--
  SPDX-License-Identifier: GPL-3.0-or-later
 -->
-<?xml version="1.0" encoding="utf-8"?>
-<xs:schema elementFormDefault="qualified"
-    xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-    <xs:complexType name="DimensionType">
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema
+    elementFormDefault="qualified"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+>
+
+       <xs:complexType name="DimensionType">
         <xs:simpleContent>
             <xs:extension base="xs:float">
-                <xs:attribute name="unit" type="xs:string" use="optional"/>
+                <xs:attribute name="unit" type="xs:string" use="optional" />
             </xs:extension>
         </xs:simpleContent>
     </xs:complexType>
@@ -77,6 +80,7 @@
     </xs:simpleContent>
 </xs:complexType>
 
+<!--
 <xs:complexType name="TimeType">
     <xs:simpleContent>
         <xs:restriction base="DimensionType">
@@ -91,6 +95,7 @@
         </xs:restriction>
     </xs:simpleContent>
 </xs:complexType>
+-->
 
 
 </xs:schema>
