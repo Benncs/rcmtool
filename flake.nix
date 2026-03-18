@@ -30,10 +30,9 @@
           root = unfilteredRoot;
           fileset = lib.fileset.unions [
             (lib.fileset.fileFilter (file: file.hasExt "xsd") unfilteredRoot)
-            # Default files from crane (Rust and cargo files)
             (craneLib.fileset.commonCargoSources unfilteredRoot)
-
-
+            (unfilteredRoot + "/cmtool-data/test_data")
+            (unfilteredRoot + "/examples/data")
           ];
         };
 
@@ -47,18 +46,18 @@
         commonArgs = {
           inherit src;
           strictDeps = true;
-
           nativeBuildInputs = with pkgs; [
             pkg-config
           ];
           buildInputs = commonBuildInputs
             ++ (if pkgs.stdenv.isLinux  then linuxBuildInputs  else [])
             ++ (if pkgs.stdenv.isDarwin then darwinBuildInputs else []);
-          # LD_LIBRARY_PATH = "$LD_LIBRARY_PATH:${
-          #   pkgs.lib.makeLibraryPath ( commonBuildInputs
-          #   ++ (if pkgs.stdenv.isLinux  then linuxBuildInputs  else [])
-          #   ++ (if pkgs.stdenv.isDarwin then darwinBuildInputs else []) )
-          # }";
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (
+            commonBuildInputs
+            ++ (if pkgs.stdenv.isLinux  then linuxBuildInputs  else [])
+            ++ (if pkgs.stdenv.isDarwin then darwinBuildInputs else [])
+            ++ [ pkgs.stdenv.cc.cc.lib ]
+          );
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -110,9 +109,9 @@
           checks = self.checks.${system};
 
           packages = with pkgs; [
-            cargo-nextest # faster tests
+            cargo-nextest
             samply        # profiling
-            taplo         # TOML formatting
+
           ];
         };
       });

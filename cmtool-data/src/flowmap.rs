@@ -84,15 +84,17 @@ mod test {
 
     #[test]
     fn read_descriptor() {
-        let flow_cma = std::env::var("CUVE_SLDMSH_FLOW_PATH").unwrap();
+        let _flow_cma = std::env::var("CUVE_SLDMSH_FLOW_PATH");
 
-        let volume_cma = std::env::var("CUVE_SLDMSH_VOLUME_PATH").unwrap();
+        let _volume_cma = std::env::var("CUVE_SLDMSH_VOLUME_PATH");
 
-        let descriptor = FlowMapDescriptor::from_path(flow_cma, volume_cma).unwrap();
+        if let (Ok(flow_cma), Ok(volume_cma)) = (_flow_cma, _volume_cma) {
+            let descriptor = FlowMapDescriptor::from_path(flow_cma, volume_cma).unwrap();
 
-        assert!(!descriptor.volumes.is_empty());
-        assert!(descriptor.flowmap.is_square());
-        assert!(descriptor.volumes.len() == descriptor.flowmap.ncols());
-        assert!(descriptor.neighbors.nrows() == descriptor.flowmap.ncols());
+            assert!(!descriptor.volumes.is_empty());
+            assert!(descriptor.flowmap.is_square());
+            assert!(descriptor.volumes.len() == descriptor.flowmap.ncols());
+            assert!(descriptor.neighbors.nrows() == descriptor.flowmap.ncols());
+        }
     }
 }

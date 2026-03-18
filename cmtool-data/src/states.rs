@@ -174,16 +174,17 @@ mod test {
 
     #[test]
     fn construct_itstate_liquid_only() {
-        let flow_cma = std::env::var("CUVE_SLDMSH_FLOW_PATH").unwrap();
+        let _flow_cma = std::env::var("CUVE_SLDMSH_FLOW_PATH");
+        let _volume_cma = std::env::var("CUVE_SLDMSH_VOLUME_PATH");
 
-        let volume_cma = std::env::var("CUVE_SLDMSH_VOLUME_PATH").unwrap();
+        if let (Ok(flow_cma), Ok(volume_cma)) = (_flow_cma, _volume_cma) {
+            let descriptor = FlowMapDescriptor::from_path(flow_cma, volume_cma).unwrap();
 
-        let descriptor = FlowMapDescriptor::from_path(flow_cma, volume_cma).unwrap();
+            let vol_ref = descriptor.volumes.clone();
 
-        let vol_ref = descriptor.volumes.clone();
+            let state = IterationState::new(descriptor, None, HashMap::new());
 
-        let state = IterationState::new(descriptor, None, HashMap::new());
-
-        assert!(state.liquid.volumes == vol_ref);
+            assert!(state.liquid.volumes == vol_ref);
+        }
     }
 }

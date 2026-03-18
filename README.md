@@ -5,6 +5,12 @@ The specific goal of this repository is to develop a Compartment Modelling Tool.
 Compartmental Modeling Approach (CMA) is a method that simplifies spatial dimensions by dividing the domain into smaller, uniform "compartments." Each compartment behaves as a homogeneous unit, connected to its neighboring compartments. The domain is represented by a scalar field, and the interactions between compartments are governed by a flowmap.
 
 This approach significantly reduces computational complexity while maintaining an acceptable level of model accuracy.
+
+### Objectives 
+
+This crate is a port of an existing C++ tool. The objective of the Rust implementation is to evaluate the efficiency of the Rust language to  perform this type of operation, with a particular focus on maintaining code readability, maintainability, and performance.
+
+
 ## Overview
 
 This crates aims to provides different feature to perform complete simulation using CMA. 
@@ -22,13 +28,12 @@ This crates aims to provides different feature to perform complete simulation us
  - cmtool-python: Python bindings for cmtool-core,FlowmapTransitioner and case reading
  - cmtool-cxx: Bindings for C++ use, expose FlowMapTranstioner API
 
-## Objectives 
-
-This crate is a port of an existing C++ tool. The objective of the Rust implementation is to evaluate the efficiency of the Rust language to  perform this type of operation, with a particular focus on maintaining code readability, maintainability, and performance.
 
 ## Getting started 
 
-
+```sh 
+cargo run --example [NAME]
+```
 
 ## Authors
 - **CASALE Benjamin**

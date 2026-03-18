@@ -823,23 +823,23 @@ mod test {
 
     use super::*;
 
-    const number_point_ax1: usize = 8;
-    const max_ax1: f64 = 4.;
+    const NUMBER_POINT_AX1: usize = 8;
+    const MAX_AX1: f64 = 4.;
 
-    const number_point_ax2: usize = 5;
-    const max_ax2: f64 = 2.;
+    const NUMBER_POINT_AX2: usize = 5;
+    const _MAX_AX2: f64 = 2.;
 
-    const number_point_ax3: usize = 10;
-    const max_ax3: f64 = 10.;
+    const NUMBER_POINT_AX3: usize = 10;
+    const MAX_AX3: f64 = 10.;
 
     fn ref_mesh_cyclindrical() -> Box<dyn CompartmentMesh> {
-        let ax1 = AxisDescriptor::new(0., max_ax1, number_point_ax1);
+        let ax1 = AxisDescriptor::new(0., MAX_AX1, NUMBER_POINT_AX1);
         let ax2 = AxisDescriptor::new(
             -std::f64::consts::PI,
             std::f64::consts::PI,
-            number_point_ax2,
+            NUMBER_POINT_AX2,
         );
-        let ax3 = AxisDescriptor::new(0., max_ax3, number_point_ax3);
+        let ax3 = AxisDescriptor::new(0., MAX_AX3, NUMBER_POINT_AX3);
         get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3])
     }
 
@@ -936,17 +936,17 @@ mod test {
     #[test]
     fn t_getter() {
         let mesh = ref_mesh_cyclindrical();
-        assert!(mesh.max_axis(0) == max_ax1);
+        assert!(mesh.max_axis(0) == MAX_AX1);
         assert!(mesh.max_axis(1) == std::f64::consts::PI);
-        assert!(mesh.max_axis(2) == max_ax3);
+        assert!(mesh.max_axis(2) == MAX_AX3);
 
         assert!(mesh.min_axis(0) == 0.);
         assert!(mesh.min_axis(1) == -std::f64::consts::PI);
 
-        assert!(mesh.n_points_axis(0) == number_point_ax1);
-        assert!(mesh.n_points_axis(1) == number_point_ax2);
-        assert!(mesh.n_points_axis(2) == number_point_ax3);
-        assert!(mesh.number_cell() == number_point_ax1 * number_point_ax2 * number_point_ax3);
+        assert!(mesh.n_points_axis(0) == NUMBER_POINT_AX1);
+        assert!(mesh.n_points_axis(1) == NUMBER_POINT_AX2);
+        assert!(mesh.n_points_axis(2) == NUMBER_POINT_AX3);
+        assert!(mesh.number_cell() == NUMBER_POINT_AX1 * NUMBER_POINT_AX2 * NUMBER_POINT_AX3);
     }
 
     #[test]
@@ -970,22 +970,22 @@ mod test {
 
         assert_id([0., -std::f64::consts::PI, 0.], 0);
 
-        assert_id([0., -std::f64::consts::PI, max_ax3], number_point_ax3 - 1);
+        assert_id([0., -std::f64::consts::PI, MAX_AX3], NUMBER_POINT_AX3 - 1);
         let theta = -std::f64::consts::PI + mesh.mesh_step_axis(1) * 1.1;
         //R!=0 because with cartesian conversion is x=rcos(theta) if theta changes but no r its the same compartment
-        assert_id([0.01, theta, 0.], number_point_ax3);
+        assert_id([0.01, theta, 0.], NUMBER_POINT_AX3);
         //-1 because we consider cell ID for 0 to n-1
         assert_id(
-            [max_ax1, std::f64::consts::PI, max_ax3],
-            (number_point_ax3 * number_point_ax1 * number_point_ax2) - 1,
+            [MAX_AX1, std::f64::consts::PI, MAX_AX3],
+            (NUMBER_POINT_AX3 * NUMBER_POINT_AX1 * NUMBER_POINT_AX2) - 1,
         );
     }
 
     #[test]
     fn t_boundary_cylindrical() {
-        let ax1 = AxisDescriptor::new(0., max_ax1, 5);
+        let ax1 = AxisDescriptor::new(0., MAX_AX1, 5);
         let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, 10);
-        let ax3 = AxisDescriptor::new(0., max_ax3, 10);
+        let ax3 = AxisDescriptor::new(0., MAX_AX3, 10);
         let mesh = get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3]);
 
         let mut v = mesh.get_boundary();

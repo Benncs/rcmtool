@@ -168,7 +168,7 @@ mod tests {
         let cyl = cart.to_cylindrical_vec(base_theta);
 
         let vr_expected = 1.0 * base_theta.cos() + 0.0 * base_theta.sin();
-        let vtheta_expected = -1.0 * base_theta.sin() + 0.0 * base_theta.cos();
+        let vtheta_expected = -base_theta.sin() + 0.0 * base_theta.cos();
         let vz_expected = 2.0;
 
         assert!((cyl.0[0] - vr_expected).abs() < 1e-10);
@@ -240,6 +240,7 @@ mod tests {
         assert!((result - 5.0).abs() < 1e-10);
     }
 
+    #[allow(clippy::needless_range_loop)]
     #[test]
     fn test_normalized() {
         let v = CartesianVec3([0.0, 3.0, 4.0]);
