@@ -23,6 +23,14 @@ impl RawDataScalarWrapper {
         let array = numpy::ndarray::Array1::from(values);
         PyArray1::from_owned_array(py, array).unbind()
     }
+
+    pub fn write(&self, path: &str) -> PyResult<()> {
+        if self.0.write_raw(path).is_ok() {
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Scalar not found"))
+        }
+    }
 }
 
 #[pyfunction]
@@ -51,11 +59,12 @@ pub fn scalar_from_data<'py>(
 
     match x.as_slice() {
         Ok(slice) => {
-            if slice.len() != 1 {
-                return Err(PyValueError::new_err(
-                    "Input array must contain exactly one element.",
-                ));
-            }
+            //TODO Why this condition has been used ?
+            // if slice.len() != 1 {
+            //     return Err(PyValueError::new_err(
+            //         "Input array must contain exactly one element.",
+            //     ));
+            // }
             let scalar = RawDataScalar::from(slice);
             Ok(RawDataScalarWrapper(scalar))
         }

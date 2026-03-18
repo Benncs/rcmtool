@@ -58,6 +58,7 @@ def integration(
         liquid_state = it.liquid
         # Get the transition matrix
         transition = pycmtool.get_sparse_transition_matrix(liquid_state)
+
         vol = liquid_state.volumes  # Volume of each compartment
         _mass = x.reshape((n_species, n_c))  # Reshape to (N_SPECIES, n_compartments)
         C = _mass / vol  # Concentration: mass / volume
@@ -134,7 +135,7 @@ def check_mixing(fmt, final_time: float):
 
 
 if __name__ == "__main__":
-    final_time = 1000
+    final_time = 100
     root = os.environ["EXAMPLE_ROOT"]
     # Let CMTool read and load the full case automatically, ready to iterate
 
