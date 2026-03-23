@@ -2,6 +2,12 @@
 
 use thiserror::Error;
 
+// macro_rules! error_fmt {
+//     ($name:ident,$msg:literal) => {
+//         format!("CMTOOL({}):{}", name, msg)
+//     };
+// }
+
 #[derive(Error, Debug)]
 pub enum CoreError {
     #[error("Cmtool: {0}")]

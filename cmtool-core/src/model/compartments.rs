@@ -44,10 +44,9 @@ impl CompartmentInfo {
 
         let mut tmp_count_k_element: Vec<usize> = vec![0; geometry.n_zone()];
 
-        for (volume_element_global_id, n_compartment_in_velem) in
+        for (volume_element_global_id, &n_compartment_in_velem) in
             geometry.volume_elements.enumerate_number_id()
         {
-            let n_compartment_in_velem = *n_compartment_in_velem;
             let (elem_type, n_vertex) = geometry
                 .volume_elements
                 .get_element_and_nvertex(volume_element_global_id);
@@ -66,7 +65,7 @@ impl CompartmentInfo {
                 let volume = compute_volume(&local_vertices, elem_type).unwrap()
                     / (n_compartment_in_velem as f64);
 
-                assert!(volume >= 0.);
+                assert!(volume >= 0., "CMTOOL(\"fill\"): Negative volume");
                 self.volumes[compartment_id][k_element] = ElementVolumeInfo {
                     global_id: volume_element_global_id,
                     volume,

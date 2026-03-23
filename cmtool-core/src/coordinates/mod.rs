@@ -39,7 +39,7 @@ impl BoundedPlane {
         let r = (point[0].powi(2) + point[1].powi(2)).sqrt();
         let theta_raw = point[1].atan2(point[0]);
         let z = point[2];
-        let tol = 1e-10;
+        const TOL: f64 = 1e-10;
 
         let (u, v) = match self.axis {
             0 => {
@@ -70,8 +70,8 @@ impl BoundedPlane {
             _ => unreachable!(),
         };
 
-        (u >= self.extent_u[0] - tol && u <= self.extent_u[1] + tol)
-            && (v >= self.extent_v[0] - tol && v <= self.extent_v[1] + tol)
+        (u >= self.extent_u[0] - TOL && u <= self.extent_u[1] + TOL)
+            && (v >= self.extent_v[0] - TOL && v <= self.extent_v[1] + TOL)
     }
 }
 
@@ -81,6 +81,16 @@ impl From<BoundedPlane> for Plane {
             normal: value.normal,
             point: value.origin,
         }
+    }
+}
+
+pub fn get_normal(axis: usize, negative: bool) -> Coords3 {
+    let sign = if negative { -1. } else { 1. };
+    match axis {
+        0 => [sign, 0.0, 0.0],
+        1 => [0.0, sign, 0.0],
+        2 => [0.0, 0.0, sign],
+        _ => unreachable!("Axis must be 0, 1, or 2"),
     }
 }
 

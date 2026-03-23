@@ -200,62 +200,25 @@ impl CMGeometry {
         let mut count = CountVolumeElement::new(self.n_zone());
 
         let grid = self.grid.as_ref().unwrap();
-        // for (_gid, interface_cid_0, interface_cid_k, k_vertex) in self.interface_iter() {
-        //     count.incr_compartment(interface_cid_k);
 
-        //     if k_vertex >= 1 {
-        //         let neighbors = grid.are_cell_neighbor(interface_cid_0, interface_cid_k);
-
-        //         if neighbors != NeighborDirection::NotNeighbors {
-        //             let (id1, id2) = neighbors.ordered_pair(interface_cid_0, interface_cid_k);
-
-        //             count.incr_interface(id1, id2);
-        //         }
-        //     }
-        // }
-        //
         for (vol_element_global_id, _, interface_cid_k, k_vertex) in self.interface_iter() {
             count.incr_compartment(interface_cid_k);
-            if k_vertex >= 1 {
-                for i in 0..k_vertex {
-                    let cid_i = self
-                        .volume_elements
-                        .get_list_compartment_id(vol_element_global_id, i);
-                    let neighbors = grid.are_cell_neighbor(cid_i, interface_cid_k);
-                    if neighbors != NeighborDirection::NotNeighbors {
-                        let (id1, id2) = neighbors.ordered_pair(cid_i, interface_cid_k);
-                        count.incr_interface(id1, id2);
-                    }
+            // if k_vertex >= 1 {
+            for i in 0..k_vertex {
+                let cid_i = self
+                    .volume_elements
+                    .get_list_compartment_id(vol_element_global_id, i);
+                let neighbors = grid.are_cell_neighbor(cid_i, interface_cid_k);
+                if neighbors != NeighborDirection::NotNeighbors {
+                    let (id1, id2) = neighbors.ordered_pair(cid_i, interface_cid_k);
+                    count.incr_interface(id1, id2);
                 }
             }
+            // }
         }
 
         count
     }
-    // pub fn get_count_volume_element_first_pass(&self) -> CountVolumeElement {
-    //     let mut count = CountVolumeElement::new(self.n_zone());
-
-    //     let grid = self.grid.as_ref().unwrap();
-
-    //     let mut seen_interfaces = std::collections::HashSet::new();
-
-    //     for (_, interface_cid_0, interface_cid_k, _) in self.interface_iter() {
-    //         count.incr_compartment(interface_cid_k);
-    //         count.incr_compartment(interface_cid_0);
-    //         if interface_cid_0 != interface_cid_k {
-    //             let neighbors = grid.are_cell_neighbor(interface_cid_0, interface_cid_k);
-    //             if neighbors != NeighborDirection::NotNeighbors {
-    //                 let (id1, id2) = neighbors.ordered_pair(interface_cid_0, interface_cid_k);
-    //                 if !seen_interfaces.contains(&(id1, id2)) {
-    //                     seen_interfaces.insert((id1, id2));
-    //                     count.incr_interface(id1, id2);
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     count
-    // }
 
     pub fn init(
         n_div: [usize; 3],

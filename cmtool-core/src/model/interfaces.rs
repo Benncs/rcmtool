@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::coordinates::*;
-use crate::grid::NeighborDirection;
+use crate::grid::{NeighborDirection, index_to_oriented};
 use crate::model::CMGeometry;
 use crate::utils::compute_intersection_area;
 
@@ -112,6 +112,58 @@ impl AInterfacesInfo {
         self.global_id_from_interface =
             self.count_interfaces_second_pass(geometry, &interfaces_id_from_cells);
         self.fill_area(geometry, &planes);
+
+        // for i_interface in 0..self.n_facet.len() {
+        //     let total: f64 = self.area[i_interface].iter().sum();
+        //     if total > 0.0 {
+        //         let source = self.ids[i_interface].source_id;
+        //         let axis = self.normal_axis[i_interface];
+        //         let theoretical = grid.cell_surface(source, index_to_oriented(axis));
+        //         let factor = theoretical / total;
+        //         for a in self.area[i_interface].iter_mut() {
+        //             *a *= factor;
+        //         }
+        //     }
+        // }
+
+        // self.check_areas(geometry);
+    }
+
+    fn check_areas(&self, geometry: &CMGeometry) {
+        let grid = geometry.get_grid().unwrap();
+        let n_zones = geometry.n_zone();
+        for cell_id in 0..n_zones {
+            for axis_idx in 0..3 {
+                let axis = crate::grid::index_to_oriented(axis_idx);
+                let theoretical_area = grid.cell_surface(cell_id, axis);
+                let total_area: f64 = self
+                    .ids
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, id)| {
+                        (id.source_id == cell_id || id.target_id == cell_id)
+                            && self.normal_axis[*i] == axis_idx
+                    })
+                    .map(|(i, _)| self.area[i].iter().sum::<f64>())
+                    .sum();
+
+                if ((total_area - theoretical_area).abs() / theoretical_area) < 0.1 {
+                    println!(
+                        "(areas): area incorect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
+                        axis_idx, cell_id, total_area, theoretical_area
+                    );
+                }
+
+                // assert!(
+                //     ((total_area - theoretical_area).abs() / theoretical_area) < 0.1,
+                //     "RCMTOOL(areas): area incorect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
+                //     axis_idx,
+                //     cell_id,
+                //     total_area,
+                //     theoretical_area
+                // );
+            }
+        }
     }
 
     fn count_interfaces_second_pass(
@@ -128,37 +180,23 @@ impl AInterfacesInfo {
         let grid = geometry.get_grid().unwrap();
         let n_zones = geometry.n_zone();
 
-        // for (vol_element_global_id, interface_cid_0, interface_cid_k, k_vertex) in
-        //     geometry.interface_iter()
-        // {
-        //     if k_vertex >= 1
-        //         && grid.are_cell_neighbor(interface_cid_0, interface_cid_k)
-        //             != NeighborDirection::NotNeighbors
-        //     {
-        //         let interface_global_id =
-        //             interfaces_id_from_cells[interface_cid_0 * n_zones + interface_cid_k];
-        //         let k_element = tmp_element_counter[interface_global_id];
-        //         tmp_element_counter[interface_global_id] += 1;
-        //         global_id_from_interface[interface_global_id][k_element] = vol_element_global_id;
-        //     }
-        // }
         for (vol_element_global_id, _, interface_cid_k, k_vertex) in geometry.interface_iter() {
-            if k_vertex >= 1 {
-                for i in 0..k_vertex {
-                    let cid_i = geometry
-                        .volume_elements
-                        .get_list_compartment_id(vol_element_global_id, i);
-                    let neighbors = grid.are_cell_neighbor(cid_i, interface_cid_k);
-                    if neighbors != NeighborDirection::NotNeighbors {
-                        let interface_global_id =
-                            interfaces_id_from_cells[cid_i * n_zones + interface_cid_k];
-                        let k_element = tmp_element_counter[interface_global_id];
-                        tmp_element_counter[interface_global_id] += 1;
-                        global_id_from_interface[interface_global_id][k_element] =
-                            vol_element_global_id;
-                    }
+            // if k_vertex >= 1 {
+            for i in 0..k_vertex {
+                let cid_i = geometry
+                    .volume_elements
+                    .get_list_compartment_id(vol_element_global_id, i);
+                let neighbors = grid.are_cell_neighbor(cid_i, interface_cid_k);
+                if neighbors != NeighborDirection::NotNeighbors {
+                    let interface_global_id =
+                        interfaces_id_from_cells[cid_i * n_zones + interface_cid_k];
+                    let k_element = tmp_element_counter[interface_global_id];
+                    tmp_element_counter[interface_global_id] += 1;
+                    global_id_from_interface[interface_global_id][k_element] =
+                        vol_element_global_id;
                 }
             }
+            // }
         }
 
         global_id_from_interface

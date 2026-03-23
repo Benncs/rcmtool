@@ -58,12 +58,12 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
     handle.dump_real_volume(format!("{}/{}/vofL", root_dir, stem))?;
     handle.dump_real_volume(format!("{}/{}/vtot", root_dir, stem))?;
 
-    handle.dump_vector_from_scalar(
-        format!("{}/{}/flowL", root_dir, stem),
-        "/tmp/sanofi/inputs/RESULTS.scl1",
-        "/tmp/sanofi/inputs/RESULTS.scl2",
-        "/tmp/sanofi/inputs/RESULTS.scl3",
-    )?;
+    // handle.dump_vector_from_scalar(
+    //     format!("{}/{}/flowL", root_dir, stem),
+    //     "/tmp/sanofi/inputs/RESULTS.scl1",
+    //     "/tmp/sanofi/inputs/RESULTS.scl2",
+    //     "/tmp/sanofi/inputs/RESULTS.scl3",
+    // )?;
 
     #[cfg(feature = "use_vtk")]
     handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
@@ -73,7 +73,7 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
         &RawDataFlux::read_raw("./out/cuve_sldmsh_initmrf/velocity.raw").unwrap(),
     )
     .unwrap();
-    println!("{}", f);
+    // println!("{}", f);
     // std::fs::write("/tmp/checks.csv", f);
     //
     // let f = cmtool::divergence_free(
