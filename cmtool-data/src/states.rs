@@ -59,6 +59,11 @@ fn get_transition_from_fm(fm: Array2<f64>) -> (CooMatrix<f64>, Vec<f64>) {
 fn get_probability(liquid_neighors: &Array2<usize>, transition: &CooMatrix<f64>) -> Array2<f64> {
     use nalgebra_sparse::CscMatrix;
 
+    //TODO: this method is called even though there's no flow (0D)
+    //To allow correct behaviour, assert has the condition outflow==0
+    //Find a way cleaner way to : skip test and do not trigger assert
+
+    //TODO change assert to real real and return Result<>
     let shape = liquid_neighors.dim();
     //Start with filled with one array to ensure that probability will be increasing
     let mut proba = Array2::<f64>::ones(shape);
@@ -66,13 +71,17 @@ fn get_probability(liquid_neighors: &Array2<usize>, transition: &CooMatrix<f64>)
     let ghost_neighor = shape.0 + 1;
     (0..shape.0).for_each(|i_compartment| {
         let mut cumsum = 0.;
+        let out_flow = round_if_needed!(
+            transition_csc
+                .index_entry(i_compartment, i_compartment)
+                .into_value(),
+            0.,
+            1e-12
+        );
+
         let mut count_neighbor = 0;
         liquid_neighors.row(i_compartment).for_each(|&i_neighbor| {
             if i_neighbor != ghost_neighor {
-                let out_flow = transition_csc
-                    .index_entry(i_compartment, i_compartment)
-                    .into_value();
-
                 let proba_out: f64 = if out_flow != 0. {
                     transition_csc
                         .index_entry(i_compartment, i_neighbor)
@@ -93,8 +102,9 @@ fn get_probability(liquid_neighors: &Array2<usize>, transition: &CooMatrix<f64>)
             }
             count_neighbor += 1;
         });
+
         assert!(
-            (cumsum - 1.0).abs() < 1e-10,
+            (cumsum - 1.0).abs() < 1e-10 || out_flow == 0.,
             "compartment {} cumulative probability = {} < 1 (not conservative)",
             i_compartment,
             cumsum
@@ -162,6 +172,10 @@ impl IterationState {
         let liquid_neighors = liq.neighbors.clone(); //Todo find way to remove clone
 
         let liq_state: HydroState = liq.into();
+
+        //TODO
+        // call this only if liq has flow (transition and neighbors), 0D maps do not have
+        //proba
         #[cfg(feature = "probability")]
         let liquid_cumulative_probability =
             get_probability(&liquid_neighors, &liq_state.transition);
