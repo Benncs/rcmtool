@@ -130,12 +130,18 @@ def check_mixing(fmt, final_time: float):
     plt.xlabel("Compartment ID")
     plt.ylabel("Normalized concentration")
     plt.legend()
+
+    plt.figure()
+    plt.style.use("tableau-colorblind10")
+    plt.plot(sol.t, y[0, 0, :])
+    plt.legend()
+
     plt.show()
     assert abs(m0m - mfm) < 1e-8
 
 
 if __name__ == "__main__":
-    final_time = 20
+    final_time = 200
     root = os.environ["EXAMPLE_ROOT"]
     # Let CMTool read and load the full case automatically, ready to iterate
 

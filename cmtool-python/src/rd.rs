@@ -1,5 +1,8 @@
+use cmtool_data::FluxFileHeader;
 use cmtool_data::RawData;
+use cmtool_data::RawDataFlux;
 use cmtool_data::RawDataScalar;
+use cmtool_data::RawFlux;
 use numpy::PyArray1;
 use numpy::PyArray2;
 use numpy::PyUntypedArrayMethods;
@@ -76,19 +79,74 @@ pub fn scalar_from_data<'py>(
 
 /* Flows */
 
+#[pyclass(from_py_object, name = "RawFlux")]
+#[derive(Clone, Copy)]
+pub struct RawFluxWrapper(cmtool_data::RawFlux);
+
+#[pyfunction]
+pub fn new_raw_flux(
+    _py: Python<'_>,
+    id_source: usize,
+    id_target: usize,
+    flux_source_target: f64,
+    flux_target_source: f64,
+) -> RawFluxWrapper {
+    RawFluxWrapper(RawFlux {
+        id_source: id_source as u32,
+        id_target: id_target as u32,
+        flux_source_target,
+        flux_target_source,
+    })
+}
+
 #[pyclass(name = "RawDataFlux")]
 pub struct RawDataFluxWrapper(cmtool_data::RawDataFlux);
+
 #[pymethods]
 impl RawDataFluxWrapper {
     #[getter]
     pub fn n_zone(&self) -> usize {
         self.0.header.n_zone as usize
     }
+
+    pub fn write(&self, path: &str) -> PyResult<()> {
+        if self.0.write_raw(path).is_ok() {
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Vector not found"))
+        }
+    }
 }
 
 #[pyfunction]
 pub fn read_rawflow(path: &str) -> RawDataFluxWrapper {
     RawDataFluxWrapper(cmtool_data::RawDataFlux::read_raw(path).unwrap())
+}
+
+// impl FromPyObject for &[RawFluxWrapper]
+// {
+//   type Error=
+//   fn extract(obj: Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
+
+//   }
+// }
+
+#[pyfunction]
+pub fn vector_from_data<'py>(
+    _py: Python<'py>,
+    n_zone: usize,
+    x: Vec<RawFluxWrapper>,
+) -> PyResult<RawDataFluxWrapper> {
+    let value: Vec<RawFlux> = x.iter().map(|i| i.0).collect();
+    let rd = RawDataFlux {
+        header: FluxFileHeader {
+            n_fluxes: value.len() as u32,
+            n_zone: n_zone as u32,
+        },
+        fluxes: value,
+    };
+
+    Ok(RawDataFluxWrapper(rd))
 }
 
 #[pyclass(name = "FlowMapDescriptor")]

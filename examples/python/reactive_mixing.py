@@ -67,10 +67,11 @@ def integration(
         d_t = 0  # Not used for this transitioner
         # Advance iterator to the corresponding flowmap (according to t or dt)
         it = fmt.advance(t, d_t)
+        liq_state = it.liquid
         # Get the transition matrix
-        transition = pycmtool.get_sparse_transition_matrix(it)
+        transition = pycmtool.get_sparse_transition_matrix(liq_state)
         n_c = transition.shape[0]  # Number of compartments
-        vol = it.volumes  # Volume of each compartment
+        vol = liq_state.volumes  # Volume of each compartment
         _mass = x.reshape((n_species, n_c))  # Reshape to (N_SPECIES, n_compartments)
         C = _mass / vol  # Concentration: mass / volume
         R = np.zeros_like(C)
@@ -79,8 +80,10 @@ def integration(
         R[1, :] = r
         return (C @ transition + R).reshape(-1)  # Return flattened array for ODE solver
 
+    w = lambda t, x: wrap(t, x, f)
+
     return solve_ivp(
-        wrap,
+        w,
         (0, duration),
         mass_0.reshape(-1),
         method="BDF",
@@ -98,26 +101,27 @@ def initial_c_distribution(n_c):
     # return m
 
 
-def get_normalized(it, y, i):
+def get_normalized(state, y, i):
     """
     Calculate the normalized concentration for a given species across all compartments.
 
     The normalization is performed by dividing each compartment's concentration by the mean concentration
     of the species across all compartments. This is useful for comparing relative concentrations.
     """
-    vol = it.volumes
+    vol = state.volumes
     m0_c = y[0, :, i]
     return (m0_c / vol) / np.mean(m0_c / vol, axis=0)
 
 
 def check_mixing(fmt, final_time: float):
     it = fmt.get_current()
-    transition = pycmtool.get_sparse_transition_matrix(it)
+    liq_state = it.liquid
+    transition = pycmtool.get_sparse_transition_matrix(liq_state)
     n_c = transition.shape[0]
 
     C = np.zeros((N_SPECIES, n_c))
     C[0, :] = initial_c_distribution(n_c)
-    vol = it.volumes
+    vol = liq_state.volumes
     m0 = C * vol
 
     sol = integration(fmt, m0, final_time, N_SPECIES)
@@ -125,20 +129,20 @@ def check_mixing(fmt, final_time: float):
     it = fmt.get_current()
     m0_c = y[0, :, 0]
     mt_c = y[0, :, -1]
-    c_init = get_normalized(fmt.get_at(0), y, 0)
-    c_final = get_normalized(fmt.get_at(fmt.n_flowmaps - 1), y, -1)
+    c_init = get_normalized(fmt.get_at(0).liquid, y, 0)
+    c_final = get_normalized(fmt.get_at(fmt.n_flowmaps - 1).liquid, y, -1)
 
     m0m = np.sum(m0_c, axis=0)
     mfm = np.sum(mt_c, axis=0)
 
-    print("Inital mass: ", m0m)
-    print("Final mass: ", mfm)
-    print("Initial normalized C: ", c_init[:5])
-    print("Final normalized C: ", c_final[:5])
-    print("Final variance: ", np.var(c_final, axis=0))
+    # print("Inital mass: ", m0m)
+    # print("Final mass: ", mfm)
+    # print("Initial normalized C: ", c_init[:5])
+    # print("Final normalized C: ", c_final[:5])
+    # print("Final variance: ", np.var(c_final, axis=0))
     plt.figure()
-    plt.plot(sol.t, y[0, 0, :])
-    plt.plot(sol.t, y[1, 0, :])
+    plt.plot(sol.t, y[0, 0, :], label="0")
+    plt.plot(sol.t, y[1, 0, :], label="1")
     plt.title("Concentration in compartment0")
     plt.legend()
     plt.show()

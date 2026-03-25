@@ -24,12 +24,12 @@ The core functionality is used for chemical or compartmental mixing simulations.
 """
 
 import os
+from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pycmtool
 from scipy.integrate import solve_ivp
-from typing import Callable
 
 
 def integration(
@@ -134,9 +134,12 @@ def check_mixing(fmt, n_s, final_time: float, reaction_rate):
     two_phase_flow = it.has_gas()
     n_p = 2 if two_phase_flow else 1
     C = np.zeros((n_s, n_c, n_p))
+
     C[0, :, :] = 0.7 * initial_c_distribution(n_c, n_p)
     C[1, :, :] = 0.2 * initial_c_distribution(n_c, n_p)
-    C[2, :, 1] = 300e-3
+    C[2, :, 0] = 9e-3
+    if two_phase_flow:
+        C[2, :, 1] = 300e-3
     m0 = gm0(two_phase_flow, C, it)
 
     sol = integration(two_phase_flow, fmt, m0, final_time, n_s, reaction_rate)
@@ -179,9 +182,10 @@ def check_mixing(fmt, n_s, final_time: float, reaction_rate):
 
 if __name__ == "__main__":
     final_time = 15 * 3600
-    root =  os.environ["EXAMPLE_ROOT"]
+    root = os.environ["EXAMPLE_ROOT"]
 
     N_SPECIES = 3
+
     def _reaction_rate(Cl):
         mum = 0.8 / 3600
         K_S = 0.1
