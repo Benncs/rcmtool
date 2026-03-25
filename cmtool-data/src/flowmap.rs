@@ -26,31 +26,36 @@ impl FlowMapDescriptor {
         let n_zone = data_flows.header.n_zone as usize;
         let mut flowmap = Array2::<f64>::zeros((n_zone, n_zone));
 
-        let mut neighbors: Vec<Vec<usize>> = vec![Vec::new(); n_zone]; //Vec::with_capacity(data.header.n_zone as usize)
+        let mut neighbors: Vec<Vec<usize>> = vec![Vec::with_capacity(10); n_zone];
 
         if data_flows.header.n_zone != data_volumes.header.n_zone {
             return Err(DataError::BadData);
         }
 
-        for RawFlux {
+        let mut add_at = |i: usize, j: usize, val: f64| -> Result<(), DataError> {
+            //Error should never be triggered, by construction i<n and j<n
+            let g = flowmap.get_mut((i, j)).ok_or(DataError::BadData)?;
+            *g += val;
+            Ok(())
+        };
+
+        for &RawFlux {
             id_source,
             id_target,
             flux_source_target,
             flux_target_source,
         } in data_flows.fluxes.iter()
         {
-            let id_source = *id_source as usize;
-            let id_target = *id_target as usize;
+            let id_source = id_source as usize;
+            let id_target = id_target as usize;
+            assert!(flux_source_target >= 0.);
+            assert!(flux_target_source >= 0.);
 
-            if let Some(g) = flowmap.get_mut((id_source, id_target)) {
-                *g += flux_source_target;
-            }
+            add_at(id_source, id_target, flux_source_target)?;
+            add_at(id_target, id_source, flux_target_source)?;
 
-            if let Some(g) = flowmap.get_mut((id_target, id_source)) {
-                *g += flux_target_source;
-            }
             neighbors[id_source].push(id_target);
-            neighbors[id_target].push(id_source)
+            neighbors[id_target].push(id_source);
         }
 
         let max_size = neighbors
@@ -65,9 +70,13 @@ impl FlowMapDescriptor {
 
         for (i_zone, neighbors_for_zone) in neighbors.iter().enumerate() {
             for (i_n, id_neighbor) in neighbors_for_zone.iter().enumerate() {
-                *(neighbor_flat.get_mut((i_zone, i_n)).unwrap()) = *id_neighbor;
+                // *(neighbor_flat.get_mut((i_zone, i_n)).unwrap()) = *id_neighbor;
+                *(neighbor_flat
+                    .get_mut((i_zone, i_n))
+                    .expect("Flat neighbor out of bound")) = *id_neighbor;
             }
         }
+
         let volumes: Vec<f64> = data_volumes.values.iter().map(|v| v.value).collect();
 
         Ok(FlowMapDescriptor {

@@ -199,8 +199,6 @@ impl From<Vec<ScalarValueType>> for RawDataScalar {
     }
 }
 
-
-
 // impl Into<Vec<ScalarValueType>> for RawDataScalar {
 //     fn into(self) -> Vec<ScalarValueType> {
 //         self.values.iter().map(|i| i.value).collect()
@@ -274,6 +272,10 @@ impl RawData for RawDataFlux {
         let mut fluxes = Vec::new();
         while offset < buffer.len() {
             fluxes.push(RawFlux::from_bytes(&buffer, &mut offset)?);
+        }
+
+        if fluxes.len() as u32 != header.n_fluxes {
+            return None;
         }
 
         Some(RawDataFlux { header, fluxes })
@@ -402,6 +404,11 @@ impl FromBytes for RawFlux {
                 .unwrap(),
         );
         *offset += size_of::<f64>();
+
+        if flux_source_target < 0. || flux_target_source < 0. {
+            return None;
+        }
+
         Some(RawFlux {
             id_source,
             id_target,
@@ -585,14 +592,22 @@ mod tests {
         let raw_data_flux = RawDataFlux {
             header: FluxFileHeader {
                 n_zone: 10,
-                n_fluxes: 100,
+                n_fluxes: 2,
             },
-            fluxes: vec![RawFlux {
-                id_source: 1,
-                id_target: 2,
-                flux_source_target: 0.1,
-                flux_target_source: 2.71,
-            }],
+            fluxes: vec![
+                RawFlux {
+                    id_source: 1,
+                    id_target: 2,
+                    flux_source_target: 0.1,
+                    flux_target_source: 2.71,
+                },
+                RawFlux {
+                    id_source: 1,
+                    id_target: 2,
+                    flux_source_target: 0.1,
+                    flux_target_source: 2.71,
+                },
+            ],
         };
 
         let path = "./tes2t.raw";
