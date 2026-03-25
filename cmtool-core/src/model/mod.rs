@@ -5,16 +5,16 @@
 
 use crate::{
     CoreError,
-    coordinates::{CartesianCoordinates, CartesianVec3, CylindricalCoordinates},
-    grid::MeshType,
+    coordinates::{CartesianCoordinates, CartesianVec3, Coords3},
+    errors::ModelError,
     model::{
         compartments::{CompartmentInfo, CountVolumeElement, ElementVolumeInfo},
         interfaces::{AInterfacesInfo, InterfaceFlow, InterfaceInfo},
     },
 };
-use std::sync::Arc;
+use std::{f64, sync::Arc};
 mod data;
-use cmtool_data::{RawDataFlux, RawDataScalar};
+use cmtool_data::{FluxFileHeader, RawDataFlux, RawDataScalar, RawFlux};
 mod compartments;
 mod geometry;
 mod interfaces;
@@ -30,6 +30,104 @@ pub struct CMModel {
 }
 
 pub use geometry::CMGeometry;
+
+fn get_data_flow(
+    n_zones: usize,
+    i_info: &[InterfaceInfo],
+    i_flow: &[InterfaceFlow],
+) -> RawDataFlux {
+    let fluxes: Vec<RawFlux> = i_info
+        .iter()
+        .zip(i_flow)
+        .map(|(k_i_nfo, k_i_flow)| RawFlux {
+            id_source: k_i_nfo.source_id as u32,
+            id_target: k_i_nfo.target_id as u32,
+            flux_source_target: k_i_flow.source_flow,
+            flux_target_source: k_i_flow.target_flow,
+        })
+        .collect();
+    RawDataFlux {
+        header: FluxFileHeader {
+            n_fluxes: i_flow.len() as u32,
+            n_zone: n_zones as u32,
+        },
+        fluxes,
+    }
+
+    // let mut flux_field = RawDataFlux::new(n_zones, i_flow.len());
+    // for (i_interface, rd) in flux_field.fluxes.iter_mut().enumerate() {
+    //     let InterfaceInfo {
+    //         source_id,
+    //         target_id,
+    //     } = i_info[i_interface];
+    //     rd.id_source = source_id as u32;
+    //     rd.id_target = target_id as u32;
+    //     let InterfaceFlow {
+    //         source_flow,
+    //         target_flow,
+    //     } = &i_flow[i_interface];
+    //     rd.flux_source_target = *source_flow;
+    //     rd.flux_target_source = *target_flow;
+    // }
+
+    // flux_field
+}
+
+impl CMModel {
+    fn check_flux(n_zone: u32, rf: &RawFlux) -> bool {
+        let mut flag = false;
+        flag |= rf.flux_source_target.is_finite();
+        flag |= rf.flux_source_target.is_sign_positive();
+        flag |= rf.id_source < n_zone;
+        flag |= rf.id_target < n_zone;
+        flag
+    }
+
+    pub fn check_flow(&self, raw: &RawDataFlux) -> Result<(), ModelError> {
+        const REL_TOLERANCE_DIVERGENCE_CELL: f64 = 1e-2;
+        const ABS_TOLERANCE_DIVERGENCE_CELL: f64 = 1e-7;
+
+        let mut mass_balance: Vec<InterfaceFlow> =
+            vec![InterfaceFlow::default(); raw.header.n_zone as usize];
+        let mut id_max = u32::MIN;
+
+        for flow in raw.fluxes.iter() {
+            if !Self::check_flux(raw.header.n_zone, flow) {
+                return Err(ModelError::InvalidFlow);
+            }
+
+            id_max = u32::max(id_max, flow.id_source);
+            //out
+            mass_balance[flow.id_source as usize].source_flow += flow.flux_target_source;
+            //in
+            mass_balance[flow.id_source as usize].target_flow += flow.flux_source_target;
+
+            //in
+            mass_balance[flow.id_target as usize].source_flow += flow.flux_source_target;
+            //out
+            mass_balance[flow.id_target as usize].target_flow += flow.flux_target_source;
+        }
+
+        for flow in &mass_balance {
+            let abs_diff = (flow.source_flow - flow.target_flow).abs();
+            let denom = flow.source_flow.abs() + flow.target_flow.abs();
+
+            let err = if denom > f64::EPSILON {
+                2.0 * abs_diff / denom
+            } else {
+                abs_diff
+            };
+            if abs_diff > ABS_TOLERANCE_DIVERGENCE_CELL && err > REL_TOLERANCE_DIVERGENCE_CELL {
+                return Err(ModelError::CellToCellDivergence(
+                    err,
+                    REL_TOLERANCE_DIVERGENCE_CELL,
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
 
 impl CMModel {
     pub fn grid(&self) -> &dyn crate::grid::CompartmentMesh {
@@ -54,8 +152,8 @@ impl CMModel {
 
         let (c_info, interfaces) = volume_element_count.into_reduce();
 
-        if interfaces.n_interfaces() >= geometry.get_grid().as_ref().unwrap().n_maximum_interface()
-        {
+        // if interfaces.n_interfaces() >= geometry.get_grid().as_ref().unwrap().n_maximum_interface()
+        if interfaces.n_interfaces() > geometry.get_grid().as_ref().unwrap().n_maximum_interface() {
             unimplemented!(
                 "RCMTOOL: CMModel::init: should have intefaces  < n_maximum_interface {} {}",
                 interfaces.n_interfaces(),
@@ -81,91 +179,54 @@ impl CMModel {
         todo!()
     }
 
+    fn get_average_velocity(
+        &self,
+        vector: &Vector,
+        _curent_inteface_element: &[usize],
+        __curent_inteface_area: &[f64],
+    ) -> Coords3 {
+        let total_area: f64 = __curent_inteface_area.iter().sum();
+        _curent_inteface_element
+            .iter()
+            .zip(__curent_inteface_area)
+            .fold([0.0f64; 3], |acc, (gid, a)| {
+                let v = CartesianVec3(vector.get_slice_xyz(*gid).to_owned());
+                let CartesianCoordinates(centroid) = self.geometry.volume_elements.xyz[*gid];
+                let theta = centroid[1].atan2(centroid[0]);
+                let cyl = v.to_cylindrical_vec(theta).0;
+                [
+                    acc[0] + cyl[0] * a / total_area,
+                    acc[1] + cyl[1] * a / total_area,
+                    acc[2] + cyl[2] * a / total_area,
+                ]
+            })
+    }
+
     pub fn compute_flux_between_compartments(
         &self,
         vector: Vector,
     ) -> Result<cmtool_data::RawDataFlux, CoreError> {
         let n_fluxes = self.interfaces.n_interfaces();
-        let mut flux_field = RawDataFlux::new(self.geometry.n_zone(), n_fluxes);
-
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
-
-        // for (i_interface, flow) in flows.iter_mut().enumerate() {
-        //     let axis: usize = self.interfaces.normal_axis[i_interface];
-        //     let current_interface_area = &self.interfaces.area[i_interface];
-        //     let curent_inteface_element = &self.interfaces.global_id_from_interface[i_interface];
-
-        //     for (global_id, area) in curent_inteface_element.iter().zip(current_interface_area) {
-        //         let vector_value = CartesianVec3(vector.get_slice_xyz(*global_id).to_owned());
-
-        //         let coords = match self.geometry.mesh_type {
-        //             MeshType::Cylindrical => {
-        //                 let CartesianCoordinates(centroid) =
-        //                     self.geometry.volume_elements.xyz[*global_id];
-
-        //                 let CylindricalCoordinates(centroid) =
-        //                     CartesianCoordinates(centroid).into();
-
-        //                 vector_value.to_cylindrical_vec(centroid[1]).0
-
-        //                 // let cyl_vec = vector_value
-        //                 //     .to_cylindrical_vec(self.interfaces.interface_theta[i_interface])
-        //                 //     .0;
-        //                 // cyl_vec
-        //                 //
-        //                 //
-        //                 //
-        //                 // let r = (centroid[0].powi(2) + centroid[1].powi(2)).sqrt();
-        //                 // match axis {
-        //                 //     1 => [cyl_vec[0], cyl_vec[1] * r, cyl_vec[2]],
-        //                 //     _ => cyl_vec,
-        //                 // }
-        //             }
-        //             _ => vector_value.0,
-        //         };
-
-        //         let f = coords[axis] * area;
-
-        //         if f > 0. {
-        //             flow.source_flow += f
-        //         } else if f < 0. {
-        //             flow.target_flow += f.abs()
-        //         }
-        //     }
-        // }
 
         for (i_interface, flow) in flows.iter_mut().enumerate() {
             let axis: usize = self.interfaces.normal_axis[i_interface];
-            let current_interface_area = &self.interfaces.area[i_interface];
-            let curent_inteface_element = &self.interfaces.global_id_from_interface[i_interface];
 
-            let total_area: f64 = current_interface_area.iter().sum();
-            let v_avg = curent_inteface_element
-                .iter()
-                .zip(current_interface_area)
-                .fold([0.0f64; 3], |acc, (gid, a)| {
-                    let v = CartesianVec3(vector.get_slice_xyz(*gid).to_owned());
-                    let CartesianCoordinates(centroid) = self.geometry.volume_elements.xyz[*gid];
-                    let theta = centroid[1].atan2(centroid[0]);
-                    let cyl = v.to_cylindrical_vec(theta).0;
-                    [
-                        acc[0] + cyl[0] * a / total_area,
-                        acc[1] + cyl[1] * a / total_area,
-                        acc[2] + cyl[2] * a / total_area,
-                    ]
-                });
-
-            let coords = v_avg;
+            let axis_oriented = crate::grid::index_to_oriented(axis);
 
             let source_id = self.interfaces.ids[i_interface].source_id;
-            let axis_oriented = crate::grid::index_to_oriented(axis);
             let theoretical_area = self
                 .geometry
                 .get_grid()
                 .unwrap()
                 .cell_surface(source_id, axis_oriented);
 
-            let f = coords[axis] * theoretical_area;
+            let current_interface_area = &self.interfaces.area[i_interface];
+            let curent_inteface_element = &self.interfaces.global_id_from_interface[i_interface];
+            let v_avg =
+                self.get_average_velocity(&vector, curent_inteface_element, current_interface_area);
+
+            let f = v_avg[axis] * theoretical_area;
 
             if f > 0. {
                 flow.source_flow += f
@@ -176,39 +237,10 @@ impl CMModel {
 
         self.clean(&mut flows);
 
-        for (i_interface, rd) in flux_field.fluxes.iter_mut().enumerate() {
-            let InterfaceInfo {
-                source_id,
-                target_id,
-            } = self.interfaces.ids[i_interface];
-            rd.id_source = source_id as u32;
-            rd.id_target = target_id as u32;
-            let InterfaceFlow {
-                source_flow,
-                target_flow,
-            } = &flows[i_interface];
-            rd.flux_source_target = *source_flow;
-            rd.flux_target_source = *target_flow;
-        }
+        let data_flow = get_data_flow(self.geometry.n_zone(), &self.interfaces.ids, &flows);
 
-        // for (i_interface, rd) in flux_field.fluxes.iter_mut().enumerate() {
-        //     let InterfaceInfo {
-        //         source_id,
-        //         target_id,
-        //     } = self.interfaces.ids[i_interface];
-
-        //     rd.id_source = source_id as u32;
-        //     rd.id_target = target_id as u32;
-
-        //     let InterfaceFlow {
-        //         source_flow,
-        //         target_flow,
-        //     } = &flows[i_interface];
-        //     rd.flux_source_target = *source_flow;
-        //     rd.flux_target_source = *target_flow;
-        // }
-
-        Ok(flux_field)
+        self.check_flow(&data_flow)?;
+        Ok(data_flow)
     }
 
     // pub fn export_volume_integral_per_zone(&self,scalar:&mut cmtool_data::RawDataScalar) {
@@ -217,7 +249,9 @@ impl CMModel {
 
     fn clean(&self, flows: &mut [InterfaceFlow]) {
         const TOL: f64 = 1e-19;
-        const TOL_CONV: f64 = 1e-12;
+        const ABS_TOL_CONV: f64 = 1e-12;
+        const REL_TOL_CONV: f64 = 1e-6;
+
         const MAX_IT: usize = 10000;
         let mut balance = vec![0.0f64; self.geometry.n_zone()];
         let n_interfaces_per_zone = {
@@ -248,13 +282,18 @@ impl CMModel {
                 _balance[source_id] += flow.target_flow - flow.source_flow;
                 _balance[target_id] += flow.source_flow - flow.target_flow;
             }
-            let total_balance = _balance.iter().map(|&x| x.abs()).sum::<f64>();
+            // let total_balance = _balance.iter().map(|&x| x.abs()).sum::<f64>();
+            let total_balance = _balance.iter().map(|&x| x * x).sum::<f64>().sqrt();
             let total_flow = _flows
                 .iter()
                 .map(|flow| flow.target_flow + flow.source_flow)
                 .sum::<f64>();
 
-            total_balance / total_flow
+            if total_flow > f64::EPSILON {
+                total_balance / total_flow
+            } else {
+                total_balance
+            }
         };
 
         let mut conv = false;
@@ -264,11 +303,13 @@ impl CMModel {
         while it < MAX_IT && !conv {
             balance.fill(0.0);
             let max_err = f_err(&mut balance, flows);
-            if max_err < TOL {
+
+            let delta = (err - max_err).abs();
+
+            conv = delta < ABS_TOL_CONV || delta / err.max(f64::EPSILON) < REL_TOL_CONV;
+            if conv {
                 break;
             }
-            println!("{} {}", max_err, it);
-            conv = (err - max_err).abs() < TOL_CONV;
             err = max_err;
             it += 1;
             for (i_interface, flow) in flows.iter_mut().enumerate() {
@@ -280,26 +321,8 @@ impl CMModel {
                 flow.target_flow -= corr;
             }
         }
-
-        // for i in 0..MAX_IT {
-        //     balance.fill(0.0);
-
-        //     let max_err = f_err(&mut balance, flows);
-
-        //     println!("{} {}", max_err, i);
-        //     if max_err < TOL {
-        //         break;
-        //     }
-        //     for (i_interface, flow) in flows.iter_mut().enumerate() {
-        //         let source_id = self.interfaces.ids[i_interface].source_id;
-        //         let target_id = self.interfaces.ids[i_interface].target_id;
-        //         let corr = (balance[source_id] - balance[target_id])
-        //             / (n_interfaces_per_zone[source_id] + n_interfaces_per_zone[target_id]) as f64;
-        //         flow.source_flow += corr;
-        //         flow.target_flow -= corr;
-        //     }
-        // }
     }
+
     pub fn export_volume_integral_per_zone(
         &self,
         model_scalar: Scalar,

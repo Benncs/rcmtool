@@ -11,7 +11,7 @@ pub struct InterfaceInfo {
     pub target_id: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct InterfaceFlow {
     pub source_flow: f64,
     pub target_flow: f64,

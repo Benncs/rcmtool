@@ -21,14 +21,14 @@ pub fn check_flows(
     // let boundary = grid.get_boundary();
 
     for flow in raw_flows.fluxes.iter() {
-        // mass_balance[flow.id_target as usize].0 += flow.flux_source_target;
-        // mass_balance[flow.id_source as usize].1 += flow.flux_source_target;
-        //
-        //
-        mass_balance[flow.id_target as usize].0 += flow.flux_source_target;
+        //out
+        mass_balance[flow.id_source as usize].0 += flow.flux_target_source;
+        //in
         mass_balance[flow.id_source as usize].1 += flow.flux_source_target;
 
-        mass_balance[flow.id_source as usize].0 += flow.flux_target_source;
+        //in
+        mass_balance[flow.id_target as usize].0 += flow.flux_source_target;
+        //out
         mass_balance[flow.id_target as usize].1 += flow.flux_target_source;
     }
 

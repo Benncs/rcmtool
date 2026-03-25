@@ -8,7 +8,7 @@ use std::{
 
 use crate::CoreError;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum VariableType {
     Scalar,
     Vector,
@@ -26,7 +26,7 @@ impl TryInto<VariableType> for String {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct VariableInfo {
     pub var_type: String,
     pub name: String,

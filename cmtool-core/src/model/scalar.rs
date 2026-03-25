@@ -2,13 +2,16 @@
 
 use std::ops::Index;
 
+use cmtool_data::ScalarValueType;
+
 use crate::{
+    CoreError,
     ensight_gold::{self, types::ElementsType},
     model::CMGeometry,
 };
 
 pub struct Scalar {
-    value_in_vo: Vec<cmtool_data::ScalarValueType>,
+    pub(crate) value_in_vo: Vec<cmtool_data::ScalarValueType>,
     pub name: String,
 }
 
@@ -42,6 +45,36 @@ impl Scalar {
         Self {
             value_in_vo,
             name: eg_scalar.get_name().to_string(),
+        }
+    }
+
+    pub fn element_wise(self, a: &Self) -> Result<Self, CoreError> {
+        if a.value_in_vo.len() != self.value_in_vo.len() {
+            return Err(CoreError::Custom(format!(
+                "Bad size for scalar scaling {} vs {} ",
+                self.value_in_vo.len(),
+                a.value_in_vo.len()
+            )));
+        }
+
+        let values: Vec<cmtool_data::ScalarValueType> = a
+            .value_in_vo
+            .iter()
+            .zip(&self.value_in_vo)
+            .map(|(a, b)| a * b)
+            .collect();
+        Ok(Self {
+            value_in_vo: values,
+            name: format!("{} per {} scalar ", self.name, a.name),
+        })
+    }
+
+    pub fn scalar_shift(self, lambda: ScalarValueType) -> Self {
+        let value_in_vo = self.value_in_vo.iter().map(|i| lambda - i).collect();
+
+        Self {
+            value_in_vo,
+            name: format!("{} shifted by {} ", self.name, lambda),
         }
     }
 }

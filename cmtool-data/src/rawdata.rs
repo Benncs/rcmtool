@@ -199,6 +199,14 @@ impl From<Vec<ScalarValueType>> for RawDataScalar {
     }
 }
 
+
+
+// impl Into<Vec<ScalarValueType>> for RawDataScalar {
+//     fn into(self) -> Vec<ScalarValueType> {
+//         self.values.iter().map(|i| i.value).collect()
+//     }
+// }
+
 impl From<&[ScalarValueType]> for RawDataScalar {
     fn from(value: &[ScalarValueType]) -> Self {
         let len: u32 = value.len().try_into().unwrap_or_else(|_| {
@@ -283,6 +291,7 @@ impl RawData for RawDataFlux {
         Ok(())
     }
 }
+
 pub trait FromBytes: Sized {
     fn from_bytes(buffer: &[u8], offset: &mut usize) -> Option<Self>;
 }

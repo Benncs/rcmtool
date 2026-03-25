@@ -19,7 +19,13 @@ fn main() -> Result<(), CmtoolError> {
     let mode = args.mode;
     match mode {
         AllModes::Cfd(cfdargs) => match cfdargs.mode {
-            Mode::Auto(autoargs) => auto_main(cfdargs.common, autoargs),
+            Mode::Auto(autoargs) => {
+                if let Err(e) = auto_main(cfdargs.common, autoargs) {
+                    eprintln!("{}", e);
+                    return Err(e);
+                }
+                return Ok(());
+            }
 
             Mode::Manual(_manual_args) => todo!(),
         },
@@ -33,9 +39,9 @@ fn main() -> Result<(), CmtoolError> {
 
 fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> {
     let stem = Path::new(&autoargs.case_path)
-        .file_stem() // Gets "casename" as OsStr
+        .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap(); // Converts OsStr to &str
+        .unwrap();
 
     let root_dir = out_or_default(common.out);
 
@@ -58,19 +64,38 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
     handle.dump_real_volume(format!("{}/{}/vofL", root_dir, stem))?;
     handle.dump_real_volume(format!("{}/{}/vtot", root_dir, stem))?;
 
+    // let path_gas_f = case.paths.iter().find(|f| f.name == "gas_vof").unwrap();
+
+    // let liquid_fraction = handle
+    //     .get_scalar(std::path::PathBuf::from(&case.root).join(&path_gas_f.filepath))
+    //     .unwrap()
+    //     .scalar_shift(1.);
+
+    // let manual_flowl = handle
+    //     .vector_from_scalar(
+    //         "/tmp/inputs/RESULTS.scl1",
+    //         "/tmp/inputs/RESULTS.scl2",
+    //         "/tmp/inputs/RESULTS.scl3",
+    //     )
+    //     .unwrap()
+    //     .scale_by(liquid_fraction)
+    //     .unwrap();
+
+    // handle.dump_vector_raw(format!("{}/{}/flowL", root_dir, stem), manual_flowl)?;
+
     // handle.dump_vector_from_scalar(
     //     format!("{}/{}/flowL", root_dir, stem),
-    //     "/tmp/sanofi/inputs/RESULTS.scl1",
-    //     "/tmp/sanofi/inputs/RESULTS.scl2",
-    //     "/tmp/sanofi/inputs/RESULTS.scl3",
+    // "/tmp/sanofi/inputs/RESULTS.scl1",
+    // "/tmp/sanofi/inputs/RESULTS.scl2",
+    // "/tmp/sanofi/inputs/RESULTS.scl3",
     // )?;
 
-    #[cfg(feature = "use_vtk")]
-    handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
+    // #[cfg(feature = "use_vtk")]
+    // handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
 
     let f = cmtool::check_flows(
         handle.grid(),
-        &RawDataFlux::read_raw("./out/cuve_sldmsh_initmrf/velocity.raw").unwrap(),
+        &RawDataFlux::read_raw("./out/RESULTS/flowL.raw").unwrap(),
     )
     .unwrap();
     // println!("{}", f);
