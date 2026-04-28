@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use crate::DataError;
 use crate::descriptors::{CMExportType, PhaseCM};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -7,8 +8,9 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
 };
-pub type ScalarValueType = f64;
-use crate::DataError;
+
+///Scalar type (float)
+pub type ScalarValueType = f64; //TODO decide if this alias is needed
 
 // A trait for reading and writing raw data to and from storage.
 pub trait RawData: Sized {
@@ -98,7 +100,7 @@ pub struct ScalarFileHeader {
 #[derive(Deserialize, Serialize, Clone, Copy)]
 pub struct RawScalar {
     /// The scalar value stored as a floating-point number.
-    pub value: f64,
+    pub value: ScalarValueType,
 }
 
 /// Represents a collection of raw scalar data along with its header.
@@ -173,9 +175,9 @@ impl Default for RawFlux {
     }
 }
 
-impl From<f64> for RawScalar {
+impl From<ScalarValueType> for RawScalar {
     #[inline(always)]
-    fn from(value: f64) -> Self {
+    fn from(value: ScalarValueType) -> Self {
         Self { value }
     }
 }
@@ -191,13 +193,26 @@ impl RawDataScalar {
     }
 }
 
-impl From<Vec<f64>> for RawDataScalar {
-    fn from(value: Vec<f64>) -> Self {
+impl From<Vec<ScalarValueType>> for RawDataScalar {
+    fn from(value: Vec<ScalarValueType>) -> Self {
+        value.as_slice().into()
+    }
+}
+
+// impl Into<Vec<ScalarValueType>> for RawDataScalar {
+//     fn into(self) -> Vec<ScalarValueType> {
+//         self.values.iter().map(|i| i.value).collect()
+//     }
+// }
+
+impl From<&[ScalarValueType]> for RawDataScalar {
+    fn from(value: &[ScalarValueType]) -> Self {
+        let len: u32 = value.len().try_into().unwrap_or_else(|_| {
+            panic!("Array length is too large to convert into u32");
+        });
         Self {
-            header: ScalarFileHeader {
-                n_zone: value.len().try_into().unwrap(),
-            },
-            values: value.into_iter().map(|i| i.into()).collect(),
+            header: ScalarFileHeader { n_zone: len },
+            values: value.iter().copied().map(Into::into).collect(),
         }
     }
 }
@@ -259,6 +274,10 @@ impl RawData for RawDataFlux {
             fluxes.push(RawFlux::from_bytes(&buffer, &mut offset)?);
         }
 
+        if fluxes.len() as u32 != header.n_fluxes {
+            return None;
+        }
+
         Some(RawDataFlux { header, fluxes })
     }
 
@@ -274,6 +293,7 @@ impl RawData for RawDataFlux {
         Ok(())
     }
 }
+
 pub trait FromBytes: Sized {
     fn from_bytes(buffer: &[u8], offset: &mut usize) -> Option<Self>;
 }
@@ -336,15 +356,15 @@ impl ToBytes for FluxFileHeader {
 
 impl FromBytes for RawScalar {
     fn from_bytes(buffer: &[u8], offset: &mut usize) -> Option<Self> {
-        if *offset + size_of::<f64>() > buffer.len() {
+        if *offset + size_of::<ScalarValueType>() > buffer.len() {
             return None;
         }
-        let value = f64::from_le_bytes(
-            buffer[*offset..*offset + size_of::<f64>()]
+        let value = ScalarValueType::from_le_bytes(
+            buffer[*offset..*offset + size_of::<ScalarValueType>()]
                 .try_into()
                 .unwrap(),
         );
-        *offset += size_of::<f64>();
+        *offset += size_of::<ScalarValueType>();
         Some(RawScalar { value })
     }
 }
@@ -384,6 +404,11 @@ impl FromBytes for RawFlux {
                 .unwrap(),
         );
         *offset += size_of::<f64>();
+
+        if flux_source_target < 0. || flux_target_source < 0. {
+            return None;
+        }
+
         Some(RawFlux {
             id_source,
             id_target,
@@ -567,14 +592,22 @@ mod tests {
         let raw_data_flux = RawDataFlux {
             header: FluxFileHeader {
                 n_zone: 10,
-                n_fluxes: 100,
+                n_fluxes: 2,
             },
-            fluxes: vec![RawFlux {
-                id_source: 1,
-                id_target: 2,
-                flux_source_target: 0.1,
-                flux_target_source: 2.71,
-            }],
+            fluxes: vec![
+                RawFlux {
+                    id_source: 1,
+                    id_target: 2,
+                    flux_source_target: 0.1,
+                    flux_target_source: 2.71,
+                },
+                RawFlux {
+                    id_source: 1,
+                    id_target: 2,
+                    flux_source_target: 0.1,
+                    flux_target_source: 2.71,
+                },
+            ],
         };
 
         let path = "./tes2t.raw";

@@ -1,11 +1,11 @@
-use cmtool_data::CMCase;
-use cmtool_data::CMCaseReader;
-use cmtool_data::CMCaseWriter;
-use cmtool_data::CMExportType;
-use cmtool_data::PhaseCM;
-use cmtool_data::RawData;
-use cmtool_data::RawPhase;
-use cmtool_data::{CMAExportType, CMCaseJson, RawDataFlux, RawDataScalar, RawFlux};
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+use crate::CMError;
+
+use cmtool_data::{
+    CMAExportType, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter, CMExportType, PhaseCM, RawData,
+    RawDataFlux, RawDataScalar, RawFlux, RawPhase,
+};
 use std::path::Path;
 
 const LIQUID_PAIR: (CMAExportType, CMAExportType) =
@@ -17,34 +17,64 @@ type PairType = (CMAExportType, CMAExportType);
 
 const PAIRS: (PairType, PairType) = (LIQUID_PAIR, GAS_PAIR);
 
-use thiserror::Error;
-#[derive(Error, Debug)]
-pub enum CmtoolError {
-    #[error("Cmtool: {0}")]
-    Data(#[from] cmtool_data::DataError),
-
-    #[error("Cmtool: {0}")]
-    Core(#[from] cmtool_core::CoreError),
-
-    #[error("Cmtool: {0}")]
-    Custom(String),
+pub struct PFRDescription {
+    pub n_compartment: usize,
+    pub length: f64,
+    pub diameter: f64,
+    pub liquid_flow: f64,
+    pub gas_flow: f64,
+    pub gas_fraction: f64,
+    pub axial_dispersion: f64,
 }
 
+//TODO improve and change name
 pub struct Generator {
     raw_phase: Vec<RawPhase>,
 }
 
 struct Field0D {
+    #[allow(unused)]
     name: String,
+    #[allow(unused)]
     value: f64,
+}
+///wrapper Get absolute path from relative
+fn resolve_path(
+    case: &CMCase,
+    relative_path: &str,
+    value: CMAExportType,
+) -> Result<String, CMError> {
+    case.resolve(relative_path, value)
+        .ok_or(CMError::Custom("Error resolving path".to_string()))
+}
+
+///Create vector of raw phase from raw
+fn get_raw_phase(
+    flows: Vec<RawDataFlux>,
+    vol: Vec<RawDataScalar>,
+    phase: PhaseCM,
+) -> Vec<RawPhase> {
+    flows
+        .into_iter()
+        .zip(vol)
+        .map(|(f, v)| RawPhase {
+            flow: f,
+            volume: v,
+            identifier: phase,
+        })
+        .collect()
+}
+
+///Select specific phase type in a slice of phases
+fn filter_phase(raw_phase: &[RawPhase], phase: PhaseCM) -> Vec<RawPhase> {
+    raw_phase
+        .iter()
+        .filter(|p| p.identifier == phase)
+        .cloned()
+        .collect()
 }
 
 impl Generator {
-    fn f_write(f: impl RawData, r: &str, p: &str) -> Result<(), CmtoolError> {
-        f.write_raw(&format!("{}/{}", r, p))?;
-        Ok(())
-    }
-
     pub fn new() -> Self {
         Self {
             raw_phase: Default::default(),
@@ -56,7 +86,7 @@ impl Generator {
         case: &mut CMCase,
         phase: RawPhase,
         relative_path: Option<String>,
-    ) -> Result<(), CmtoolError> {
+    ) -> Result<(), CMError> {
         let (flowp, volumep) = phase.write(dest)?;
         let flowp = match &relative_path {
             Some(rel) => format!("./{}/{}", rel, flowp),
@@ -79,7 +109,7 @@ impl Generator {
         volume: f64,
         phase: PhaseCM,
         dest: Option<String>,
-    ) -> Result<(), CmtoolError> {
+    ) -> Result<(), CMError> {
         let mut phase = cmtool_data::RawPhase::new(1, 1, phase);
         phase.flow.fluxes[0] = Default::default(); //Not usefull because new already makes default
         phase.volume.values.push(volume.into());
@@ -99,7 +129,7 @@ impl Generator {
         gas_volume: f64,
         fields: Option<&[Field0D]>,
         dest: Option<String>,
-    ) -> Result<CMCase, CmtoolError> {
+    ) -> Result<CMCase, CMError> {
         let mut case = CMCase::default();
         case.n_div = [1, 0, 0];
 
@@ -109,7 +139,7 @@ impl Generator {
             self.generate_0d_phase(&mut case, gas_volume, PhaseCM::Gas, dest)?;
         }
 
-        if let Some(scalars) = fields {
+        if let Some(_scalars) = fields {
             todo!("Scalar field")
         }
 
@@ -121,7 +151,7 @@ impl Generator {
         total_volume: f64,
         gas_fraction: f64,
         dest: Option<String>,
-    ) -> Result<CMCase, CmtoolError> {
+    ) -> Result<CMCase, CMError> {
         if !(0. ..=1.).contains(&gas_fraction) {
             panic!("TODO: handle error gas fraction generation 0d");
         }
@@ -132,22 +162,23 @@ impl Generator {
         self.generate_0d(liquid_volume, gas_volume, None, dest)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn generate_1d(
         &mut self,
         case: &mut CMCase,
         n_compartment: usize,
         length: f64,
         diameter: f64,
-        liquid_flow: f64,
+        flow: f64,
         volume_fraction: f64,
         axial_dispersion: f64,
         gas: bool,
         dest: Option<String>,
-    ) -> Result<(), CmtoolError> {
+    ) -> Result<(), CMError> {
         let dx = length / (n_compartment as f64);
         let reactor_section_area = std::f64::consts::PI * diameter.powf(2.) / 4.;
         let compartment_volume = volume_fraction * dx * reactor_section_area;
-        let flow_velocity = liquid_flow / reactor_section_area;
+        let flow_velocity = flow / reactor_section_area;
         let n_flow = n_compartment - 1;
 
         let flow_source_target = reactor_section_area / dx * (flow_velocity + axial_dispersion);
@@ -184,15 +215,18 @@ impl Generator {
 
     pub fn generate_1d_from_fraction(
         &mut self,
-        n_compartment: usize,
-        length: f64,
-        diameter: f64,
-        liquid_flow: f64,
-        gas_flow: f64,
-        gas_fraction: f64,
-        axial_dispersion: f64,
+
+        PFRDescription {
+            n_compartment,
+            length,
+            diameter,
+            liquid_flow,
+            gas_flow,
+            gas_fraction,
+            axial_dispersion,
+        }: PFRDescription,
         dest: Option<String>,
-    ) -> Result<CMCase, CmtoolError> {
+    ) -> Result<CMCase, CMError> {
         let mut case = CMCase::default();
         case.n_div = [0, 0, n_compartment as u32];
 
@@ -228,13 +262,12 @@ impl Generator {
         Ok(case)
     }
 
-    //TODO add result type
     fn merge_phase(
         // flows: Vec<RawDataFlux>,
         // volumes: Vec<RawDataScalar>
         phases: Vec<RawPhase>,
         connections: Option<RawDataFlux>,
-    ) -> Result<RawPhase, CmtoolError> {
+    ) -> Result<RawPhase, CMError> {
         let mut phase = RawPhase::new(0, 0, phases[0].identifier);
 
         // let mut merge_phase_flow = RawDataFlux::new(0, 0); //
@@ -279,26 +312,16 @@ impl Generator {
         &self,
         dest: &str,
         connections: Option<[RawDataFlux; 2]>,
-    ) -> Result<(), CmtoolError> {
-        let liquid_phase = self
-            .raw_phase
-            .iter()
-            .filter(|p| p.identifier == PhaseCM::Liquid)
-            .cloned()
-            .collect();
+    ) -> Result<String, CMError> {
+        const MERGE_FOLDER_NAME: &str = "merged";
+        let liquid_phase = filter_phase(&self.raw_phase, PhaseCM::Liquid);
+        let gasphase = filter_phase(&self.raw_phase, PhaseCM::Gas);
 
-        let gasphase: Vec<_> = self
-            .raw_phase
-            .iter()
-            .filter(|p| p.identifier == PhaseCM::Gas)
-            .cloned()
-            .collect();
-
-        let path = format!("{}/merged", dest);
-        std::fs::create_dir_all(&path).unwrap(); //FIXME
+        let path = format!("{}/{}", dest, MERGE_FOLDER_NAME);
+        std::fs::create_dir_all(&path)?; //FIXME
         let mut case = CMCase::default();
         // case.n_div = n_div;
-        let relative = Some(String::from("merged")); //TODO Clean this
+        let relative = Some(String::from(MERGE_FOLDER_NAME));
 
         let liquid_connection = connections.as_ref().map(|c| c[0].clone());
         let gas_connection = connections.as_ref().map(|c| c[1].clone());
@@ -310,10 +333,10 @@ impl Generator {
             let phase = Self::merge_phase(gasphase, gas_connection)?;
             Self::write_phase(&path, &mut case, phase, relative)?;
         }
-
-        CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
-        cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)))?;
-        Ok(())
+        let path = format!("{}/cma_case", dest);
+        CMCaseJson::write_case(case.clone(), Path::new(&path))?;
+        // cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)))?;
+        Ok(path)
     }
 
     pub fn merge(
@@ -321,7 +344,7 @@ impl Generator {
         dest: &str,
         ids: &[String],
         connections: Option<[RawDataFlux; 2]>,
-    ) -> Result<(), CmtoolError> {
+    ) -> Result<String, CMError> {
         let mut liquid_flows = Vec::with_capacity(ids.len());
         let mut liquid_volumes = Vec::with_capacity(ids.len());
         let mut gas_flows = Vec::with_capacity(ids.len());
@@ -329,31 +352,29 @@ impl Generator {
 
         let mut n_div = [0, 0, 0];
         for id in ids.iter() {
-            let case = CMCaseJson::read_case(Path::new(&format!("{}/{}/cma_case", dest, id)))?;
+            let partial_case =
+                CMCaseJson::read_case(Path::new(&format!("{}/{}/cma_case", dest, id)))?;
             let relative_path = format!("{}/{}", dest, id);
             let (liquid_flow, liquid_volume) = PAIRS.0;
-            let path = case
-                .resolve(&relative_path, liquid_flow)
-                .ok_or(CmtoolError::Custom("Error resolve".to_string()))?;
-            let rf = RawDataFlux::read_raw(path)
-                .ok_or(CmtoolError::Custom("Error reading".to_string()))?;
+
+            let path = resolve_path(&partial_case, &relative_path, liquid_flow)?;
+            let rf =
+                RawDataFlux::read_raw(path).ok_or(CMError::Custom("Error reading".to_string()))?;
 
             let n_zone = rf.header.n_zone as usize;
             liquid_flows.push(rf);
-            n_div[0] += case.n_div[0];
-            n_div[1] += case.n_div[1];
-            n_div[2] += case.n_div[2];
+            n_div[0] += partial_case.n_div[0];
+            n_div[1] += partial_case.n_div[1];
+            n_div[2] += partial_case.n_div[2];
 
-            let path = case
-                .resolve(&relative_path, liquid_volume)
-                .ok_or(CmtoolError::Custom("Error resolve".to_string()))?;
+            let path = resolve_path(&partial_case, &relative_path, liquid_volume)?;
+
             let sc = RawDataScalar::read_raw(path)
-                .ok_or(CmtoolError::Custom("Error reading".to_string()))?;
+                .ok_or(CMError::Custom("Error reading".to_string()))?;
             liquid_volumes.push(sc);
             let (gas_flow, gas_volume) = PAIRS.1;
-            let path = case
-                .resolve(&relative_path, gas_flow)
-                .ok_or(CmtoolError::Custom("Error resolve".to_string()))?;
+            let path = resolve_path(&partial_case, &relative_path, gas_flow)?;
+
             let rf = match RawDataFlux::read_raw(path) {
                 Some(rf) => rf,
                 None => {
@@ -363,9 +384,7 @@ impl Generator {
             };
             gas_flows.push(rf);
 
-            let path = case
-                .resolve(&relative_path, gas_volume)
-                .ok_or(CmtoolError::Custom("Error resolve".to_string()))?;
+            let path = resolve_path(&partial_case, &relative_path, gas_volume)?;
             let rs = match RawDataScalar::read_raw(path) {
                 Some(rs) => rs,
                 None => {
@@ -378,29 +397,12 @@ impl Generator {
         }
 
         let path = format!("{}/merged", dest);
-        std::fs::create_dir_all(&path).unwrap(); //FIXME
+        std::fs::create_dir_all(&path)?;
         let mut case = CMCase::default();
         case.n_div = n_div;
 
-        let liquid_phases = liquid_flows
-            .into_iter()
-            .zip(liquid_volumes)
-            .map(|(f, v)| RawPhase {
-                flow: f,
-                volume: v,
-                identifier: PhaseCM::Liquid,
-            })
-            .collect();
-
-        let gas_phases: Vec<_> = gas_flows
-            .into_iter()
-            .zip(gas_volumes)
-            .map(|(f, v)| RawPhase {
-                flow: f,
-                volume: v,
-                identifier: PhaseCM::Gas,
-            })
-            .collect();
+        let liquid_phases = get_raw_phase(liquid_flows, liquid_volumes, PhaseCM::Liquid);
+        let gas_phases = get_raw_phase(gas_flows, gas_volumes, PhaseCM::Gas);
 
         let liquid_connection = connections.as_ref().map(|c| c[0].clone());
         let gas_connection = connections.as_ref().map(|c| c[1].clone());
@@ -416,7 +418,7 @@ impl Generator {
         CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
         let _ =
             cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)));
-        Ok(())
+        Ok(path)
     }
 }
 
@@ -458,12 +460,23 @@ mod tests {
         let l = 1.;
         let d = 0.2;
         let alpha_g = 0.1;
+
+        let desc = PFRDescription {
+            n_compartment: 10,
+            length: l,
+            diameter: d,
+            liquid_flow: 0.01,
+            gas_flow: 0.01,
+            gas_fraction: alpha_g,
+            axial_dispersion: 1e-9,
+        };
+
         let case = Generator::new()
-            .generate_1d_from_fraction(10, l, d, 0.01, 0.01, alpha_g, 1e-9, Some(path.to_owned()))
+            .generate_1d_from_fraction(desc, Some(path.to_owned()))
             .expect("case");
-        let liquid_volume_path: String = case
-            .resolve(path, cmtool_data::CMAExportType::LiquidVolume)
-            .expect("path");
+
+        let liquid_volume_path =
+            resolve_path(&case, path, cmtool_data::CMAExportType::LiquidVolume).unwrap();
 
         let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone())
             .expect("Liquid error")
@@ -485,8 +498,19 @@ mod tests {
         let l = 1.;
         let d = 0.2;
         let alpha_g = 0.1;
+
+        let desc = PFRDescription {
+            n_compartment: 10,
+            length: l,
+            diameter: d,
+            liquid_flow: 0.01,
+            gas_flow: 0.001,
+            gas_fraction: alpha_g,
+            axial_dispersion: 1e-9,
+        };
+
         let case = Generator::new()
-            .generate_1d_from_fraction(10, l, d, 0.01, 0.001, alpha_g, 1e-9, Some(path.to_owned()))
+            .generate_1d_from_fraction(desc, Some(path.to_owned()))
             .expect("case");
         let liquid_volume_path = case
             .resolve(path, cmtool_data::CMAExportType::LiquidVolume)

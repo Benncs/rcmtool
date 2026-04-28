@@ -4,16 +4,35 @@ use crate::FlowMapDescriptor;
 use nalgebra_sparse::CooMatrix;
 use ndarray::Array2;
 
-macro_rules! non_zero {
-    ($i:ident, $eps:expr) => {
-        ($i.abs() > $eps)
+macro_rules! almost_equal {
+    ($i:expr, $base:expr, $eps:expr) => {
+        (($i - $base).abs() < $eps)
     };
 }
 
+// macro_rules! non_zero {
+//     ($i:expr, $eps:expr) => {
+//         ($i.abs() > $eps)
+//     };
+// }
+
+// macro_rules! near_one {
+//     ($i:expr, $eps:expr) => {
+//         almost_equal!($i, 1.0, $eps)
+//     };
+// }
+
+macro_rules! round_if_needed {
+    ($val:expr, $base:expr, $tol:expr) => {{
+        if almost_equal!($val, $base, $tol) {
+            $base
+        } else {
+            $val
+        }
+    }};
+}
 fn get_transition_from_fm(fm: Array2<f64>) -> (CooMatrix<f64>, Vec<f64>) {
     let n_compartments: usize = fm.nrows();
-    const EPS: f64 = 1e-7;
-    // let row_sum = fm.sum_axis(Axis(1));
 
     let mut transition = CooMatrix::new(n_compartments, n_compartments);
     let mut row_sum = vec![0.; n_compartments];
@@ -22,9 +41,7 @@ fn get_transition_from_fm(fm: Array2<f64>) -> (CooMatrix<f64>, Vec<f64>) {
         for i_col in 0..n_compartments {
             if i_row != i_col {
                 let val = *fm.get((i_row, i_col)).expect("Bad formated flowmap");
-                if non_zero!(val, EPS) {
-                    transition.push(i_row, i_col, val);
-                }
+                transition.push(i_row, i_col, val);
                 row_sum[i_row] += val;
             }
         }
@@ -32,10 +49,9 @@ fn get_transition_from_fm(fm: Array2<f64>) -> (CooMatrix<f64>, Vec<f64>) {
 
     (0..n_compartments).for_each(|i_row| {
         let val = row_sum[i_row];
-        if non_zero!(val, EPS) {
-            transition.push(i_row, i_row, -val);
-        }
+        transition.push(i_row, i_row, -val);
     });
+
     (transition, row_sum)
 }
 
@@ -43,34 +59,62 @@ fn get_transition_from_fm(fm: Array2<f64>) -> (CooMatrix<f64>, Vec<f64>) {
 fn get_probability(liquid_neighors: &Array2<usize>, transition: &CooMatrix<f64>) -> Array2<f64> {
     use nalgebra_sparse::CscMatrix;
 
-    let shape = liquid_neighors.dim();
-    let mut proba = Array2::<f64>::zeros(shape);
-    let transition_csc = CscMatrix::from(transition);
+    //TODO: this method is called even though there's no flow (0D)
+    //To allow correct behaviour, assert has the condition outflow==0
+    //Find a way cleaner way to : skip test and do not trigger assert
 
+    //TODO change assert to real real and return Result<>
+    let shape = liquid_neighors.dim();
+    //Start with filled with one array to ensure that probability will be increasing
+    let mut proba = Array2::<f64>::ones(shape);
+    let transition_csc = CscMatrix::from(transition);
+    let ghost_neighor = shape.0 + 1;
     (0..shape.0).for_each(|i_compartment| {
         let mut cumsum = 0.;
-        let mut count_neighbor = 0;
-        liquid_neighors.row(i_compartment).for_each(|i_neighbor| {
-            if *i_neighbor != i_compartment {
-                let out_flow = transition_csc
-                    .index_entry(i_compartment, i_compartment)
-                    .into_value();
+        let out_flow = round_if_needed!(
+            transition_csc
+                .index_entry(i_compartment, i_compartment)
+                .into_value()
+                .abs(),
+            0.,
+            1e-12
+        );
 
+        //TODO PFR lead to cumsum==-1 how to handle assertion ?
+
+        let mut count_neighbor = 0;
+        liquid_neighors.row(i_compartment).for_each(|&i_neighbor| {
+            if i_neighbor != ghost_neighor {
                 let proba_out: f64 = if out_flow != 0. {
                     transition_csc
-                        .index_entry(i_compartment, *i_neighbor)
+                        .index_entry(i_compartment, i_neighbor)
                         .into_value()
-                        / out_flow.abs()
+                        / out_flow
                 } else {
                     0.
                 };
+                debug_assert!(proba_out >= 0.);
+                //round to one if close enough
+                let p_cp = round_if_needed!(proba_out + cumsum, 1., 1e-8);
 
-                let p_cp = proba_out + cumsum;
-                *proba.get_mut((i_compartment, count_neighbor)).unwrap() = p_cp;
+                *proba
+                    .get_mut((i_compartment, count_neighbor))
+                    .expect("Probability out of bound") = p_cp;
+
                 cumsum += proba_out;
             }
             count_neighbor += 1;
         });
+        //TODO PFR lead to cumsum==-1 how to handle assertion ?
+        // Idea:
+        // let is_pfr = i_compartment == 0 || i_compartment == liquid_neighors.len() - 1;
+        //For PFR NEED TO REMOVE THISASSERT FIXME
+        // assert!(
+        //     (cumsum - 1.0).abs() < 1e-10 || out_flow == 0.,
+        //     "compartment {} cumulative probability = {} < 1 (not conservative)",
+        //     i_compartment,
+        //     cumsum
+        // );
     });
 
     proba
@@ -95,6 +139,11 @@ impl HydroState {
     #[inline(always)]
     pub fn n_compartments(&self) -> usize {
         self.volumes.len()
+    }
+
+    #[inline(always)]
+    pub fn total_volume(&self) -> f64 {
+        self.volumes.iter().sum()
     }
 }
 
@@ -129,6 +178,10 @@ impl IterationState {
         let liquid_neighors = liq.neighbors.clone(); //Todo find way to remove clone
 
         let liq_state: HydroState = liq.into();
+
+        //TODO
+        // call this only if liq has flow (transition and neighbors), 0D maps do not have
+        //proba
         #[cfg(feature = "probability")]
         let liquid_cumulative_probability =
             get_probability(&liquid_neighors, &liq_state.transition);
@@ -169,16 +222,17 @@ mod test {
 
     #[test]
     fn construct_itstate_liquid_only() {
-        let flow_cma = std::env::var("CUVE_SLDMSH_FLOW_PATH").unwrap();
+        let _flow_cma = std::env::var("CUVE_SLDMSH_FLOW_PATH");
+        let _volume_cma = std::env::var("CUVE_SLDMSH_VOLUME_PATH");
 
-        let volume_cma = std::env::var("CUVE_SLDMSH_VOLUME_PATH").unwrap();
+        if let (Ok(flow_cma), Ok(volume_cma)) = (_flow_cma, _volume_cma) {
+            let descriptor = FlowMapDescriptor::from_path(flow_cma, volume_cma).unwrap();
 
-        let descriptor = FlowMapDescriptor::from_path(flow_cma, volume_cma).unwrap();
+            let vol_ref = descriptor.volumes.clone();
 
-        let vol_ref = descriptor.volumes.clone();
+            let state = IterationState::new(descriptor, None, HashMap::new());
 
-        let state = IterationState::new(descriptor, None, HashMap::new());
-
-        assert!(state.liquid.volumes == vol_ref);
+            assert!(state.liquid.volumes == vol_ref);
+        }
     }
 }

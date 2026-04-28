@@ -3,7 +3,7 @@
 use crate::{
     CoreError,
     ensight_gold::{self, types::ElementsType},
-    model::CMGeometry,
+    model::{CMGeometry, Scalar},
 };
 
 pub struct Vector {
@@ -16,6 +16,26 @@ impl Vector {
         self.value_in_vo[offset..offset + 3]
             .try_into()
             .expect("Slice with exactly 3 elements")
+    }
+
+    pub fn scale_by(self, a: Scalar) -> Result<Self, CoreError> {
+        // if self.value_in_vo.len() != a.value_in_vo.len() {
+        //     return Err(CoreError::Custom(format!(
+        //         "Bad size for vector scaling {} vs {} ",
+        //         self.value_in_vo.len(),
+        //         a.value_in_vo.len()
+        //     )));
+        // }
+
+        let values: Vec<cmtool_data::ScalarValueType> = self
+            .value_in_vo
+            .chunks(3)
+            .zip(&a.value_in_vo)
+            .flat_map(|(triplet, &s)| triplet.iter().map(move |&v| v * s))
+            .collect();
+        Ok(Self {
+            value_in_vo: values,
+        })
     }
 
     pub(crate) fn from_scalar(

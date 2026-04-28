@@ -22,20 +22,20 @@ Flows are stored as binary data with a structure that can be described as "flow-
 
 The raw file structure is as follows:
 
-- Header:
-  - Number of compartments
-  - Number of flows
-- Body:
-  - List of flows:
+|Offset|  Size | Type  |      Description|
+--::--- | :----: | ----       | -----------
+0x00   | 4   |  uint32    |  Number of compartments
+0x04  |  4   |  uint32     | Number of flows (n)
+0x08  |  $$ n \times 2 \times 8 $$ |   binary   |   Body (compartment & flow data)
+
 
 ## Scalars
 
 Scalar fields are more standard files, they contains the value of the considered sclar for each zone of our grid, id for each compartment.
-- Header:
-  - Number of compartments
-- Body:
-  - List of values:
-
+|Offset|  Size | Type  |      Description|
+--::--- | :----: | ----       | -----------
+0x00   | 4   |  uint32    |  Number of compartments (m)
+0x08  |  $$ m  \times 8 $$ |   binary   |   Body (scalar values)
 
 
 ## Case

@@ -25,13 +25,50 @@ pub struct CMCase {
     pub is_reursive: bool,
 }
 
+impl std::fmt::Display for CMCase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "CMCase Configuration:")?;
+        writeln!(
+            f,
+            "  - Number of Divisions: [{}x{}x{}]",
+            self.n_div[0], self.n_div[1], self.n_div[2]
+        )?;
+        writeln!(f, "  - Description: {}", self.description)?;
+        writeln!(
+            f,
+            "  - Time per Flow Map: {:.2} seconds",
+            self.time_per_flow_map
+        )?;
+
+        // Show paths, iterating over the HashMap
+        writeln!(f, "  - Export Paths:\n")?;
+        for export_type in self.paths.keys() {
+            writeln!(f, "    - {:?}\n", export_type)?;
+        }
+
+        writeln!(
+            f,
+            "  - Recursive: {}",
+            if self.is_reursive { "Yes" } else { "No" }
+        )?;
+        Ok(())
+    }
+}
+
 impl CMCase {
     pub fn n_compartment(&self) -> u32 {
+        if self.n_div.contains(&0) {
+            return 1; //FIXME
+        }
         self.n_div.iter().product()
     }
 
     pub fn toggle_recursive(&mut self) {
         self.is_reursive = !self.is_reursive;
+    }
+
+    pub fn is_two_phase_flow(&self) -> bool {
+        self.paths.contains_key(&CMAExportType::GasVolume)
     }
 
     pub fn add(&mut self, stype: CMAExportType, relative_path: &str) {
@@ -89,13 +126,15 @@ impl CMCase {
         let ok_gas = if has_gas_volume && !has_gas_flow {
             false
         } else {
-            !(has_gas_flow && !has_gas_volume)
+            // !(has_gas_flow && !has_gas_volume)
+            !has_gas_flow || has_gas_volume
         };
 
         let ok_liq = if has_liq_volume && !has_liq_flow {
             false
         } else {
-            !(has_liq_flow && !has_liq_volume)
+            // !(has_liq_flow && !has_liq_volume)
+            !has_liq_flow || has_liq_volume
         };
 
         ok_liq && ok_gas

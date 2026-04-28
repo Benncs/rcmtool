@@ -6,7 +6,8 @@ use pyo3::prelude::*;
 use crate::PythonError;
 
 //Use C compartible enum because Enum-Struct not supported by PyO3
-#[pyclass(name = "CMExportType")]
+// #[pyclass(name = "CMExportType")]
+#[pyclass(from_py_object, name = "CMExportType")]
 #[derive(Clone, Copy)]
 pub enum CMExportTypeWrapper {
     LiquidFlow,
@@ -31,7 +32,8 @@ impl From<CMExportTypeWrapper> for cmtool_data::CMAExportType {
     }
 }
 
-#[pyclass(name = "CMCase")]
+// #[pyclass(name = "CMCase")]
+#[pyclass(from_py_object, name = "CMCase")]
 #[derive(Clone)]
 pub struct CMCaseWrapper(cmtool_data::CMCase);
 
@@ -47,6 +49,9 @@ impl CMCaseWrapper {
         let c = self.0.clone();
         cmtool_data::CMCaseJson::write_case(c, p).map_err(PythonError::from)?;
         Ok(())
+    }
+    pub fn resolve(&self, root: &str, stype: CMExportTypeWrapper) -> Option<String> {
+        self.0.resolve(root, stype.into())
     }
 }
 

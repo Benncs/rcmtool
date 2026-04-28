@@ -15,7 +15,7 @@
         overlays = [ fenix.overlays.default ];
         pkgs = import nixpkgs { inherit system overlays; };
         lib = pkgs.lib;
-        
+
         craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.fenix.stable.withComponents [
             "cargo"
             "clippy"
@@ -29,11 +29,10 @@
         src = lib.fileset.toSource {
           root = unfilteredRoot;
           fileset = lib.fileset.unions [
-            # Default files from crane (Rust and cargo files)
+            (lib.fileset.fileFilter (file: file.hasExt "xsd") unfilteredRoot)
             (craneLib.fileset.commonCargoSources unfilteredRoot)
-            # Also keep any VTK files, this is a dirty fix for tests which use our example vtk file
-            # TODO: VTK files should be excluded to avoid indexing of residual output files
-            (lib.fileset.fileFilter (file: file.hasExt "vtk") unfilteredRoot)
+            (unfilteredRoot + "/cmtool-data/test_data")
+            (unfilteredRoot + "/examples/data")
           ];
         };
 
@@ -47,18 +46,18 @@
         commonArgs = {
           inherit src;
           strictDeps = true;
-
           nativeBuildInputs = with pkgs; [
             pkg-config
           ];
           buildInputs = commonBuildInputs
             ++ (if pkgs.stdenv.isLinux  then linuxBuildInputs  else [])
             ++ (if pkgs.stdenv.isDarwin then darwinBuildInputs else []);
-          # LD_LIBRARY_PATH = "$LD_LIBRARY_PATH:${
-          #   pkgs.lib.makeLibraryPath ( commonBuildInputs
-          #   ++ (if pkgs.stdenv.isLinux  then linuxBuildInputs  else [])
-          #   ++ (if pkgs.stdenv.isDarwin then darwinBuildInputs else []) )
-          # }";
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (
+            commonBuildInputs
+            ++ (if pkgs.stdenv.isLinux  then linuxBuildInputs  else [])
+            ++ (if pkgs.stdenv.isDarwin then darwinBuildInputs else [])
+            ++ [ pkgs.stdenv.cc.cc.lib ]
+          );
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -105,14 +104,14 @@
             }
           );
         };
-        
+
         devShells.default = craneLib.devShell {
           checks = self.checks.${system};
-          
+
           packages = with pkgs; [
-            cargo-nextest # faster tests
+            cargo-nextest
             samply        # profiling
-            taplo         # TOML formatting
+
           ];
         };
       });

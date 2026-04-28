@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<Root run_id="simple_0d" version="3">
+    <Reactors>
+        <Reactor0D id="reactor">
+            <Size>
+                <Volume unit="liquid">
+                    10.0
+                </Volume>
+            </Size>
+            <VolumeFraction phase="gas">
+                0.0
+            </VolumeFraction>
+        </Reactor0D>
+    </Reactors>
+</Root>

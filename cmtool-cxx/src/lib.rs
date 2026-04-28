@@ -1,9 +1,17 @@
-use std::ptr::null;
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//!Expose required method to C++
 
 use cmtool_data::{
     DiscontinuousTransitioner, FlowMapTransitioner, HydroState, IterationState, get_transitioner,
 };
 use nalgebra_sparse::CooMatrix;
+
+use std::ptr::null;
+
+//Choice to use raw ptr was made to avoid clone/creating Arc which are useless for our usage
+//All ptr are valid because they are created from rust side
+
 struct TransitionerWrapper(DiscontinuousTransitioner);
 
 struct IterationStateWrapper(*const IterationState);
@@ -49,7 +57,10 @@ mod ffi {
 
         fn has_gas(self: &IterationStateWrapper) -> bool;
 
+        #[allow(clippy::needless_lifetimes)]
         unsafe fn get_misc<'a>(self: &'a IterationStateWrapper, key: &str) -> &'a [f64];
+
+        fn has_misc(self: &IterationStateWrapper, key: &str) -> bool;
 
         fn flat_neighobrs(self: &IterationStateWrapper) -> &[usize];
 
@@ -154,7 +165,7 @@ impl TransitionerWrapper {
 fn get_dtransitioner(root: &str) -> Result<Box<TransitionerWrapper>, String> {
     match get_transitioner(root) {
         Ok(t) => Ok(Box::new(TransitionerWrapper(t))),
-        Err(d) => Err(format!("{}", d)),
+        Err(d) => Err(format!("Error while reading {}: {}", root, d)),
     }
 }
 
@@ -172,6 +183,9 @@ impl IterationStateWrapper {
             Some(t) => Box::new(HydroStateWrapper(t)),
             None => Box::new(HydroStateWrapper(null())),
         }
+    }
+    fn has_misc(self: &IterationStateWrapper, key: &str) -> bool {
+        unsafe { &*self.0 }.get(key).is_some()
     }
 
     fn get_misc(self: &IterationStateWrapper, key: &str) -> &[f64] {

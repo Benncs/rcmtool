@@ -11,7 +11,7 @@ pub struct InterfaceInfo {
     pub target_id: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct InterfaceFlow {
     pub source_flow: f64,
     pub target_flow: f64,
@@ -23,6 +23,7 @@ pub struct AInterfacesInfo {
     pub area: Vec<Vec<f64>>,
     pub normal_axis: Vec<usize>,
     pub global_id_from_interface: Vec<Vec<usize>>,
+    pub interface_theta: Vec<f64>,
     // pub plane_coordinates: Vec<f64>,
     // pub planes: Vec<BoundedPlane>,
 }
@@ -37,6 +38,7 @@ impl AInterfacesInfo {
             area: vec![Default::default(); n_interfaces],
             normal_axis: vec![Default::default(); n_interfaces],
             global_id_from_interface: vec![Default::default(); n_interfaces],
+            interface_theta: vec![Default::default(); n_interfaces],
             // plane_coordinates: vec![0.; n_interfaces * 3 * 2], //Extent geometry
             // planes: Vec::new(),
         }
@@ -99,6 +101,10 @@ impl AInterfacesInfo {
                 interfaces_id_from_cells[target_id * n_zones + source_id] = interface_id;
 
                 let (plane, direction_neighbors) = grid.get_interface_plane(source_id, target_id);
+
+                let origin = plane.origin.0;
+                let theta = origin[1].atan2(origin[0]);
+                self.interface_theta[interface_id] = theta;
                 planes.push(plane);
                 self.normal_axis[interface_id] = direction_neighbors;
             }
@@ -106,6 +112,58 @@ impl AInterfacesInfo {
         self.global_id_from_interface =
             self.count_interfaces_second_pass(geometry, &interfaces_id_from_cells);
         self.fill_area(geometry, &planes);
+
+        // for i_interface in 0..self.n_facet.len() {
+        //     let total: f64 = self.area[i_interface].iter().sum();
+        //     if total > 0.0 {
+        //         let source = self.ids[i_interface].source_id;
+        //         let axis = self.normal_axis[i_interface];
+        //         let theoretical = grid.cell_surface(source, index_to_oriented(axis));
+        //         let factor = theoretical / total;
+        //         for a in self.area[i_interface].iter_mut() {
+        //             *a *= factor;
+        //         }
+        //     }
+        // }
+
+        // self.check_areas(geometry);
+    }
+    #[allow(unused)]
+    fn check_areas(&self, geometry: &CMGeometry) {
+        let grid = geometry.get_grid().unwrap();
+        let n_zones = geometry.n_zone();
+        for cell_id in 0..n_zones {
+            for axis_idx in 0..3 {
+                let axis = crate::grid::index_to_oriented(axis_idx);
+                let theoretical_area = grid.cell_surface(cell_id, axis);
+                let total_area: f64 = self
+                    .ids
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, id)| {
+                        (id.source_id == cell_id || id.target_id == cell_id)
+                            && self.normal_axis[*i] == axis_idx
+                    })
+                    .map(|(i, _)| self.area[i].iter().sum::<f64>())
+                    .sum();
+
+                if ((total_area - theoretical_area).abs() / theoretical_area) < 0.1 {
+                    println!(
+                        "(areas): area incorect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
+                        axis_idx, cell_id, total_area, theoretical_area
+                    );
+                }
+
+                // assert!(
+                //     ((total_area - theoretical_area).abs() / theoretical_area) < 0.1,
+                //     "RCMTOOL(areas): area incorect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
+                //     axis_idx,
+                //     cell_id,
+                //     total_area,
+                //     theoretical_area
+                // );
+            }
+        }
     }
 
     fn count_interfaces_second_pass(
@@ -122,55 +180,27 @@ impl AInterfacesInfo {
         let grid = geometry.get_grid().unwrap();
         let n_zones = geometry.n_zone();
 
-        for (vol_element_global_id, interface_cid_0, interface_cid_k, k_vertex) in
-            geometry.interface_iter()
-        {
-            if k_vertex >= 1
-                && grid.are_cell_neighbor(interface_cid_0, interface_cid_k)
-                    != NeighborDirection::NotNeighbors
-            {
-                let interface_global_id =
-                    interfaces_id_from_cells[interface_cid_0 * n_zones + interface_cid_k];
-                let k_element = tmp_element_counter[interface_global_id];
-                tmp_element_counter[interface_global_id] += 1;
-                global_id_from_interface[interface_global_id][k_element] = vol_element_global_id;
+        for (vol_element_global_id, _, interface_cid_k, k_vertex) in geometry.interface_iter() {
+            // if k_vertex >= 1 {
+            for i in 0..k_vertex {
+                let cid_i = geometry
+                    .volume_elements
+                    .get_list_compartment_id(vol_element_global_id, i);
+                let neighbors = grid.are_cell_neighbor(cid_i, interface_cid_k);
+                if neighbors != NeighborDirection::NotNeighbors {
+                    let interface_global_id =
+                        interfaces_id_from_cells[cid_i * n_zones + interface_cid_k];
+                    let k_element = tmp_element_counter[interface_global_id];
+                    tmp_element_counter[interface_global_id] += 1;
+                    global_id_from_interface[interface_global_id][k_element] =
+                        vol_element_global_id;
+                }
             }
+            // }
         }
 
         global_id_from_interface
     }
-
-    //fn count_interfaces_second_pass(
-    //&mut self,
-    //geometry: &CMGeometry,
-    //interfaces_id_from_cells: &[usize],
-    //) -> Vec<Vec<usize>> {
-    //let mut tmp_element_counter = vec![0; self.n_facet.len()];
-    //let mut global_id_from_interface: Vec<Vec<usize>> = vec![Vec::new(); self.n_facet.len()];
-    //for (element_id, n_element) in global_id_from_interface.iter_mut().zip(self.n_facet.iter())
-    //{
-    //*element_id = vec![0; *n_element];
-    //}
-    //let grid = geometry.get_grid().unwrap();
-    //let n_zones = geometry.n_zone();
-    //let functor = |vol_element_global_id: usize,
-    //interface_cid_0: usize,
-    //interface_cid_k: usize,
-    //k_vertex: usize| {
-    //if k_vertex >= 1
-    //&& grid.are_cell_neighbor(interface_cid_0, interface_cid_k)!= NeighborDirection::NotNeighbors
-    //{
-    //let interface_global_id =
-    //interfaces_id_from_cells[interface_cid_0 * n_zones + interface_cid_k];
-    //let k_element = tmp_element_counter[interface_global_id];
-    //tmp_element_counter[interface_global_id] += 1;
-    //global_id_from_interface[interface_global_id][k_element] = vol_element_global_id;
-    //}
-    //};
-    //geometry.interface_iterator(functor);
-    //
-    //global_id_from_interface
-    //}
 
     fn fill_area(&mut self, geometry: &CMGeometry, planes: &[BoundedPlane]) {
         //This is almost the same algorithm as fill for c_info struct (to compute volume of velem)
@@ -191,11 +221,14 @@ impl AInterfacesInfo {
 
                 geometry.fill_vertices(volume_element_global_id, n_vertex, &mut local_vertices);
 
+                // let area = compute_intersection_area(&local_vertices, elem_type, plane)
+                //     .expect("Area between element");
+                // let area = area * plane.normal.0[plane.axis].signum();
+                // self.area[interface_id][i_facet] = area;
+                //
                 let area = compute_intersection_area(&local_vertices, elem_type, plane)
                     .expect("Area between element");
-                if area == 0. {
-                    println!("{} {}", interface_id, i_facet);
-                }
+
                 self.area[interface_id][i_facet] = area;
             }
         }

@@ -1,0 +1,23 @@
+[package]
+name = "cmtool-assemble"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+license.workspace = true
+[lib]
+name = "cmtool_assemble"
+path = "src/lib.rs"
+
+[build-dependencies]
+xsd-parser.workspace=true
+
+[dependencies]
+ndarray.workspace = true
+cmtool-data.workspace = true
+serde_xml.workspace = true
+serde-xml-rs.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+serde_json.workspace = true

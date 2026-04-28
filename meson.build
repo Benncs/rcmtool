@@ -1,7 +1,7 @@
 project(
   'rcmtool-cxx',
   'cpp',
-  version: '0.1.0',
+  version: '0.1.4',
   meson_version: '>= 1.3.0',
 )
 out_dir = meson.current_build_dir() + '/rust_target'

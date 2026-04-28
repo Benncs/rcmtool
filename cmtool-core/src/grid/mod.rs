@@ -2,7 +2,9 @@
 
 mod collections;
 use collections::*;
-pub use collections::{AxisDescriptor, CylindricalAxis, cylindrical_index};
+pub use collections::{
+    AxisDescriptor, CylindricalAxis, OrientedAxis, cylindrical_index, index_to_oriented,
+};
 use enum_dispatch::enum_dispatch;
 use std::f64;
 
@@ -12,30 +14,52 @@ pub(crate) mod vtk;
 use crate::coordinates::*;
 use crate::utils::AxisPoints;
 
-fn get_tangent_plane_at_r(
-    axis: usize,
-    r0: f64,
-    theta: f64,
-    z: f64,
-    extent_u: [f64; 2],
-    extent_v: [f64; 2],
-) -> BoundedPlane {
-    let x0 = r0 * theta.cos();
-    let y0 = r0 * theta.sin();
-    let z0 = z;
+// fn get_tangent_plane_at_r(
+//     axis: usize,
+//     r0: f64,
+//     theta: f64,
+//     z: f64,
+//     extent_u: [f64; 2],
+//     extent_v: [f64; 2],
+// ) -> BoundedPlane {
+//     let x0 = r0 * theta.cos();
+//     let y0 = r0 * theta.sin();
+//     let z0 = z;
 
-    let normal = CartesianVec3([x0 / r0, y0 / r0, 0.0]);
+//     let normal = CartesianVec3([x0 / r0, y0 / r0, 0.0]);
 
-    let origin = CartesianCoordinates([x0, y0, z0]);
+//     let origin = CartesianCoordinates([x0, y0, z0]);
 
-    BoundedPlane {
-        normal,
-        origin,
-        extent_u, // extensités sur theta
-        extent_v, // extensités sur z
-        axis,
-    }
-}
+//     BoundedPlane {
+//         normal,
+//         origin,
+//         extent_u,
+//         extent_v,
+//         axis,
+//     }
+// }
+//
+// fn get_tangent_plane_at_r(
+//     axis: usize,
+//     r0: f64,
+//     theta: f64,
+//     z: f64,
+//     extent_u: [f64; 2], // [theta0, theta1] — will be converted to arc length
+//     extent_v: [f64; 2], // [z0, z1] — already metric
+// ) -> BoundedPlane {
+//     let origin = CartesianCoordinates([r0 * theta.cos(), r0 * theta.sin(), z]);
+//     let normal = CartesianVec3([theta.cos(), theta.sin(), 0.0]);
+
+//     let extent_u_metric = [r0 * extent_u[0], r0 * extent_u[1]];
+
+//     BoundedPlane {
+//         normal,
+//         origin,
+//         extent_u: extent_u_metric,
+//         extent_v, // z is already metric
+//         axis,
+//     }
+// }
 
 /// Represents the type of mesh geometry.
 #[derive(PartialEq, Clone, Copy)]
@@ -227,7 +251,7 @@ pub trait CompartmentMeshManip {
     /// # Arguments
     ///
     /// * `cell_id` - The ID of the cell.
-    /// /// * `axis_project` - Axis index on which the surface is calculated
+    /// * `axis_project` - Axis index on which the surface is calculated
     ///
     /// # Returns
     ///
@@ -287,6 +311,9 @@ pub trait CompartmentMeshManip {
     fn n_maximum_interface(&self) -> usize;
 
     fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (BoundedPlane, usize);
+
+    fn cell_from_ax_points(&self, axis_points: &AxisPoints) -> Option<usize>;
+    fn get_boundary(&self) -> Vec<usize>;
 }
 /// A compartment mesh grid.
 ///
@@ -413,15 +440,10 @@ impl CompartmentMeshManip for MeshCylindrical {
         let neighbors = self.are_cell_neighbor(cell1_id, cell2_id);
         let axis = neighbors
             .to_coord_index()
-            .expect("Cells must be neighbors to get interface plane");
+            .expect("RMTOOL(get_interface_plane): Cells must be neighbors to get interface plane");
 
         let sign = if neighbors.is_negative() { -1.0 } else { 1.0 };
-        let normal_dir = match axis {
-            0 => [sign, 0.0, 0.0],
-            1 => [0.0, sign, 0.0],
-            2 => [0.0, 0.0, sign],
-            _ => unreachable!("Axis must be 0, 1, or 2"),
-        };
+        let normal_dir = get_normal(axis, sign == -1.);
 
         let indices_cell = self.cell_points(cell1_id);
 
@@ -432,13 +454,34 @@ impl CompartmentMeshManip for MeshCylindrical {
         let theta1 = self.get_cell_edge(1, indices_cell[1] + 1);
         let z0 = self.get_cell_edge(2, indices_cell[2]);
         let z1 = self.get_cell_edge(2, indices_cell[2] + 1);
+        let pi = std::f64::consts::PI;
+        let normalize = |a: f64| -> f64 {
+            let mut x = a % (2.0 * pi);
+            if x > pi {
+                x -= 2.0 * pi;
+            }
+            if x < -pi {
+                x += 2.0 * pi;
+            }
+            x
+        };
 
         // Centers
         let r_center = 0.5 * (r0 + r1);
-        let theta_center = 0.5 * (theta0 + theta1);
-        let z_center = 0.5 * (z0 + z1);
 
-        // Origin of the plane (on interface)
+        let z_center = 0.5 * (z0 + z1);
+        // let theta_center = 0.5 * (theta0 + theta1);
+        let theta_center = {
+            let mut dtheta = theta1 - theta0;
+            if dtheta > pi {
+                dtheta -= 2.0 * pi;
+            }
+            if dtheta < -pi {
+                dtheta += 2.0 * pi;
+            }
+            normalize(theta0 + 0.5 * dtheta)
+        };
+
         let (r, theta, z) = match axis {
             0 => (if sign < 0.0 { r0 } else { r1 }, theta_center, z_center),
             1 => (r_center, if sign < 0.0 { theta0 } else { theta1 }, z_center),
@@ -447,18 +490,24 @@ impl CompartmentMeshManip for MeshCylindrical {
         };
 
         let (extent_u, extent_v) = match axis {
-            0 => ([theta0, theta1], [z0, z1]), // u = theta, v = z
-            1 => ([r0, r1], [z0, z1]),         // u = r, v = z
-            2 => ([r0, r1], [theta0, theta1]), // u = r, v = theta
+            0 => ([theta0, theta1], [z0, z1]),
+            1 => ([r0, r1], [z0, z1]),
+            2 => ([r0, r1], [theta0, theta1]),
             _ => unreachable!(),
         };
 
         if axis == 0 {
-            // axe r -> plan tangent au cylindre
-            let bounded_plane = get_tangent_plane_at_r(axis, r, theta, z, extent_u, extent_v);
+            let normal_cartesian = CartesianVec3([theta.cos(), theta.sin(), 0.0]);
+            let origin = CartesianCoordinates([r * theta.cos(), r * theta.sin(), z]);
+            let bounded_plane = BoundedPlane {
+                normal: normal_cartesian,
+                origin,
+                extent_u,
+                extent_v,
+                axis,
+            };
             (bounded_plane, axis)
         } else {
-            // pour axis 1 et 2 on garde ta méthode normale
             let cyl_normal = CylindricalVec3(normal_dir, theta);
             let normal_cartesian = cyl_normal.to_cartesian_vec();
             let origin = CylindricalCoordinates([r, theta, z]).into();
@@ -472,6 +521,71 @@ impl CompartmentMeshManip for MeshCylindrical {
             (bounded_plane, axis)
         }
     }
+
+    // fn get_interface_plane(&self, cell1_id: usize, cell2_id: usize) -> (BoundedPlane, usize) {
+    //     let neighbors = self.are_cell_neighbor(cell1_id, cell2_id);
+    //     let axis = neighbors
+    //         .to_coord_index()
+    //         .expect("Cells must be neighbors to get interface plane");
+
+    //     let sign = if neighbors.is_negative() { -1.0 } else { 1.0 };
+
+    //     let indices_cell = self.cell_points(cell1_id);
+
+    //     // Cell edges
+    //     let r0 = self.get_cell_edge(0, indices_cell[0]);
+    //     let r1 = self.get_cell_edge(0, indices_cell[0] + 1);
+    //     let theta0 = self.get_cell_edge(1, indices_cell[1]);
+    //     let theta1 = self.get_cell_edge(1, indices_cell[1] + 1);
+    //     let z0 = self.get_cell_edge(2, indices_cell[2]);
+    //     let z1 = self.get_cell_edge(2, indices_cell[2] + 1);
+
+    //     // Midpoints
+    //     let r_center = 0.5 * (r0 + r1);
+    //     let z_center = 0.5 * (z0 + z1);
+    //     let theta_center = 0.5 * (theta0 + theta1);
+
+    //     // Extents
+    //     let (extent_u, extent_v) = match axis {
+    //         0 => ([r0, r1], [z0, z1]),         // Plane defined by (r, z)
+    //         1 => ([theta0, theta1], [z0, z1]), // Plane defined by (theta, z)
+    //         2 => ([r0, r1], [theta0, theta1]), // Plane defined by (r, theta)
+    //         _ => unreachable!("Axis must be 0, 1, or 2"),
+    //     };
+
+    //     // Origin and normal
+    //     let (origin, normal) = match axis {
+    //         0 => {
+    //             // Plane defined by (r, z)
+    //             let origin = CartesianCoordinates([r_center, theta_center, z_center]).into();
+    //             let normal = CartesianVec3([1.0, 0.0, 0.0]); // Radial direction
+    //             (origin, normal)
+    //         }
+    //         1 => {
+    //             // Plane defined by (theta, z)
+    //             let origin = CartesianCoordinates([r_center, theta_center, z_center]).into();
+    //             let normal = CartesianVec3([0.0, 1.0, 0.0]); // Angular direction
+    //             (origin, normal)
+    //         }
+    //         2 => {
+    //             // Plane defined by (r, theta)
+    //             let origin = CartesianCoordinates([r_center, theta_center, z_center]).into();
+    //             let normal = CartesianVec3([0.0, 0.0, 1.0]); // Axial direction
+    //             (origin, normal)
+    //         }
+    //         _ => unreachable!("Axis must be 0, 1, or 2"),
+    //     };
+
+    //     let bounded_plane = BoundedPlane {
+    //         normal,
+    //         origin,
+    //         extent_u,
+    //         extent_v,
+    //         axis,
+    //     };
+
+    //     (bounded_plane, axis)
+    // }
 
     fn are_cell_neighbor(&self, cell1_id: usize, cell2_id: usize) -> NeighborDirection {
         let [r1, theta1, z1] = self.cell_points(cell1_id);
@@ -539,10 +653,10 @@ impl CompartmentMeshManip for MeshCylindrical {
             CylindricalAxis::Theta => delta_ijk[0] * delta_ijk[2], // ds = dr*dz
             CylindricalAxis::Z => {
                 // ds  =r*dr*dtheta
-                // R here is not radius but (r-R)
-                let R = self.axes[0].edges[points_indices[0] + 1];
+                // rr here is not radius but (r-R)
+                let rr = self.axes[0].edges[points_indices[0] + 1];
                 let r2 = self.axes[0].edges[points_indices[0]];
-                0.5 * (R * R - r2 * r2) * delta_ijk[1]
+                0.5 * (rr * rr - r2 * r2) * delta_ijk[1]
             }
         }
     }
@@ -560,6 +674,23 @@ impl CompartmentMeshManip for MeshCylindrical {
         let surface_ij = self.cell_surface(cell_id, height_axis.into());
 
         delta_ijk[height_axis] * surface_ij
+    }
+
+    fn cell_from_ax_points(&self, axis_points: &AxisPoints) -> Option<usize> {
+        let mut cell_1d = 0;
+        let mut multiplier = 1;
+
+        for i in (0..self.axes.len()).rev() {
+            let n = self.axes[i].descriptor.n_range;
+            if axis_points[i] >= n {
+                return None;
+            }
+            cell_1d += axis_points[i] * multiplier;
+
+            multiplier *= n;
+        }
+
+        Some(cell_1d)
     }
 
     fn cell_from_coordinates(&self, coords: &Coords3) -> Option<usize> {
@@ -583,13 +714,12 @@ impl CompartmentMeshManip for MeshCylindrical {
         Some(mesh_id)
     }
 
-    fn is_point_inside(&self, cell_id: usize, point_coords: &Coords3) -> bool {
+    fn is_point_inside(&self, _cell_id: usize, _point_coords: &Coords3) -> bool {
         todo!()
     }
 
     fn cell_points(&self, cell_1d: usize) -> AxisPoints {
         let mut axis_points = AxisPoints::default();
-
         let mut p_coeff_up = cell_1d;
 
         // for (current_point, current_axis) in axis_points.iter_mut().zip(&self.axes) {
@@ -607,6 +737,45 @@ impl CompartmentMeshManip for MeshCylindrical {
         }
 
         axis_points
+    }
+
+    fn get_boundary(&self) -> Vec<usize> {
+        let (n_r, n_theta, n_z) = (
+            self.n_points_axis(0),
+            self.n_points_axis(1),
+            self.n_points_axis(2),
+        );
+
+        let expected = n_theta * (n_z - 2) + 2 * n_r * n_z;
+        let mut v = Vec::with_capacity(expected);
+
+        for i in 0..n_r {
+            for j in 0..n_theta {
+                let p = self
+                    .cell_from_ax_points(&[i, j, 0])
+                    .expect("get_boundary: out of bound ");
+                let p2 = self
+                    .cell_from_ax_points(&[i, j, n_z - 1])
+                    .expect("get_boundary: out of bound ");
+                v.push(p);
+                v.push(p2);
+            }
+        }
+
+        for k in 1..n_z - 1 {
+            for j in 0..n_theta {
+                let p = self
+                    .cell_from_ax_points(&[n_r - 1, j, k])
+                    .expect("get_boundary: out of bound ");
+                v.push(p)
+            }
+        }
+
+        if expected != v.len() {
+            panic!("Detected number is not correct {} {}", expected, v.len());
+        }
+
+        v
     }
 }
 
@@ -628,259 +797,4 @@ pub fn get_mesh(
 }
 
 #[cfg(test)]
-mod test {
-
-    use super::*;
-
-    const number_point_ax1: usize = 8;
-    const max_ax1: f64 = 4.;
-
-    const number_point_ax2: usize = 5;
-    const max_ax2: f64 = 2.;
-
-    const number_point_ax3: usize = 10;
-    const max_ax3: f64 = 10.;
-
-    fn ref_mesh_cyclindrical() -> Box<dyn CompartmentMesh> {
-        let ax1 = AxisDescriptor::new(0., max_ax1, number_point_ax1);
-        let ax2 = AxisDescriptor::new(
-            -std::f64::consts::PI,
-            std::f64::consts::PI,
-            number_point_ax2,
-        );
-        let ax3 = AxisDescriptor::new(0., max_ax3, number_point_ax3);
-        get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3])
-    }
-
-    #[test]
-    fn t_cell_surface_cylindrical() {
-        let ax1 = AxisDescriptor::new(0., 4., 10);
-        let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, 10);
-        let ax3 = AxisDescriptor::new(0., 2., 10);
-
-        let mesh = get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3]);
-
-        let r_face_center = 0.4;
-        let dtheta = 2. * std::f64::consts::PI / 10.;
-        let dz = 2. / 10.;
-        let expected_surface = r_face_center * dtheta * dz;
-        let actual_surface = mesh.cell_surface(0, OrientedAxis::I);
-        assert!(
-            (actual_surface - expected_surface).abs() < 1e-10,
-            "Radial face surface incorrect: got {}, expected {}",
-            actual_surface,
-            expected_surface
-        );
-
-        let dr = 4. / 10.; // 0.4
-        let expected_surface = dr * dz;
-        let actual_surface = mesh.cell_surface(0, OrientedAxis::J);
-        assert!(
-            (actual_surface - expected_surface).abs() < 1e-10,
-            "Theta face surface incorrect: got {}, expected {}",
-            actual_surface,
-            expected_surface
-        );
-
-        let r1 = 0.0;
-        let r2 = 0.4;
-        let dtheta = 2. * std::f64::consts::PI / 10.;
-
-        let expected_surface = 0.5 * (r2 * r2 - r1 * r1) * dtheta;
-        let actual_surface = mesh.cell_surface(0, OrientedAxis::K);
-        assert!(
-            (actual_surface - expected_surface).abs() < 1e-10,
-            "Axial face surface incorrect: got {}, expected {}",
-            actual_surface,
-            expected_surface
-        );
-    }
-
-    #[test]
-    fn t_cell_volume_cylindrical() {
-        let ax1 = AxisDescriptor::new(0., 4., 10);
-        let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, 10);
-        let ax3 = AxisDescriptor::new(0., 2., 10);
-        let mesh = get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3]);
-
-        let r1 = 0.0;
-        let r2 = 0.4;
-        let dtheta = 2. * std::f64::consts::PI / 10.;
-        let dz = 2.0 / 10.0;
-
-        let expected_volume = 0.5 * (r2 * r2 - r1 * r1) * dtheta * dz;
-        let actual_volume = mesh.cell_volume(0);
-        assert!(
-            (expected_volume - actual_volume).abs() < 1e-10,
-            "Axial face volume incorrect: got {}, expected {}",
-            actual_volume,
-            expected_volume
-        );
-
-        let expected_full_volume = std::f64::consts::PI * 4. * 4. * 2.;
-        let full_volume: f64 = (0..mesh.number_cell()).map(|e| mesh.cell_volume(e)).sum();
-        assert!(
-            (expected_full_volume - full_volume).abs() < 1e-10,
-            "full_volume incorrect: got {}, expected {}",
-            full_volume,
-            expected_full_volume
-        );
-    }
-
-    #[test]
-    fn t_get_mesh() {
-        let ax1 = AxisDescriptor::new(0.5, 1., 10);
-        let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, 20);
-        let ax3 = AxisDescriptor::new(0., 2., 15);
-        let expected_step_x = 1. / 10.; //Cylindrical start ax from 0 to max_range
-        let mesh = get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3]);
-        assert!(
-            mesh.mesh_step_axis(0) == expected_step_x,
-            "{} {}",
-            mesh.mesh_step_axis(0),
-            expected_step_x
-        );
-    }
-
-    #[test]
-    fn t_getter() {
-        let mesh = ref_mesh_cyclindrical();
-        assert!(mesh.max_axis(0) == max_ax1);
-        assert!(mesh.max_axis(1) == std::f64::consts::PI);
-        assert!(mesh.max_axis(2) == max_ax3);
-
-        assert!(mesh.min_axis(0) == 0.);
-        assert!(mesh.min_axis(1) == -std::f64::consts::PI);
-
-        assert!(mesh.n_points_axis(0) == number_point_ax1);
-        assert!(mesh.n_points_axis(1) == number_point_ax2);
-        assert!(mesh.n_points_axis(2) == number_point_ax3);
-        assert!(mesh.number_cell() == number_point_ax1 * number_point_ax2 * number_point_ax3);
-    }
-
-    #[test]
-    fn t_identification_cylindrical() {
-        let mesh = ref_mesh_cyclindrical();
-
-        let assert_id = |a: Coords3, expect: usize| {
-            let CartesianCoordinates(aa) = CylindricalCoordinates(a).into();
-
-            let id1 = mesh
-                .cell_from_coordinates(&aa)
-                .expect("Test neighbors: coordinates for cell a are outside the mesh.");
-
-            assert!(
-                id1 == expect,
-                "Assertion failed: expected {:?}, got {:?}",
-                expect,
-                id1
-            );
-        };
-
-        assert_id([0., -std::f64::consts::PI, 0.], 0);
-
-        assert_id([0., -std::f64::consts::PI, max_ax3], number_point_ax3 - 1);
-        let theta = -std::f64::consts::PI + mesh.mesh_step_axis(1) * 1.1;
-        //R!=0 because with cartesian conversion is x=rcos(theta) if theta changes but no r its the same compartment
-        assert_id([0.01, theta, 0.], number_point_ax3);
-        //-1 because we consider cell ID for 0 to n-1
-        assert_id(
-            [max_ax1, std::f64::consts::PI, max_ax3],
-            (number_point_ax3 * number_point_ax1 * number_point_ax2) - 1,
-        );
-    }
-
-    #[test]
-    fn t_neighbors_cylindrical() {
-        use NeighborDirection::*;
-
-        let mesh = ref_mesh_cyclindrical();
-
-        let assert_neighbors =
-            |a: CylindricalCoordinates, b: CylindricalCoordinates, expected: NeighborDirection| {
-                let CartesianCoordinates(aa) = a.into();
-
-                let CartesianCoordinates(bb) = b.into();
-
-                let id1 = mesh
-                    .cell_from_coordinates(&aa)
-                    .expect("Test neighbors: coordinates for cell a are outside the mesh.");
-                let id2 = mesh
-                    .cell_from_coordinates(&bb)
-                    .expect("Test neighbors: coordinates for cell b are outside the mesh.");
-
-                let neighbors = mesh.are_cell_neighbor(id1, id2);
-                assert!(
-                    neighbors == expected,
-                    "Assertion failed: expected {:?}, got {:?}",
-                    expected,
-                    neighbors
-                );
-            };
-
-        // Fixed coordinates and offsets for testing
-        let fix_i = 2.2;
-        let offset_i = mesh.mesh_step_axis(0);
-        let fix_j = 0.;
-        let offset_j = 0.68;
-        let fix_k = 4.0;
-        let offset_k = 0.9;
-
-        // Assert neighbor relationships in different directions
-
-        // Testing in X direction
-        assert_neighbors(
-            CylindricalCoordinates([fix_i, fix_j, fix_k]),
-            CylindricalCoordinates([fix_i + offset_i, fix_j, fix_k]),
-            XPlus,
-        );
-        assert_neighbors(
-            CylindricalCoordinates([fix_i + offset_i, fix_j, fix_k]),
-            CylindricalCoordinates([fix_i, fix_j, fix_k]),
-            XMinus,
-        );
-
-        // Testing in Y direction
-        assert_neighbors(
-            CylindricalCoordinates([fix_i, fix_j + offset_j, fix_k]),
-            CylindricalCoordinates([fix_i, fix_j, fix_k]),
-            YMinus,
-        );
-        assert_neighbors(
-            CylindricalCoordinates([fix_i, fix_j, fix_k]),
-            CylindricalCoordinates([fix_i, fix_j + offset_j, fix_k]),
-            YPlus,
-        );
-
-        // Testing in Z direction
-        assert_neighbors(
-            CylindricalCoordinates([fix_i, fix_j, fix_k + offset_k]),
-            CylindricalCoordinates([fix_i, fix_j, fix_k]),
-            ZMinus,
-        );
-        assert_neighbors(
-            CylindricalCoordinates([fix_i, fix_j, fix_k]),
-            CylindricalCoordinates([fix_i, fix_j, fix_k + offset_k]),
-            ZPlus,
-        );
-
-        // Testing non-neighbor cases
-        assert_neighbors(
-            CylindricalCoordinates([0., fix_j, fix_k + offset_k]),
-            CylindricalCoordinates([fix_i, fix_j, fix_k]),
-            NotNeighbors,
-        );
-        assert_neighbors(
-            CylindricalCoordinates([fix_i, fix_j, fix_k]),
-            CylindricalCoordinates([0., fix_j, fix_k + offset_k]),
-            NotNeighbors,
-        );
-        let little_offset = mesh.mesh_step_axis(0) * 1.005;
-        let c1: f64 = mesh.get_cell_edge(0, 2);
-        assert_neighbors(
-            CylindricalCoordinates([c1, fix_j, fix_k]),
-            CylindricalCoordinates([c1 + little_offset, fix_j, fix_k]),
-            NotNeighbors,
-        );
-    }
-}
+mod tests;
