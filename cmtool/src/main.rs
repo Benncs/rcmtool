@@ -24,7 +24,7 @@ fn main() -> Result<(), CmtoolError> {
                     eprintln!("{}", e);
                     return Err(e);
                 }
-                return Ok(());
+                Ok(())
             }
 
             Mode::Manual(_manual_args) => todo!(),
@@ -93,7 +93,7 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
     // #[cfg(feature = "use_vtk")]
     // handle.write_vtk(format!("{}/{}/cma_case.vtu", root_dir, stem));
 
-    let f = cmtool::check_flows(
+    let _f = cmtool::check_flows(
         handle.grid(),
         &RawDataFlux::read_raw("./out/RESULTS/flowL.raw").unwrap(),
     )

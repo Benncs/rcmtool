@@ -5,24 +5,24 @@ use crate::{
     ensight_gold::types::{ElementsType, VolumeElementTypes},
 };
 
-fn sort_polygon_ccw(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
-    let centroid = {
-        let (mut sx, mut sy) = (0.0, 0.0);
-        for p in points {
-            sx += p[0];
-            sy += p[1];
-        }
-        [sx / points.len() as f64, sy / points.len() as f64]
-    };
+// fn sort_polygon_ccw(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
+//     let centroid = {
+//         let (mut sx, mut sy) = (0.0, 0.0);
+//         for p in points {
+//             sx += p[0];
+//             sy += p[1];
+//         }
+//         [sx / points.len() as f64, sy / points.len() as f64]
+//     };
 
-    let mut sorted = points.to_vec();
-    sorted.sort_by(|a, b| {
-        let angle_a = (a[1] - centroid[1]).atan2(a[0] - centroid[0]);
-        let angle_b = (b[1] - centroid[1]).atan2(b[0] - centroid[0]);
-        angle_a.partial_cmp(&angle_b).unwrap()
-    });
-    sorted
-}
+//     let mut sorted = points.to_vec();
+//     sorted.sort_by(|a, b| {
+//         let angle_a = (a[1] - centroid[1]).atan2(a[0] - centroid[0]);
+//         let angle_b = (b[1] - centroid[1]).atan2(b[0] - centroid[0]);
+//         angle_a.partial_cmp(&angle_b).unwrap()
+//     });
+//     sorted
+// }
 
 fn project_points_to_plane_2d(points: &[[f64; 3]], normal: &CartesianVec3) -> Vec<[f64; 2]> {
     let n = normal.normalized();

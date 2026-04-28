@@ -3,7 +3,7 @@
 use crate::{
     CoreError,
     ensight_gold::{self, types::ElementsType},
-    model::{self, CMGeometry, Scalar},
+    model::{CMGeometry, Scalar},
 };
 
 pub struct Vector {

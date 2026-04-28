@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::coordinates::*;
-use crate::grid::{NeighborDirection, index_to_oriented};
+use crate::grid::NeighborDirection;
 use crate::model::CMGeometry;
 use crate::utils::compute_intersection_area;
 
@@ -128,7 +128,7 @@ impl AInterfacesInfo {
 
         // self.check_areas(geometry);
     }
-
+    #[allow(unused)]
     fn check_areas(&self, geometry: &CMGeometry) {
         let grid = geometry.get_grid().unwrap();
         let n_zones = geometry.n_zone();

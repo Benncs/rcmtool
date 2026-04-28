@@ -248,7 +248,7 @@ impl CMModel {
     // }
 
     fn clean(&self, flows: &mut [InterfaceFlow]) {
-        const TOL: f64 = 1e-19;
+        // const TOL: f64 = 1e-19;
         const ABS_TOL_CONV: f64 = 1e-12;
         const REL_TOL_CONV: f64 = 1e-6;
 

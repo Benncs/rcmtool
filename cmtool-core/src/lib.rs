@@ -99,7 +99,7 @@ impl CMHandle {
         let mut rs = Vec::with_capacity(vars.len());
         let mut v: Vec<ensight_gold::case::VariableInfo> = vars.to_owned();
 
-        v.sort_by(|a, b| {
+        v.sort_by(|a, _b| {
             if a.get_type() == ensight_gold::case::VariableType::Scalar {
                 Ordering::Less
             }
