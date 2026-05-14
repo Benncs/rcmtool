@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::GenerateContract;
+
 #[derive(Debug, PartialEq)]
 pub enum FlowDirection {
     In,
@@ -29,14 +31,14 @@ pub struct ParsedFeeds {
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct DomainInfo {
     ///Compartment index offset for given reactor (e.g compartment_cumsum[reactor_id]==10)
-    pub compartment_cumsum: HashMap<String, usize>,
-    pub total_number_compartment: usize,
+    pub(crate) compartment_cumsum: HashMap<String, usize>,
+    pub(crate) total_number_compartment: usize,
     ///Reactor id of pfr names, needed to ensure global mass balance
-    pub pfr_names: Vec<String>,
+    pub(crate) pfr_names: Vec<String>,
     //TODO improve it
     ///Indicates if case only contains cfd-based reator
-    pub cm_case_only: Option<String>,
-    pub is_two_phase_flow: bool,
+    pub(crate) cm_case_only: Option<String>,
+    pub(crate) is_two_phase_flow: bool,
 }
 impl DomainInfo {
     pub fn get_relative_compartment_number(
@@ -48,6 +50,10 @@ impl DomainInfo {
             .get(reactor_id)
             .map(|cum_sum| relative_index + *cum_sum)
     }
+
+    pub fn get_total_number_compartment(&self) -> usize {
+        self.total_number_compartment
+    }
 }
 
 ///Details about generated domain
@@ -55,10 +61,23 @@ impl DomainInfo {
 #[derive(Clone, Serialize, Deserialize, Default)]
 pub struct DomainData {
     ///connections between partial flowmaps
-    pub connections: Option<[cmtool_data::RawDataFlux; 2]>,
-    pub info: DomainInfo,
+    pub(crate) info: DomainInfo,
     ///Information about feed of the resulting merged domain
-    pub feeds: Option<ParsedFeeds>,
-    pub case_path: String,
+    pub(crate) feeds: Option<ParsedFeeds>,
+    pub(crate) case_path: String,
     pub run_id: String,
+}
+
+impl DomainData {
+    pub fn feeds(&self) -> &Option<ParsedFeeds> {
+        &self.feeds
+    }
+
+    pub fn info(&self) -> &DomainInfo {
+        &self.info
+    }
+
+    pub fn get_case_path(&self) -> impl AsRef<std::path::Path> {
+        &self.case_path
+    }
 }

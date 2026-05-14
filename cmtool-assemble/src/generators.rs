@@ -6,7 +6,8 @@ use cmtool_data::{
     CMAExportType, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter, CMExportType, PhaseCM, RawData,
     RawDataFlux, RawDataScalar, RawFlux, RawPhase,
 };
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 const LIQUID_PAIR: (CMAExportType, CMAExportType) =
     (CMAExportType::LiquidFlow, CMAExportType::LiquidVolume);
@@ -27,9 +28,127 @@ pub struct PFRDescription {
     pub axial_dispersion: f64,
 }
 
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct GenerateContract {
+    // root_dir: std::path::PathBuf,
+    case: CMCase,
+    liquid_phase: Option<RawPhase>,
+    gas_phase: Option<RawPhase>,
+    relative_path: Option<String>,
+}
+
+use std::fmt;
+
+impl fmt::Debug for GenerateContract {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GenerateContract").finish()
+    }
+}
+
 //TODO improve and change name
 pub struct Generator {
     raw_phase: Vec<RawPhase>,
+}
+
+impl GenerateContract {
+    pub fn get_case(&self) -> &CMCase {
+        &self.case
+    }
+
+    fn new_single_phase(case: CMCase, phase: RawPhase, relative_path: Option<String>) -> Self {
+        if phase.identifier == PhaseCM::Liquid {
+            Self {
+                // root_dir: dest.as_ref().to_owned(),
+                case,
+                liquid_phase: Some(phase),
+                gas_phase: None,
+                relative_path,
+            }
+        } else {
+            Self {
+                // root_dir: dest.as_ref().to_owned(),
+                case,
+                liquid_phase: None,
+                gas_phase: Some(phase),
+                relative_path,
+            }
+        }
+    }
+
+    pub fn new(
+        // dest: impl AsRef<std::path::Path>,
+        case: CMCase,
+        liquid_phase: RawPhase,
+        gas_phase: Option<RawPhase>,
+        relative_path: Option<String>,
+    ) -> Self {
+        Self {
+            // root_dir: dest.as_ref().to_owned(),
+            case,
+            liquid_phase: Some(liquid_phase),
+            gas_phase,
+            relative_path,
+        }
+    }
+
+    fn write_phase(
+        dest: impl AsRef<std::path::Path>,
+        case: &mut CMCase,
+        phase: RawPhase,
+        relative_path: Option<String>,
+    ) -> Result<(), CMError> {
+        let (flowp, volumep) = phase.write(dest.as_ref().to_str().expect("utf path"))?;
+        let flowp = match &relative_path {
+            Some(rel) => format!("./{}/{}", rel, flowp),
+            _ => format!("./{}", flowp),
+        };
+
+        let volumep = match &relative_path {
+            Some(rel) => format!("./{}/{}", rel, volumep),
+            _ => format!("./{}", volumep),
+        };
+        case.add(CMExportType::Flow(phase.identifier).into(), &flowp);
+        case.add(CMExportType::Volume(phase.identifier).into(), &volumep);
+
+        Ok(())
+    }
+
+    fn prepare_fs(&self, root_dir: impl AsRef<std::path::Path>) -> Result<PathBuf, CMError> {
+        let path = if let Some(p) = &self.relative_path {
+            root_dir.as_ref().join(p)
+        } else {
+            root_dir.as_ref().to_owned()
+        };
+        std::fs::create_dir_all(&path)?; //FIXME
+        Ok(path)
+    }
+
+    // pub fn write(mut self, root_dir: impl AsRef<std::path::Path>) -> Result<CMCase, CMError> {
+    pub fn write(mut self, root_dir: impl AsRef<std::path::Path>) -> Result<CMCase, CMError> {
+        if self.liquid_phase.is_none() && self.gas_phase.is_none() {
+            return Err(CMError::Custom("No phase to write".to_owned()));
+        }
+
+        let path = self.prepare_fs(&root_dir)?;
+
+        if let Some(liquid_phase) = self.liquid_phase {
+            Self::write_phase(
+                &path,
+                &mut self.case,
+                liquid_phase,
+                self.relative_path.clone(),
+            )?;
+        }
+
+        if let Some(gas_phase) = self.gas_phase {
+            Self::write_phase(path, &mut self.case, gas_phase, self.relative_path.clone())?;
+        }
+
+        let case_path = root_dir.as_ref().join("cma_case");
+        CMCaseJson::write_case(self.case.clone(), &case_path)?;
+
+        Ok(self.case)
+    }
 }
 
 struct Field0D {
@@ -81,28 +200,6 @@ impl Generator {
         }
     }
 
-    fn write_phase(
-        dest: &str,
-        case: &mut CMCase,
-        phase: RawPhase,
-        relative_path: Option<String>,
-    ) -> Result<(), CMError> {
-        let (flowp, volumep) = phase.write(dest)?;
-        let flowp = match &relative_path {
-            Some(rel) => format!("./{}/{}", rel, flowp),
-            None => format!("./{}", flowp),
-        };
-
-        let volumep = match relative_path {
-            Some(rel) => format!("./{}/{}", rel, volumep),
-            None => format!("./{}", volumep),
-        };
-        case.add(CMExportType::Flow(phase.identifier).into(), &flowp);
-        case.add(CMExportType::Volume(phase.identifier).into(), &volumep);
-
-        Ok(())
-    }
-
     fn generate_0d_phase(
         &mut self,
         case: &mut CMCase,
@@ -115,7 +212,10 @@ impl Generator {
         phase.volume.values.push(volume.into());
 
         match dest {
-            Some(s) => Self::write_phase(&s, case, phase, None),
+            Some(s) => {
+                *case = GenerateContract::new_single_phase(case.clone(), phase, None).write(&s)?;
+                Ok(())
+            }
             None => {
                 self.raw_phase.push(phase);
                 Ok(())
@@ -205,7 +305,8 @@ impl Generator {
         }
 
         if let Some(s) = dest {
-            Self::write_phase(&s, case, phase, None)?;
+            *case = GenerateContract::new_single_phase(case.clone(), phase, None).write(&s)?;
+            // GenerateContract::write_phase(&s, case, phase, None)?;
         } else {
             self.raw_phase.push(phase);
         }
@@ -268,10 +369,12 @@ impl Generator {
         phases: Vec<RawPhase>,
         connections: Option<RawDataFlux>,
     ) -> Result<RawPhase, CMError> {
+        if phases.is_empty() {
+            return Err(CMError::Custom("Empty phases".to_owned()));
+        }
+
         let mut phase = RawPhase::new(0, 0, phases[0].identifier);
 
-        // let mut merge_phase_flow = RawDataFlux::new(0, 0); //
-        // let mut merge_phase_volume = RawDataScalar::new(0);
         let offset_compartment = std::cell::Cell::new(0u32);
         let incr_id = |mut flow: RawFlux| -> RawFlux {
             flow.id_source += offset_compartment.get();
@@ -310,41 +413,55 @@ impl Generator {
 
     pub fn merge_from_memory(
         &self,
-        dest: &str,
         connections: Option<[RawDataFlux; 2]>,
-    ) -> Result<String, CMError> {
+    ) -> Result<GenerateContract, CMError> {
         const MERGE_FOLDER_NAME: &str = "merged";
-        let liquid_phase = filter_phase(&self.raw_phase, PhaseCM::Liquid);
-        let gasphase = filter_phase(&self.raw_phase, PhaseCM::Gas);
 
-        let path = format!("{}/{}", dest, MERGE_FOLDER_NAME);
-        std::fs::create_dir_all(&path)?; //FIXME
-        let mut case = CMCase::default();
+        let liquid_phase = filter_phase(&self.raw_phase, PhaseCM::Liquid);
+        let gas_phase = filter_phase(&self.raw_phase, PhaseCM::Gas);
+
+        // let path = format!("{}/{}", dest, MERGE_FOLDER_NAME);
+        // std::fs::create_dir_all(&path)?; //FIXME
+        let case = CMCase::default();
         // case.n_div = n_div;
         let relative = Some(String::from(MERGE_FOLDER_NAME));
 
         let liquid_connection = connections.as_ref().map(|c| c[0].clone());
         let gas_connection = connections.as_ref().map(|c| c[1].clone());
 
-        let phase = Self::merge_phase(liquid_phase, liquid_connection)?;
-        Self::write_phase(&path, &mut case, phase, relative.clone())?;
+        let liquid_phase = Self::merge_phase(liquid_phase, liquid_connection)?;
+        let gas_phase = if !gas_phase.is_empty() {
+            Some(Self::merge_phase(gas_phase, gas_connection)?)
+        } else {
+            None
+        };
+        Ok(GenerateContract::new(
+            // merge_folder_path,
+            case,
+            liquid_phase,
+            gas_phase,
+            relative,
+        ))
+        // Self::write_phase(&path, &mut case, phase, relative.clone())?;
 
-        if !gasphase.is_empty() {
-            let phase = Self::merge_phase(gasphase, gas_connection)?;
-            Self::write_phase(&path, &mut case, phase, relative)?;
-        }
-        let path = format!("{}/cma_case", dest);
-        CMCaseJson::write_case(case.clone(), Path::new(&path))?;
+        // if !gasphase.is_empty() {
+        //     let phase = Self::merge_phase(gasphase, gas_connection)?;
+        //     // Self::write_phase(&path, &mut case, phase, relative)?;
+        // }
+        // let path = format!("{}/cma_case", dest);
+        // CMCaseJson::write_case(case.clone(), Path::new(&path))?;
+        //
+
         // cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)))?;
-        Ok(path)
+        // Ok(path)
     }
 
     pub fn merge(
         &self,
-        dest: &str,
+        root_dir: impl AsRef<std::path::Path>,
         ids: &[String],
         connections: Option<[RawDataFlux; 2]>,
-    ) -> Result<String, CMError> {
+    ) -> Result<GenerateContract, CMError> {
         let mut liquid_flows = Vec::with_capacity(ids.len());
         let mut liquid_volumes = Vec::with_capacity(ids.len());
         let mut gas_flows = Vec::with_capacity(ids.len());
@@ -352,12 +469,15 @@ impl Generator {
 
         let mut n_div = [0, 0, 0];
         for id in ids.iter() {
-            let partial_case =
-                CMCaseJson::read_case(Path::new(&format!("{}/{}/cma_case", dest, id)))?;
-            let relative_path = format!("{}/{}", dest, id);
+            let relative_path = root_dir.as_ref().join(id);
+            //TODO remove str
+            let relative_path_str = relative_path.to_str().expect("utf8 path");
+            let case_path = relative_path.join("cma_case");
+
+            let partial_case = CMCaseJson::read_case(&case_path)?;
             let (liquid_flow, liquid_volume) = PAIRS.0;
 
-            let path = resolve_path(&partial_case, &relative_path, liquid_flow)?;
+            let path = resolve_path(&partial_case, relative_path_str, liquid_flow)?;
             let rf =
                 RawDataFlux::read_raw(path).ok_or(CMError::Custom("Error reading".to_string()))?;
 
@@ -367,13 +487,13 @@ impl Generator {
             n_div[1] += partial_case.n_div[1];
             n_div[2] += partial_case.n_div[2];
 
-            let path = resolve_path(&partial_case, &relative_path, liquid_volume)?;
+            let path = resolve_path(&partial_case, relative_path_str, liquid_volume)?;
 
             let sc = RawDataScalar::read_raw(path)
                 .ok_or(CMError::Custom("Error reading".to_string()))?;
             liquid_volumes.push(sc);
             let (gas_flow, gas_volume) = PAIRS.1;
-            let path = resolve_path(&partial_case, &relative_path, gas_flow)?;
+            let path = resolve_path(&partial_case, relative_path_str, gas_flow)?;
 
             let rf = match RawDataFlux::read_raw(path) {
                 Some(rf) => rf,
@@ -384,7 +504,7 @@ impl Generator {
             };
             gas_flows.push(rf);
 
-            let path = resolve_path(&partial_case, &relative_path, gas_volume)?;
+            let path = resolve_path(&partial_case, relative_path_str, gas_volume)?;
             let rs = match RawDataScalar::read_raw(path) {
                 Some(rs) => rs,
                 None => {
@@ -395,9 +515,8 @@ impl Generator {
             };
             gas_volumes.push(rs);
         }
-
-        let path = format!("{}/merged", dest);
-        std::fs::create_dir_all(&path)?;
+        let merge_path = root_dir.as_ref().join("merged");
+        std::fs::create_dir_all(&merge_path)?;
         let mut case = CMCase::default();
         case.n_div = n_div;
 
@@ -407,18 +526,33 @@ impl Generator {
         let liquid_connection = connections.as_ref().map(|c| c[0].clone());
         let gas_connection = connections.as_ref().map(|c| c[1].clone());
         //TODO wont working without let relative = Some(String::from("merged"));
-        let phase = Self::merge_phase(liquid_phases, liquid_connection)?;
-        Self::write_phase(&path, &mut case, phase, None)?;
 
-        if !gas_phases.is_empty() {
-            let phase = Self::merge_phase(gas_phases, gas_connection)?;
-            Self::write_phase(&path, &mut case, phase, None)?;
-        }
+        let liquid_phase = Self::merge_phase(liquid_phases, liquid_connection)?;
+        let gas_phase = if !gas_phases.is_empty() {
+            Some(Self::merge_phase(gas_phases, gas_connection)?)
+        } else {
+            None
+        };
+        Ok(GenerateContract::new(
+            // &path,
+            case,
+            liquid_phase,
+            gas_phase,
+            None,
+        ))
 
-        CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
-        let _ =
-            cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)));
-        Ok(path)
+        // let phase = Self::merge_phase(liquid_phases, liquid_connection)?;
+        // Self::write_phase(&path, &mut case, phase, None)?;
+
+        // if !gas_phases.is_empty() {
+        //     let phase = Self::merge_phase(gas_phases, gas_connection)?;
+        //     Self::write_phase(&path, &mut case, phase, None)?;
+        // }
+
+        // CMCaseJson::write_case(case.clone(), Path::new(&format!("{}/jcma_case", dest)))?;
+        // let _ =
+        //     cmtool_data::CCMCaseInfo::write_case(case, Path::new(&format!("{}/cma_case", dest)));
+        // Ok(path)
     }
 }
 
@@ -454,8 +588,8 @@ mod tests {
         assert_eq!(liquid_volume.values[0].value, 8.0);
     }
     #[test]
-    fn test_1d() {
-        let path = "/tmp/test_1d";
+    fn test_merge_lazy() {
+        let path = "/tmp/test_merge_lazy";
         std::fs::create_dir_all(path).unwrap();
         let l = 1.;
         let d = 0.2;
@@ -470,11 +604,16 @@ mod tests {
             gas_fraction: alpha_g,
             axial_dispersion: 1e-9,
         };
-
-        let case = Generator::new()
-            .generate_1d_from_fraction(desc, Some(path.to_owned()))
+        let mut generator = Generator::new();
+        let case = generator
+            .generate_1d_from_fraction(desc, None)
             .expect("case");
 
+        // generator.generate_0d(1.0, 0., None, None).expect("0d");
+
+        let c = generator.merge_from_memory(None).expect("merge");
+
+        let case = c.write(path).expect("write");
         let liquid_volume_path =
             resolve_path(&case, path, cmtool_data::CMAExportType::LiquidVolume).unwrap();
 
@@ -494,6 +633,50 @@ mod tests {
     #[test]
     fn test_merge_phase() {
         let path = "/tmp/test_merge";
+        std::fs::create_dir_all(path).unwrap();
+        let l = 1.;
+        let d = 0.2;
+        let alpha_g = 0.1;
+
+        let desc = PFRDescription {
+            n_compartment: 10,
+            length: l,
+            diameter: d,
+            liquid_flow: 0.01,
+            gas_flow: 0.001,
+            gas_fraction: alpha_g,
+            axial_dispersion: 1e-9,
+        };
+
+        let case = Generator::new()
+            .generate_1d_from_fraction(desc, Some(path.to_owned()))
+            .expect("case");
+        let liquid_volume_path = case
+            .resolve(path, cmtool_data::CMAExportType::LiquidVolume)
+            .expect("path");
+
+        let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone())
+            .expect("Liquid error")
+            .values
+            .iter()
+            .map(|v| v.value)
+            .sum();
+
+        //volume is h*pi*d^2/4
+        let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
+        std::fs::remove_dir_all(path).unwrap();
+        assert!(
+            liquid_volume - (1. - alpha_g) * geo_volume < 1e-9,
+            "liquid_volume {}, alpha {}, geo_volume {}",
+            liquid_volume,
+            alpha_g,
+            geo_volume
+        );
+    }
+
+    #[test]
+    fn test_1d() {
+        let path = "/tmp/test_1d";
         std::fs::create_dir_all(path).unwrap();
         let l = 1.;
         let d = 0.2;

@@ -4,13 +4,16 @@
 pub mod generated_domain;
 use crate::{CMError, DomainData};
 mod reactors;
+use cmtool_data::RawDataFlux;
 use reactors::{parse_connection, parse_feed, parse_reactor};
 mod pfr_mb;
 pub(super) use pfr_mb::PfrGlobalMassBalance;
 
+pub type ConnectionType = [RawDataFlux; 2];
+
 pub fn parse_domain(
     root: &generated_domain::RootElementType,
-) -> Result<(DomainData, PfrGlobalMassBalance), CMError> {
+) -> Result<(DomainData, PfrGlobalMassBalance, Option<ConnectionType>), CMError> {
     if root.reactors.content.is_empty() {
         return Err(CMError::Parse(serde_xml_rs::Error::Custom(
             "At least one reactor required".to_owned(),
@@ -34,13 +37,13 @@ pub fn parse_domain(
     let run_id = root.run_id.clone();
     Ok((
         DomainData {
-            connections: raw_connections,
             info,
             feeds: pfeeds,
             case_path: String::new(),
             run_id,
         },
         mass_balance,
+        raw_connections,
     ))
 }
 
