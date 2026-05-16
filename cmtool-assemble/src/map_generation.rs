@@ -5,7 +5,7 @@ use crate::generators::{Generator, PFRDescription};
 use crate::parser::generated_domain::{self, GeneralSizeType};
 use crate::parser::{PfrGlobalMassBalance, generated_domain::Reactor0DType};
 use crate::{CMError, GenerateContract};
-use cmtool_data::{CMCaseJson, CMCaseReader, PhaseCM, RawDataFlux};
+use cmtool_data::{CMCaseJson, CMCaseReader, DEFAULT_CASE_FILE_NAME, PhaseCM, RawDataFlux};
 use cmtool_data::{CMCaseWriter, DataError};
 
 impl GeneralSizeType {
@@ -40,13 +40,20 @@ fn _generate_reactor_0d<T: cmtool_data::CMCaseWriter>(
         opt_path = Some(p.to_string_lossy().to_string());
     }
 
-    let case = generator.generate_0d_from_fraction(
+    let descriptor = crate::generators::Reactor0DDescriptor::from_fraction(
         volume,
         reactor0d.volume_fraction.content as f64,
-        opt_path,
-    )?;
+    );
+
+    let case = generator.generate_0d(descriptor, opt_path)?;
+
+    // let case = generator.generate_0d_from_fraction(
+    //     volume,
+    //     reactor0d.volume_fraction.content as f64,
+    //     opt_path,
+    // )?;
     if let Some(p) = &path {
-        T::write_case(case, &p.join("cma_case"))?;
+        T::write_case(case, &p.join(DEFAULT_CASE_FILE_NAME))?;
     }
 
     Ok(())
@@ -77,21 +84,21 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
         }
         generated_domain::GeneralSizeType::Dimension(dim) => {
             eprintln!("TODO: PFR GENERATION W/O FLOW RATES");
+            let desc = PFRDescription::new(
+                current_pfr.compartments.get(),
+                dim.length.content,
+                dim.diameter.content,
+                mb.get_flow(&current_pfr.id, PhaseCM::Liquid)?,
+                mb.get_flow(&current_pfr.id, PhaseCM::Gas)?,
+                current_pfr.volume_fraction.content,
+                1e-9,
+            )
+            .map_err(|e| CMError::Custom(format!("Invalid PFR descritor {}", e)))?;
 
-            let desc = PFRDescription {
-                n_compartment: current_pfr.compartments.get(),
-                length: dim.length.content.into(),
-                diameter: dim.diameter.content.into(),
-                liquid_flow: mb.get_flow(&current_pfr.id, PhaseCM::Liquid)?,
-                gas_flow: mb.get_flow(&current_pfr.id, PhaseCM::Gas)?,
-                gas_fraction: current_pfr.volume_fraction.content as f64,
-                axial_dispersion: 1e-9,
-            };
-
-            let case: cmtool_data::CMCase = generator.generate_1d_from_fraction(desc, opt_path)?;
+            let case: cmtool_data::CMCase = generator.generate_1d(desc, opt_path)?;
             if let Some(p) = &path {
                 // T::write_case(case, std::path::Path::new(&format!("{}/cma_case", p)))?;
-                T::write_case(case, &p.join("cma_case"))?;
+                T::write_case(case, &p.join(DEFAULT_CASE_FILE_NAME))?;
             }
         }
     };

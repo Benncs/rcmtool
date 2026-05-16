@@ -6,7 +6,9 @@ mod flowmap;
 mod rawdata;
 mod states;
 mod transitioner;
-pub use case::{CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter, read_case};
+pub use case::{
+    CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter, DEFAULT_CASE_FILE_NAME, read_case,
+};
 use core::f64;
 pub use descriptors::{CMAExportType, CMExportType, PhaseCM};
 pub use flowmap::FlowMapDescriptor;

@@ -3,8 +3,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::GenerateContract;
-
 #[derive(Debug, PartialEq)]
 pub enum FlowDirection {
     In,
