@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::data::DomainData;
 use crate::generators::{Generator, PFRDescription};
 use crate::parser::generated_domain::{self, GeneralSizeType};
 use crate::parser::{PfrGlobalMassBalance, generated_domain::Reactor0DType};
 use crate::{CMError, GenerateContract};
-use cmtool_data::{CMCaseJson, CMCaseReader, DEFAULT_CASE_FILE_NAME, PhaseCM, RawDataFlux};
-use cmtool_data::{CMCaseWriter, DataError};
+use cmtool_data::DataError;
+use cmtool_data::{CMCaseJson, DEFAULT_CASE_FILE_NAME, PhaseCM, RawDataFlux};
 
 impl GeneralSizeType {
     ///Returns volume of reactor considering cylindrical shape

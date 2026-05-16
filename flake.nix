@@ -107,12 +107,14 @@
 
         devShells.default = craneLib.devShell {
           checks = self.checks.${system};
-
           packages = with pkgs; [
             cargo-nextest
-            samply        # profiling
-
+            prek
+            samply
           ];
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+    pkgs.stdenv.cc.cc
+  ];
         };
       });
 }

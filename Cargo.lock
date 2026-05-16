@@ -195,7 +195,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "cmtool"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "clap",
  "cmtool-assemble",
@@ -208,7 +208,7 @@ dependencies = [
 
 [[package]]
 name = "cmtool-assemble"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "cmtool-data",
  "ndarray",
@@ -222,7 +222,7 @@ dependencies = [
 
 [[package]]
 name = "cmtool-core"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "cmtool-data",
  "enum_dispatch",
@@ -232,7 +232,7 @@ dependencies = [
 
 [[package]]
 name = "cmtool-cxx"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "cmtool-data",
  "cxx",
@@ -243,7 +243,7 @@ dependencies = [
 
 [[package]]
 name = "cmtool-data"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "enum_dispatch",
  "nalgebra",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "cmtool-example"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "cmtool-assemble",
  "cmtool-data",
@@ -267,7 +267,7 @@ dependencies = [
 
 [[package]]
 name = "cmtool-python"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "cmtool-data",
  "nalgebra",
