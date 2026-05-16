@@ -68,10 +68,7 @@ fn raw_phase_from_flow_vol(
 //         .cloned()
 //         .collect()
 // }
-fn filter_phase<'a>(
-    raw_phase: &'a [RawPhase],
-    phase: PhaseCM,
-) -> impl Iterator<Item = &'a RawPhase> {
+fn filter_phase(raw_phase: &[RawPhase], phase: PhaseCM) -> impl Iterator<Item = &RawPhase> {
     raw_phase.iter().filter(move |p| p.identifier == phase)
 }
 
@@ -478,7 +475,7 @@ mod tests {
             axial_dispersion: 1e-9,
         };
         let mut generator = Generator::new();
-        let case = generator.generate_1d(desc, None).expect("case");
+        let _case = generator.generate_1d(desc, None).expect("case");
 
         // generator.generate_0d(1.0, 0., None, None).expect("0d");
 

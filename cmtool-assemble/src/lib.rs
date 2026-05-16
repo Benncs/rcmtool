@@ -30,28 +30,27 @@ impl Parser {
     /// Returns info about generated domain if suceeds
     fn continue_parsing(
         p: Parser,
-        root_dir: &str,
+        root_dir: impl AsRef<std::path::Path>,
     ) -> Result<(DomainData, Option<GenerateContract>), CMError> {
-        let path = format!("{}/{}", root_dir, p.0.run_id);
-        Self::continue_parsing_with_path(p, path.as_str())
+        let path = root_dir.as_ref().join(&p.0.run_id);
+        Self::continue_parsing_with_path(p, path)
     }
 
     /// Parse domain and generate content at given abolute path if needed
     /// Returns info about generated domain if suceeds
     pub fn continue_parsing_with_path(
         Parser(root): Parser,
-        root_dir: &str,
+        root_dir: impl AsRef<std::path::Path>,
     ) -> Result<(DomainData, Option<GenerateContract>), CMError> {
         let (mut domain, mb, connections) = parse_domain(&root)?;
 
         let (path, gc) = if let Some(cm_case) = &domain.info().cm_case_only {
             (cm_case.clone(), None)
         } else {
-            let root_path = std::path::PathBuf::from(root_dir);
             //TODO: Do not create all, return error if not root_dir
             // std::fs::create_dir_all(root_path)?;
-            let (gc) = generate_flowmap(None, &root.reactors, &mb, connections)?;
-            (root_path.to_string_lossy().to_string(), gc)
+            let gc = generate_flowmap(None, &root.reactors, &mb, connections)?;
+            (root_dir.as_ref().to_string_lossy().to_string(), gc)
         };
 
         domain.case_path = path;
@@ -62,7 +61,7 @@ impl Parser {
 //Parse and generate domain at root dir  from give xml content
 // Returns info about domain if suceeds
 pub fn generate_domain(
-    root_dir: &str,
+    root_dir: impl AsRef<std::path::Path>,
     reactor_content: &str,
 ) -> Result<(DomainData, Option<GenerateContract>), CMError> {
     let (_id, parser) = Parser::start_parsing(reactor_content)?;
@@ -73,10 +72,10 @@ pub fn generate_domain(
 //Parse and generate domain at root dir  from give xml content
 // Returns info about domain if suceeds
 pub fn generate_and_write_domain(
-    root_dir: &str,
+    root_dir: impl AsRef<std::path::Path>,
     reactor_content: &str,
 ) -> Result<DomainData, CMError> {
-    let (domain, gc) = generate_domain(root_dir, reactor_content)?;
+    let (domain, gc) = generate_domain(&root_dir, reactor_content)?;
     if let Some(contract) = gc {
         contract.write(root_dir)?;
     }
