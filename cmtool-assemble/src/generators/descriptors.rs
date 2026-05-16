@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use cmtool_data::PhaseCM;
 
 pub struct Reactor0DDescriptor {
