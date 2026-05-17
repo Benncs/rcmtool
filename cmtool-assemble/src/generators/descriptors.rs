@@ -72,18 +72,23 @@ impl PFRDescription {
         Ok(pfr)
     }
 
-    fn get_liquid_flow(&self) -> f64 {
+    pub fn get_liquid_flow(&self) -> f64 {
         self.liquid_flow
     }
 
-    fn get_gas_flow(&self) -> f64 {
+    pub fn get_gas_flow(&self) -> f64 {
         self.gas_flow
     }
-    fn get_gas_fraction(&self) -> f64 {
+    pub fn get_gas_fraction(&self) -> f64 {
         self.gas_fraction
     }
-    fn get_liquid_fraction(&self) -> f64 {
+    pub fn get_liquid_fraction(&self) -> f64 {
         1. - self.gas_fraction
+    }
+    //volume is h*pi*d^2/4
+    #[allow(unused)]
+    pub fn geometrical_volume(&self) -> f64 {
+        self.length * (self.diameter * self.diameter) * std::f64::consts::PI / 4.
     }
 
     pub fn extract_volume_flow(&self, phase: PhaseCM) -> (f64, f64) {

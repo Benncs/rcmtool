@@ -195,9 +195,8 @@ impl IterationState {
             misc,
         };
 
-        if ret.gas.is_some() {
-            let g = ret.gas.as_ref().unwrap();
-            assert!(g.n_compartments() == ret.liquid.n_compartments());
+        if let Some(gas1) = &ret.gas {
+            assert!(gas1.n_compartments() == ret.liquid.n_compartments());
         }
 
         ret

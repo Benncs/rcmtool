@@ -13,6 +13,7 @@ pub use data::{FeedFlow, ParsedFeeds};
 pub use errors::CMError;
 pub use generators::GenerateContract;
 use map_generation::generate_flowmap;
+pub type ConnectionType = [cmtool_data::RawDataFlux; 2];
 
 /// Domain parser
 // TODO: make it private + change name

@@ -4,12 +4,10 @@
 pub mod generated_domain;
 use crate::{CMError, DomainData};
 mod reactors;
-use cmtool_data::RawDataFlux;
 use reactors::{parse_connection, parse_feed, parse_reactor};
 mod pfr_mb;
+use crate::ConnectionType;
 pub(super) use pfr_mb::PfrGlobalMassBalance;
-
-pub type ConnectionType = [RawDataFlux; 2];
 
 pub fn parse_domain(
     root: &generated_domain::RootElementType,

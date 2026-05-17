@@ -427,6 +427,15 @@ impl Generator {
 mod tests {
 
     use super::*;
+
+    fn g_descriptor_pfr() -> PFRDescription {
+        let l = 1.;
+        let d = 0.2;
+        let alpha_g = 0.1;
+
+        PFRDescription::new(10, l, d, 0.01, 0.01, alpha_g, 1e-9).unwrap()
+    }
+
     #[test]
     fn test_0d() {
         let path = "/tmp/test_0d";
@@ -457,27 +466,23 @@ mod tests {
         assert_eq!(gas_volume.values[0].value, 2.0);
         assert_eq!(liquid_volume.values[0].value, 8.0);
     }
+
     #[test]
     fn test_merge_lazy() {
         let path = "/tmp/test_merge_lazy";
         std::fs::create_dir_all(path).unwrap();
+        //same value in g_descriptor_pfr
         let l = 1.;
         let d = 0.2;
-        let alpha_g = 0.1;
 
-        let desc = PFRDescription {
-            n_compartment: 10,
-            length: l,
-            diameter: d,
-            liquid_flow: 0.01,
-            gas_flow: 0.01,
-            gas_fraction: alpha_g,
-            axial_dispersion: 1e-9,
-        };
+        let desc = g_descriptor_pfr();
+        let alpha_g = desc.get_gas_fraction();
+        //volume is h*pi*d^2/4
+        let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
+        assert!(geo_volume == desc.geometrical_volume());
+
         let mut generator = Generator::new();
         let _case = generator.generate_1d(desc, None).expect("case");
-
-        // generator.generate_0d(1.0, 0., None, None).expect("0d");
 
         let c = generator.merge_from_memory(None).expect("merge");
 
@@ -492,32 +497,57 @@ mod tests {
             .map(|v| v.value)
             .sum();
         std::fs::remove_dir_all(path).unwrap();
-        //volume is h*pi*d^2/4
-        let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
 
         assert!(liquid_volume - (1. - alpha_g) * geo_volume < 1e-9);
     }
 
     #[test]
-    fn test_merge_phase() {
+    fn test_merge_phase_2() {
+        let path = "/tmp/test_merge_phase_2";
+        std::fs::create_dir_all(path).unwrap();
+
+        let v_0d = 10.;
+        let n_c = 10;
+
+        let desc_pfr = g_descriptor_pfr();
+        let alpha_g = desc_pfr.get_gas_fraction();
+        let geo_volume = desc_pfr.geometrical_volume();
+        let desc_0d = Reactor0DDescriptor::from_fraction(v_0d, alpha_g);
+
+        let mut gene = Generator::new();
+
+        gene.generate_1d(desc_pfr, None).unwrap();
+        gene.generate_0d(desc_0d, None).unwrap();
+
+        let gc = gene.merge_from_memory(None).unwrap();
+
+        let case = gc.write(path).unwrap();
+
+        let liquid_volume_path = case
+            .resolve(path, cmtool_data::CMAExportType::LiquidVolume)
+            .expect("path");
+
+        let liquid_volume =
+            cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone()).expect("Liquid error");
+        assert!(liquid_volume.header.n_zone as usize == n_c + 1);
+
+        let total_volume: f64 = liquid_volume.values.iter().map(|v| v.value).sum();
+        let expected_volume = (1. - alpha_g) * (geo_volume + v_0d);
+        assert!((total_volume - expected_volume).abs() < 1e-9);
+
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn test_merge_phase_1() {
         let path = "/tmp/test_merge";
         std::fs::create_dir_all(path).unwrap();
-        let l = 1.;
-        let d = 0.2;
-        let alpha_g = 0.1;
-
-        let desc = PFRDescription {
-            n_compartment: 10,
-            length: l,
-            diameter: d,
-            liquid_flow: 0.01,
-            gas_flow: 0.001,
-            gas_fraction: alpha_g,
-            axial_dispersion: 1e-9,
-        };
+        let desc_pfr = g_descriptor_pfr();
+        let alpha_g = desc_pfr.get_gas_fraction();
+        let geo_volume = desc_pfr.geometrical_volume();
 
         let case = Generator::new()
-            .generate_1d(desc, Some(path.to_owned()))
+            .generate_1d(desc_pfr, Some(path.to_owned()))
             .expect("case");
         let liquid_volume_path = case
             .resolve(path, cmtool_data::CMAExportType::LiquidVolume)
@@ -531,7 +561,6 @@ mod tests {
             .sum();
 
         //volume is h*pi*d^2/4
-        let geo_volume = l * (d * d) * std::f64::consts::PI / 4.;
         std::fs::remove_dir_all(path).unwrap();
         assert!(
             liquid_volume - (1. - alpha_g) * geo_volume < 1e-9,
