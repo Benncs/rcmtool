@@ -16,15 +16,29 @@ impl Reactor0DDescriptor {
         self.gas_volume
     }
 
+    pub fn is_valid(&self) -> Result<(), String> {
+        if !self.liquid_volume.is_finite() || self.liquid_volume <= 0.0 {
+            return Err("Liquid volume must be a finite positive number".into());
+        }
+        //TODO
+        if self.gas_volume < 0. {
+            return Err("Gas volume must be a finite positive number".into());
+        }
+
+        Ok(())
+    }
+
     pub fn new<L, G>(liquid_volume: L, gas_volume: G) -> Self
     where
         L: Into<f64>,
         G: Into<f64>,
     {
-        Self {
+        let _self = Self {
             liquid_volume: liquid_volume.into(),
             gas_volume: gas_volume.into(),
-        }
+        };
+        _self.is_valid().unwrap(); //TODO
+        _self
     }
 
     pub fn from_fraction(total_volume: f64, gas_fraction: f64) -> Self {

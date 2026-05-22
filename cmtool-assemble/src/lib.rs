@@ -45,16 +45,17 @@ impl Parser {
     ) -> Result<(DomainData, Option<GenerateContract>), CMError> {
         let (mut domain, mb, connections) = parse_domain(&root)?;
 
-        let (path, gc) = if let Some(cm_case) = &domain.info().cm_case_only {
-            (cm_case.clone(), None)
-        } else {
-            //TODO: Do not create all, return error if not root_dir
-            // std::fs::create_dir_all(root_path)?;
-            let gc = generate_flowmap(None, &root.reactors, &mb, connections)?;
-            (root_dir.as_ref().to_string_lossy().to_string(), gc)
-        };
+        let (path, gc): (std::path::PathBuf, Option<GenerateContract>) =
+            if let Some(cm_case) = &domain.info().cm_case_only {
+                (std::path::PathBuf::from(&cm_case), None)
+            } else {
+                //TODO: Do not create all, return error if not root_dir
+                // std::fs::create_dir_all(root_path)?;
+                let gc = generate_flowmap(None, &root.reactors, &mb, connections)?;
+                (root_dir.as_ref().to_owned(), gc)
+            };
 
-        domain.case_path = path;
+        domain.case_path = path.as_os_str().to_string_lossy().to_string();
         Ok((domain, gc))
     }
 }
