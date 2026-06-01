@@ -55,6 +55,8 @@ impl std::fmt::Display for CMCase {
     }
 }
 
+pub const DEFAULT_CASE_FILE_NAME: &str = "cma_case";
+
 impl CMCase {
     pub fn n_compartment(&self) -> u32 {
         if self.n_div.contains(&0) {
@@ -342,7 +344,9 @@ mod test {
 
     fn commomn_read_test<T: CMCaseReader>() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR"); // compile-time
-        let binding = Path::new(manifest_dir).join("test_data/cma_case");
+        let binding = Path::new(manifest_dir)
+            .join("test_data")
+            .join(DEFAULT_CASE_FILE_NAME);
         let path = binding.as_path();
 
         println!("{:?}", path);
@@ -398,7 +402,9 @@ mod test {
     #[test]
     fn test_conversion() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR"); // compile-time
-        let binding = Path::new(manifest_dir).join("test_data/cma_case");
+        let binding = Path::new(manifest_dir)
+            .join("test_data")
+            .join(DEFAULT_CASE_FILE_NAME);
         let c_path = binding.as_path();
 
         let reference_case = CCMCaseInfo::read_case(c_path).unwrap();

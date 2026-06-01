@@ -13,6 +13,7 @@ use crate::{
     CMError,
     data::{DomainInfo, FlowDirection},
 };
+use cmtool_data::DEFAULT_CASE_FILE_NAME;
 use cmtool_data::{PhaseCM, RawDataFlux};
 
 fn connection_per_phase(
@@ -173,9 +174,7 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
                 in_place_cumsum += n_c.get();
             }
             generated_domain::ReactorsTypeContent::ReactorFromFile(reactor_from_file) => {
-                let path = format!("{}/cma_case", reactor_from_file.path);
-
-                let path = PathBuf::from(path);
+                let path = PathBuf::from(&reactor_from_file.path).join(DEFAULT_CASE_FILE_NAME);
                 let case = cmtool_data::read_case(path.as_path())?;
                 // case.n_compartment()
                 domain_info

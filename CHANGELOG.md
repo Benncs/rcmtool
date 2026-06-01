@@ -1,7 +1,34 @@
 # CHANGELOG
 
+
+## 0.1.5
+*Date: 06/2026
+
+#### Features:
+
+- Deferred filesystem IO when assembling flowmaps
+
+- Generation contract 
+
+
+#### General Enhancements
+
+- Cleaner way to generate reactor in flowmap 
+- Reduce use of plain str for path handling, use Path/PathBuf instead 
+- Better error message
+
+#### Breaking Changes
+- API endpoint (parser,generate_domain,...) change signature
+
+#### Bug Fixes
+
+#### Known Issue
+
+- CFD generated model does not compute flows correctly
+
+
 ## 0.1.4
-*Date: *
+*Date: 04/2026
 
 #### Features:
 

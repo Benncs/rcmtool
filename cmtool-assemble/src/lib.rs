@@ -1,44 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 mod data;
+mod errors;
 mod generators;
 mod map_generation;
 mod parser;
 
-use std::io;
-
 pub use crate::data::{DomainData, DomainInfo};
 use crate::parser::{generated_domain::RootElementType, get_root, parse_domain};
-pub use data::{FeedFlow, ParsedFeeds};
-use map_generation::generate_flowmap;
-use thiserror::Error;
-
 pub use cmtool_data::PhaseCM; //reexport to have easier dependency
-
-#[derive(Error, Debug)]
-pub enum CMError {
-    #[error("Cmtool encountered an unknown error. Please check the input and try again.")]
-    Default,
-
-    #[error("Cmtool error: {0}")]
-    Custom(String),
-
-    #[error(
-        "Cmtool: Mass balance error in PFR '{0}' with phase {1}. Check your inputs or calculations."
-    )]
-    MassBalance(String, String),
-
-    #[error("Cmtool data error: {0}. Ensure your data files are correct and accessible.")]
-    Data(#[from] cmtool_data::DataError),
-
-    #[error("I/O error: Failed to handle the file '{0}'. Check file path and permissions.")]
-    IO(#[from] io::Error),
-
-    #[error(
-        "Cmtool parse error: {0}. Verify that the XML input is well-formed and matches expected schema."
-    )]
-    Parse(#[from] serde_xml_rs::Error),
-}
+pub use data::{FeedFlow, ParsedFeeds};
+pub use errors::CMError;
+pub use generators::GenerateContract;
+use map_generation::generate_flowmap;
+pub type ConnectionType = [cmtool_data::RawDataFlux; 2];
 
 /// Domain parser
 // TODO: make it private + change name
@@ -54,44 +29,58 @@ impl Parser {
 
     /// Parse domain and generate content in the root directory if needed
     /// Returns info about generated domain if suceeds
-    fn continue_parsing(p: Parser, root_dir: &str) -> Result<DomainData, CMError> {
-        // let (domain, mb) = parse_domain(&root)?;
-        // let root_dir = format!("{}/{}", root_dir, root.run_id);
-        // std::fs::create_dir_all(root_dir.clone())?;
-        // generate_flowmap(&root_dir, &domain, &root.reactors, &mb)?;
-        let path = format!("{}/{}", root_dir, p.0.run_id);
-        // Ok(domain)
-        Self::continue_parsing_with_path(p, path.as_str())
+    fn continue_parsing(
+        p: Parser,
+        root_dir: impl AsRef<std::path::Path>,
+    ) -> Result<(DomainData, Option<GenerateContract>), CMError> {
+        let path = root_dir.as_ref().join(&p.0.run_id);
+        Self::continue_parsing_with_path(p, path)
     }
 
     /// Parse domain and generate content at given abolute path if needed
     /// Returns info about generated domain if suceeds
     pub fn continue_parsing_with_path(
         Parser(root): Parser,
-        root_dir: &str,
-    ) -> Result<DomainData, CMError> {
-        let (mut domain, mb) = parse_domain(&root)?;
+        root_dir: impl AsRef<std::path::Path>,
+    ) -> Result<(DomainData, Option<GenerateContract>), CMError> {
+        let (mut domain, mb, connections) = parse_domain(&root)?;
 
-        let path = if let Some(cm_case) = &domain.info.cm_case_only {
-            cm_case.clone()
-        } else {
-            //TODO: Do not create all, return error if not root_dir
-            std::fs::create_dir_all(root_dir)?;
-            generate_flowmap(root_dir, &domain, &root.reactors, &mb)?
-        };
+        let (path, gc): (std::path::PathBuf, Option<GenerateContract>) =
+            if let Some(cm_case) = &domain.info().cm_case_only {
+                (std::path::PathBuf::from(&cm_case), None)
+            } else {
+                //TODO: Do not create all, return error if not root_dir
+                // std::fs::create_dir_all(root_path)?;
+                let gc = generate_flowmap(None, &root.reactors, &mb, connections)?;
+                (root_dir.as_ref().to_owned(), gc)
+            };
 
-        domain.case_path = path;
-        Ok(domain)
+        domain.case_path = path.as_os_str().to_string_lossy().to_string();
+        Ok((domain, gc))
     }
 }
 
 //Parse and generate domain at root dir  from give xml content
 // Returns info about domain if suceeds
-pub fn generate_domain(root_dir: &str, reactor_content: &str) -> Result<DomainData, CMError> {
-    let (_id, root) = Parser::start_parsing(reactor_content)?;
+pub fn generate_domain(
+    root_dir: impl AsRef<std::path::Path>,
+    reactor_content: &str,
+) -> Result<(DomainData, Option<GenerateContract>), CMError> {
+    let (_id, parser) = Parser::start_parsing(reactor_content)?;
 
-    let domain = Parser::continue_parsing(root, root_dir)?;
+    Parser::continue_parsing(parser, root_dir)
+}
 
+//Parse and generate domain at root dir  from give xml content
+// Returns info about domain if suceeds
+pub fn generate_and_write_domain(
+    root_dir: impl AsRef<std::path::Path>,
+    reactor_content: &str,
+) -> Result<DomainData, CMError> {
+    let (domain, gc) = generate_domain(&root_dir, reactor_content)?;
+    if let Some(contract) = gc {
+        contract.write(root_dir)?;
+    }
     Ok(domain)
 }
 
