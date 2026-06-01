@@ -78,4 +78,8 @@ impl DomainData {
     pub fn get_case_path(&self) -> impl AsRef<std::path::Path> {
         &self.case_path
     }
+
+    pub fn is_already_generated(&self) -> bool {
+        self.info().cm_case_only.is_some()
+    }
 }
