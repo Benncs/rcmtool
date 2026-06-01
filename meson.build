@@ -1,8 +1,8 @@
 project(
-  'rcmtool-cxx',
-  'cpp',
-  version: '0.1.4',
-  meson_version: '>= 1.3.0',
+    'rcmtool-cxx',
+    'cpp',
+    version: '0.1.5',
+    meson_version: '>= 1.3.0',
 )
 out_dir = meson.current_build_dir() + '/rust_target'
 root = meson.project_source_root()
@@ -13,19 +13,19 @@ cpp = meson.get_compiler('cpp')
 _r = run_command('sh', '-c', f'mkdir -p @out_dir@/cxxbridge/cmtool-cxx/src', check: true).stdout()
 
 dummy = custom_target(
-  'rust_build',
-  output: ['dummy'],
-  command: [
-    cargo,
-    'build',
-    '--manifest-path', cargo_path,
-    '--target-dir', out_dir,
-    '--profile', 'release-performance',
-    '-p', 'cmtool-cxx',
-  ],
-  build_always_stale: true,
-  build_by_default: true,
-  console: true,
+    'rust_build',
+    output: ['dummy'],
+    command: [
+        cargo,
+        'build',
+        '--manifest-path', cargo_path,
+        '--target-dir', out_dir,
+        '--profile', 'release-performance',
+        '-p', 'cmtool-cxx',
+    ],
+    build_always_stale: true,
+    build_by_default: true,
+    console: true,
 )
 
 dirs = include_directories('./rust_target/cxxbridge/cmtool-cxx/src')
