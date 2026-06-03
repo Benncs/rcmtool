@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#[rustfmt::skip]
-pub mod generated_domain;
+pub mod generated_domain {
+    #![allow(clippy::all)]
+    #![allow(dead_code)]
+    #![allow(unused_imports)]
+    include!(concat!(env!("OUT_DIR"), "/generated_domain.rs"));
+}
+
+// #[rustfmt::skip]
+// pub mod generated_domain;
 use crate::{CMError, DomainData};
 mod reactors;
 use reactors::{parse_connection, parse_feed, parse_reactor};
