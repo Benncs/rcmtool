@@ -1,24 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::fs::File;
-use std::fs;
 use std::io::Write;
+use std::{fs, path::PathBuf};
 use xsd_parser::{
     Config, Error,
     config::{GeneratorFlags, InterpreterFlags, OptimizerFlags, ParserFlags, RenderStep, Schema},
     generate,
 };
 
-static ROOT: &str = "./datamodel";
+static ROOT: &str = "datamodel";
+// static ROOT: &str = "./datamodel";
 
 fn domain_schema() -> Result<(), Box<Error>> {
-    // let files = [
-    //     format!("{}/units.xsd", ROOT),
-    //     format!("{}/reactors.xsd", ROOT),
-    //     format!("{}/connections.xsd", ROOT),
-    //     format!("{}/main.xsd", ROOT),
-    // ];
-    let mut cfg = Config::default().with_schema(Schema::File(format!("{}/main.xsd", ROOT).into()));
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR variable not found");
+    let path = PathBuf::from(manifest_dir).join(ROOT).join("main.xsd");
+    let mut cfg = Config::default().with_schema(Schema::File(path));
     cfg = cfg.set_parser_flags(ParserFlags::RESOLVE_INCLUDES | ParserFlags::DEFAULT_NAMESPACES);
     cfg = cfg.with_render_steps([
         //RenderStep::Types,

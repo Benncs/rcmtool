@@ -213,7 +213,7 @@ impl VerticesData {
         let (i_part, part) = part_it;
 
         let mut vertex_global_identifier = vertex_counter;
-
+        #[allow(clippy::explicit_counter_loop)]
         for ve_id in 0..vertex_detail[i_part] {
             self.ve_gid[i_part][ve_id] = vertex_global_identifier;
             let offset = vertex_global_identifier * 3;
