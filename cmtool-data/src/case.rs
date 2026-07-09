@@ -81,6 +81,28 @@ impl CMCase {
         let rel = self.paths.get(&stype)?;
         Some(Path::new(root).join(rel).to_str()?.to_string())
     }
+
+    pub fn resolve_all(&self, root: &str, stype: CMAExportType) -> Option<Vec<String>> {
+        let rel = self.paths.get(&stype)?;
+        if self.is_reursive {
+            Some(
+                self.get_folders(root)
+                    .iter()
+                    .map(|folder_name| {
+                        Path::new(root)
+                            .join(folder_name)
+                            .join(rel)
+                            .to_str()
+                            .map(|s| s.to_string())
+                    })
+                    .collect::<Option<Vec<_>>>()?,
+            )
+        } else {
+            let pa = self.resolve(root, stype)?;
+            Some(vec![pa])
+        }
+    }
+
     pub fn prepend_path(mut self, prep: &str) -> Self {
         for (_key, path) in self.paths.iter_mut() {
             *path = format!("{}/{}", prep, path);

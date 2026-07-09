@@ -45,6 +45,6 @@ mod pycmtool {
     #[pymodule]
     mod case {
         #[pymodule_export]
-        use super::_c::{CMCaseWrapper, make_cm_case, read_cm_case};
+        use super::_c::{CMCaseWrapper, CMExportTypeWrapper, make_cm_case, read_cm_case};
     }
 }
