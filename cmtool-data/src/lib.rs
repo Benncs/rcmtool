@@ -67,7 +67,7 @@ fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> us
 
 ///Create transitioner
 pub fn get_transitioner<T: FlowMapTransitioner>(root: &str) -> Result<T, DataError> {
-    let case_path = format!("{}/cma_case", root);
+    let case_path = format!("{}/{}", root, DEFAULT_CASE_FILE_NAME);
     let p = std::path::Path::new(&case_path);
     let case = read_case(p)?;
 
