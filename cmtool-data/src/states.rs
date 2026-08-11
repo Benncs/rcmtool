@@ -219,7 +219,53 @@ impl IterationState {
 mod test {
     use std::collections::HashMap;
 
+    use crate::test_utils::chain_of_three;
     use crate::{FlowMapDescriptor, IterationState};
+
+    fn synthetic_descriptor() -> FlowMapDescriptor {
+        let (flow, volume) = chain_of_three();
+        FlowMapDescriptor::from_raw_data(&flow, &volume).unwrap()
+    }
+
+    #[test]
+    fn transition_diagonal_is_minus_out_flow() {
+        let descriptor = synthetic_descriptor();
+        let state = IterationState::new(descriptor, None, HashMap::new());
+
+        // Compartment 0 only sends 1.0 to compartment 1, compartment 1 sends
+        // 0.5 back and 2.0 forward, compartment 2 sends 0.25 back.
+        assert_eq!(state.liquid.out_flows, vec![1.0, 2.5, 0.25]);
+
+        let dense = nalgebra_sparse::CsrMatrix::from(&state.liquid.transition);
+        for (i_compartment, out_flow) in state.liquid.out_flows.iter().enumerate() {
+            let diagonal = dense
+                .get_entry(i_compartment, i_compartment)
+                .unwrap()
+                .into_value();
+            assert!((diagonal + out_flow).abs() < 1e-12);
+        }
+
+        // A transition matrix conserves mass: every row sums to zero.
+        for row in dense.row_iter() {
+            let sum: f64 = row.values().iter().sum();
+            assert!(sum.abs() < 1e-12, "row sum {} is not zero", sum);
+        }
+
+        assert_eq!(state.n_compartments(), 3);
+        assert_eq!(state.liquid.total_volume(), 7.0);
+        assert_eq!(state.liquid.inverse_volume, vec![1.0, 0.5, 0.25]);
+    }
+
+    #[test]
+    fn gas_phase_must_match_liquid_compartment_count() {
+        let state = IterationState::new(
+            synthetic_descriptor(),
+            Some(synthetic_descriptor()),
+            HashMap::new(),
+        );
+
+        assert_eq!(state.gas.unwrap().n_compartments(), 3);
+    }
 
     #[test]
     fn construct_itstate_liquid_only() {

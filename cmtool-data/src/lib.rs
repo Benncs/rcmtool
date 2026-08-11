@@ -5,6 +5,8 @@ mod descriptors;
 mod flowmap;
 mod rawdata;
 mod states;
+#[cfg(test)]
+mod test_utils;
 mod transitioner;
 pub use case::{
     CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter, DEFAULT_CASE_FILE_NAME, read_case,

@@ -92,6 +92,51 @@ impl FlowMapDescriptor {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_utils::chain_of_three;
+
+    fn check_shape(descriptor: &FlowMapDescriptor) {
+        assert!(!descriptor.volumes.is_empty());
+        assert!(descriptor.flowmap.is_square());
+        assert!(descriptor.volumes.len() == descriptor.flowmap.ncols());
+        assert!(descriptor.neighbors.nrows() == descriptor.flowmap.ncols());
+    }
+
+    #[test]
+    fn descriptor_from_synthetic_data() {
+        let (flow, volume) = chain_of_three();
+        let descriptor = FlowMapDescriptor::from_raw_data(&flow, &volume).unwrap();
+
+        check_shape(&descriptor);
+
+        // Flow map is indexed [from, to].
+        assert_eq!(descriptor.flowmap[[0, 1]], 1.0);
+        assert_eq!(descriptor.flowmap[[1, 0]], 0.5);
+        assert_eq!(descriptor.flowmap[[1, 2]], 2.0);
+        assert_eq!(descriptor.flowmap[[2, 1]], 0.25);
+        // No direct interface between the two ends of the chain.
+        assert_eq!(descriptor.flowmap[[0, 2]], 0.0);
+        assert_eq!(descriptor.flowmap[[2, 0]], 0.0);
+
+        assert_eq!(descriptor.volumes, vec![1.0, 2.0, 4.0]);
+
+        // Middle compartment has two neighbors, the ends have one plus a ghost.
+        let ghost = descriptor.volumes.len() + 1;
+        assert_eq!(descriptor.neighbors.ncols(), 2);
+        assert_eq!(descriptor.neighbors[[0, 0]], 1);
+        assert_eq!(descriptor.neighbors[[0, 1]], ghost);
+        assert_eq!(descriptor.neighbors[[1, 0]], 0);
+        assert_eq!(descriptor.neighbors[[1, 1]], 2);
+        assert_eq!(descriptor.neighbors[[2, 0]], 1);
+        assert_eq!(descriptor.neighbors[[2, 1]], ghost);
+    }
+
+    #[test]
+    fn descriptor_rejects_mismatched_zone_count() {
+        let (flow, _) = chain_of_three();
+        let short_volume = vec![1.0, 2.0].into();
+
+        assert!(FlowMapDescriptor::from_raw_data(&flow, &short_volume).is_err());
+    }
 
     #[test]
     fn read_descriptor() {
@@ -102,10 +147,7 @@ mod test {
         if let (Ok(flow_cma), Ok(volume_cma)) = (_flow_cma, _volume_cma) {
             let descriptor = FlowMapDescriptor::from_path(flow_cma, volume_cma).unwrap();
 
-            assert!(!descriptor.volumes.is_empty());
-            assert!(descriptor.flowmap.is_square());
-            assert!(descriptor.volumes.len() == descriptor.flowmap.ncols());
-            assert!(descriptor.neighbors.nrows() == descriptor.flowmap.ncols());
+            check_shape(&descriptor);
         }
     }
 }
