@@ -93,7 +93,7 @@ pub trait FlowMapTransitioner {
         Self: Sized,
     {
         let buffer = if case.is_recursive {
-            let folders = case.get_folders(root);
+            let folders = case.get_folders(root)?;
 
             let mut buffers = Vec::new();
             for folder in folders.iter() {

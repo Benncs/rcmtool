@@ -93,6 +93,7 @@ impl CMCase {
         if self.is_recursive {
             Some(
                 self.get_folders(root)
+                    .ok()?
                     .iter()
                     .map(|folder_name| {
                         Path::new(root)
@@ -116,34 +117,24 @@ impl CMCase {
         self
     }
 
-    pub fn get_folders(&self, root: &str) -> Vec<String> {
-        let mut folders: Vec<String> = std::fs::read_dir(root)
-            .unwrap()
+    /// Lists the `i_<n>` sub-folders of `root`, ordered by `<n>`.
+    ///
+    /// # Errors
+    /// Returns `DataError::IO` if `root` cannot be read (missing, not a
+    /// directory, no permission).
+    pub fn get_folders(&self, root: &str) -> Result<Vec<String>, DataError> {
+        let mut folders: Vec<(usize, String)> = std::fs::read_dir(root)?
             .filter_map(|entry| {
-                if let Ok(dir) = entry {
-                    let file_name = dir.file_name();
-                    let file_name_str = file_name.to_string_lossy();
-                    if let Some(index_str) = file_name_str.strip_prefix("i_") {
-                        if index_str.parse::<usize>().is_ok() {
-                            Some(file_name_str.to_string())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+                let dir = entry.ok()?;
+                let file_name = dir.file_name();
+                let file_name_str = file_name.to_string_lossy();
+                let index: usize = file_name_str.strip_prefix("i_")?.parse().ok()?;
+                Some((index, file_name_str.to_string()))
             })
             .collect();
 
-        folders.sort_by(|a, b| {
-            let index_a: usize = a.trim_start_matches("i_").parse().unwrap_or(0);
-            let index_b: usize = b.trim_start_matches("i_").parse().unwrap_or(0);
-            index_a.cmp(&index_b)
-        });
-        folders
+        folders.sort_by_key(|(index, _)| *index);
+        Ok(folders.into_iter().map(|(_, name)| name).collect())
     }
 
     fn check(&self) -> bool {
@@ -269,19 +260,22 @@ impl CMCaseReader for CCMCaseInfo {
     fn read_case(path: &Path) -> Result<CMCase, DataError> {
         //C Caseformat do not have recursive flag, manual detection here:
 
-        let root = path.parent().unwrap();
-        let is_recursive = if root.is_dir() {
-            std::fs::read_dir(root).unwrap().any(|entry| {
-                if let Ok(dir) = entry {
-                    let file_name = dir.file_name();
-                    let file_name_str = file_name.to_string_lossy();
-                    return file_name_str.starts_with("i_");
-                }
-                false
-            })
-        } else {
-            false
+        // `parent()` is `None` only for a root path, and `Some("")` for a bare
+        // file name — both mean "the current directory" here.
+        let root = match path.parent() {
+            Some(p) if !p.as_os_str().is_empty() => p,
+            _ => Path::new("."),
         };
+        let is_recursive = std::fs::read_dir(root)
+            .map(|entries| {
+                entries.flatten().any(|dir| {
+                    dir.file_name()
+                        .to_string_lossy()
+                        .strip_prefix("i_")
+                        .is_some_and(|index| index.parse::<usize>().is_ok())
+                })
+            })
+            .unwrap_or(false);
 
         let file = fs::File::open(path)?;
         let mut buffer = BufReader::new(file);
@@ -493,6 +487,34 @@ mod test {
         let path = Path::new("test_case_common.json");
         common_write_read_test::<CMCaseJson>(path).expect("Common write-read test failed");
         remove_file(path).expect("Failed to remove test file");
+    }
+
+    #[test]
+    fn get_folders_on_missing_root_is_an_error() {
+        let case = CMCase::new([1, 1, 1], 1., None, true);
+
+        assert!(case.get_folders("./this_directory_does_not_exist").is_err());
+        assert!(
+            case.resolve_all("./this_directory_does_not_exist", CMAExportType::LiquidFlow)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn get_folders_is_ordered_numerically() {
+        let root = std::env::temp_dir().join("cmtool_get_folders_test");
+        let _ = std::fs::remove_dir_all(&root);
+        // Created out of order, and with decoys that must be skipped.
+        for name in ["i_10", "i_2", "i_0", "i_notanumber", "raw"] {
+            std::fs::create_dir_all(root.join(name)).unwrap();
+        }
+
+        let case = CMCase::new([1, 1, 1], 1., None, true);
+        let folders = case.get_folders(root.to_str().unwrap()).unwrap();
+
+        assert_eq!(folders, vec!["i_0", "i_2", "i_10"]);
+
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     /// The legacy binary reader used to build its strings with
