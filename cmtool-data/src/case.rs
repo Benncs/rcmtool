@@ -22,7 +22,13 @@ pub struct CMCase {
     pub description: String,
     pub time_per_flow_map: f64,
     paths: HashMap<CMAExportType, String>,
-    pub is_reursive: bool,
+    /// Whether the case is spread over sibling `i_0/`, `i_1/`, … folders.
+    ///
+    /// The serialized name is misspelled (`is_reursive`) and is kept as-is for
+    /// backwards compatibility with every case file already written; the
+    /// correctly spelled `is_recursive` is accepted on read as well.
+    #[serde(rename = "is_reursive", alias = "is_recursive")]
+    pub is_recursive: bool,
 }
 
 impl std::fmt::Display for CMCase {
@@ -49,7 +55,7 @@ impl std::fmt::Display for CMCase {
         writeln!(
             f,
             "  - Recursive: {}",
-            if self.is_reursive { "Yes" } else { "No" }
+            if self.is_recursive { "Yes" } else { "No" }
         )?;
         Ok(())
     }
@@ -66,7 +72,7 @@ impl CMCase {
     }
 
     pub fn toggle_recursive(&mut self) {
-        self.is_reursive = !self.is_reursive;
+        self.is_recursive = !self.is_recursive;
     }
 
     pub fn is_two_phase_flow(&self) -> bool {
@@ -84,7 +90,7 @@ impl CMCase {
 
     pub fn resolve_all(&self, root: &str, stype: CMAExportType) -> Option<Vec<String>> {
         let rel = self.paths.get(&stype)?;
-        if self.is_reursive {
+        if self.is_recursive {
             Some(
                 self.get_folders(root)
                     .iter()
@@ -174,7 +180,7 @@ impl CMCase {
         Self {
             n_div,
             time_per_flow_map,
-            is_reursive: recursive,
+            is_recursive: recursive,
             description,
             paths: HashMap::new(),
         }
@@ -451,7 +457,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
-            is_reursive: false,
+            is_recursive: false,
         };
 
         T::write_case(case, path).map_err(|_| ())?;
@@ -470,7 +476,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
-            is_reursive: false,
+            is_recursive: false,
         };
 
         CMCaseJson::write_case(case, path).expect("Failed to write case");
@@ -487,5 +493,29 @@ mod test {
         let path = Path::new("test_case_common.json");
         common_write_read_test::<CMCaseJson>(path).expect("Common write-read test failed");
         remove_file(path).expect("Failed to remove test file");
+    }
+
+    /// The `is_recursive` field is serialized under its historical misspelling,
+    /// so already-written case files keep loading.
+    #[test]
+    fn recursive_flag_keeps_its_legacy_wire_name() {
+        let mut case = CMCase::new([1, 1, 1], 1., None, false);
+        case.toggle_recursive();
+        assert!(case.is_recursive);
+
+        let json = serde_json::to_string(&case).unwrap();
+        assert!(json.contains("\"is_reursive\":true"), "{}", json);
+
+        let legacy: CMCase = serde_json::from_str(
+            r#"{"n_div":[1,1,1],"description":"d","time_per_flow_map":1.0,"paths":{},"is_reursive":true}"#,
+        )
+        .unwrap();
+        assert!(legacy.is_recursive);
+
+        let renamed: CMCase = serde_json::from_str(
+            r#"{"n_div":[1,1,1],"description":"d","time_per_flow_map":1.0,"paths":{},"is_recursive":true}"#,
+        )
+        .unwrap();
+        assert!(renamed.is_recursive);
     }
 }
