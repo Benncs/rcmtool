@@ -304,7 +304,7 @@ impl CMCaseReader for CCMCaseInfo {
 
         let mut string_buf = vec![0; string_size as usize];
         buffer.read_exact(&mut string_buf)?;
-        case.description = unsafe { String::from_utf8_unchecked(string_buf) };
+        case.description = String::from_utf8(string_buf).map_err(|_| DataError::BadData)?;
 
         buffer.read_exact(&mut buffer_8bytes)?;
 
@@ -323,7 +323,7 @@ impl CMCaseReader for CCMCaseInfo {
 
             let mut string_buf = vec![0; string_size as usize];
             buffer.read_exact(&mut string_buf)?;
-            let value = unsafe { String::from_utf8_unchecked(string_buf) };
+            let value = String::from_utf8(string_buf).map_err(|_| DataError::BadData)?;
 
             case.paths.insert(key, value);
         }
@@ -493,6 +493,31 @@ mod test {
         let path = Path::new("test_case_common.json");
         common_write_read_test::<CMCaseJson>(path).expect("Common write-read test failed");
         remove_file(path).expect("Failed to remove test file");
+    }
+
+    /// The legacy binary reader used to build its strings with
+    /// `from_utf8_unchecked`, which made a corrupt file undefined behaviour.
+    #[test]
+    fn c_compatible_rejects_invalid_utf8() {
+        let path = std::env::temp_dir().join("cmtool_bad_utf8_cma_case");
+
+        let mut bytes = Vec::new();
+        for div in [6u32, 6, 12] {
+            bytes.extend_from_slice(&div.to_le_bytes());
+        }
+        let description = [0xff_u8, 0xfe, 0xfd, 0xfc]; // not valid UTF-8
+        bytes.extend_from_slice(&(description.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&description);
+        bytes.extend_from_slice(&0f64.to_le_bytes());
+        bytes.extend_from_slice(&0u64.to_le_bytes()); // empty path map
+        std::fs::write(&path, &bytes).unwrap();
+
+        assert!(matches!(
+            CCMCaseInfo::read_case(&path),
+            Err(DataError::BadData)
+        ));
+
+        remove_file(&path).unwrap();
     }
 
     /// The `is_recursive` field is serialized under its historical misspelling,
