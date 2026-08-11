@@ -41,9 +41,17 @@ impl From<PhaseCM> for String {
     }
 }
 
-impl From<String> for PhaseCM {
-    fn from(_value: String) -> Self {
-        todo!()
+/// Parses a phase from either its long name (`liquid`, `gas`) or its
+/// [`PhaseCM::identifier`] (`L`, `G`), ignoring case.
+impl std::str::FromStr for PhaseCM {
+    type Err = crate::DataError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "liquid" | "l" => Ok(Self::Liquid),
+            "gas" | "g" => Ok(Self::Gas),
+            _ => Err(crate::DataError::BadData),
+        }
     }
 }
 
@@ -130,5 +138,24 @@ impl From<i8> for CMAExportType {
             6 => CMAExportType::Other,
             _ => panic!("Invalid value for CMAExportType: {}", value),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn phase_string_format() {
+        for phase in [PhaseCM::Liquid, PhaseCM::Gas] {
+            let long: String = phase.into();
+            assert_eq!(long.parse::<PhaseCM>().unwrap(), phase);
+            assert_eq!(phase.identifier().parse::<PhaseCM>().unwrap(), phase);
+        }
+
+        assert_eq!("  GAS ".parse::<PhaseCM>().unwrap(), PhaseCM::Gas);
+        assert_eq!("l".parse::<PhaseCM>().unwrap(), PhaseCM::Liquid);
+        assert!("solid".parse::<PhaseCM>().is_err());
+        assert!("".parse::<PhaseCM>().is_err());
     }
 }
