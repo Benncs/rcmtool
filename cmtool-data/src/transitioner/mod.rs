@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::{CMCase, DataError, states::IterationState};
 use std::sync::Arc;
 mod buffer;
