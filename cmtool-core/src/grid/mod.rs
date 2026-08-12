@@ -645,9 +645,9 @@ impl CompartmentMeshManip for MeshCylindrical {
             .map(|(ax, cell_p)| ax.edges[cell_p + 1] - ax.edges[*cell_p])
             .collect();
 
-        let min_max = if points_indices[0] == 0 { 1 } else { 0 };
-
-        let r = self.axes[0].edges[points_indices[0] + min_max];
+        //The radial face of a cell sits on its outer edge, which is where get_interface_plane
+        //places the interface as well
+        let r = self.axes[0].edges[points_indices[0] + 1];
         match i_axis {
             CylindricalAxis::R => r * delta_ijk[1] * delta_ijk[2], // ds=r*dtheta*dz
             CylindricalAxis::Theta => delta_ijk[0] * delta_ijk[2], // ds = dr*dz

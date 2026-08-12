@@ -118,6 +118,33 @@ mod test {
         );
     }
 
+    ///Every cell takes its outer edge for the radial face, not only the one touching the axis
+    #[test]
+    fn t_cell_surface_cylindrical_outer_ring() {
+        let n_r = 10;
+        let ax1 = AxisDescriptor::new(0., 4., n_r);
+        let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, 10);
+        let ax3 = AxisDescriptor::new(0., 2., 10);
+
+        let mesh = get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3]);
+
+        let dr = 4. / n_r as f64;
+        let dtheta = 2. * std::f64::consts::PI / 10.;
+        let dz = 2. / 10.;
+
+        //Third ring, its radial face sits at r = 3 * dr
+        let cell_id = mesh.cell_from_ax_points(&[2, 0, 0]).expect("cell");
+        let expected_surface = 3. * dr * dtheta * dz;
+        let actual_surface = mesh.cell_surface(cell_id, OrientedAxis::I);
+
+        assert!(
+            (actual_surface - expected_surface).abs() < 1e-10,
+            "Radial face surface incorrect: got {}, expected {}",
+            actual_surface,
+            expected_surface
+        );
+    }
+
     #[test]
     fn t_cell_volume_cylindrical() {
         let ax1 = AxisDescriptor::new(0., 4., 10);
