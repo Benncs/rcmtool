@@ -238,14 +238,26 @@ impl CMHandle {
         Vector::from_scalar([s, sj, sk], &self.cm_geometry, &self.eg_geometry)
     }
 
+    ///Volume of each compartment, as covered by the mesh
+    pub fn real_volume(&self) -> Vec<f64> {
+        self.model.get_real_volume()
+    }
+
+    ///Flow map out of the three components of a velocity, optionally scaled by the volume
+    ///fraction of its phase: a phase only carries its own share of the flow
     pub fn dump_vector_from_scalar(
         &self,
         res_name: impl AsRef<std::path::Path>,
         path_i: impl AsRef<std::path::Path>,
         path_j: impl AsRef<std::path::Path>,
         path_k: impl AsRef<std::path::Path>,
+        phase_fraction: Option<Scalar>,
     ) -> Result<RawDataFlux, CoreError> {
         let vector = self.vector_from_scalar(path_i, path_j, path_k)?;
+        let vector = match phase_fraction {
+            Some(fraction) => vector.scale_by(fraction)?,
+            None => vector,
+        };
         let flow_data = self
             .model
             .compute_flux_between_compartments(vector, &self.balance)?;

@@ -29,9 +29,30 @@ pub struct CommonArgs {
 
 #[derive(Parser, Default, Clone)]
 pub struct ManualArgs {
+    /// Root directory of the CFD case
     pub root: String,
+
+    /// Geometry file, relative to the root
     pub geo_file: String,
+
+    /// The three scalar files holding the components of the liquid velocity
+    #[clap(long, value_delimiter = ',')]
+    pub liquid: Vec<String>,
+
+    /// The three scalar files holding the components of the gas velocity
+    #[clap(long, value_delimiter = ',')]
+    pub gas: Vec<String>,
+
+    /// Scalar file holding the gas volume fraction, used to split the phases
+    #[clap(long)]
+    pub gas_fraction: Option<String>,
+
+    /// Scalar file to integrate over each compartment, repeatable
+    #[clap(long = "scalar")]
     pub scalars: Vec<String>,
+
+    /// Vector file to turn into a flow map, repeatable
+    #[clap(long = "vector")]
     pub vectors: Vec<String>,
 }
 
@@ -64,6 +85,8 @@ pub struct XMLGenerate {
 }
 
 #[derive(Subcommand, Clone)]
+//Command line arguments, parsed once: the size of a variant does not matter here
+#[allow(clippy::large_enum_variant)]
 pub enum AllModes {
     Cfd(CfdGenerate),
     Xml(XMLGenerate),
