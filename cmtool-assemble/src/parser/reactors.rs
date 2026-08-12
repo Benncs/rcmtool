@@ -21,7 +21,7 @@ fn connection_per_phase(
     mass_balance: &mut PfrGlobalMassBalance,
     phase_node: &[generated_domain::FluxType],
     phase: PhaseCM,
-) -> cmtool_data::RawDataFlux {
+) -> Result<cmtool_data::RawDataFlux, CMError> {
     let n_node = phase_node.len();
 
     let mut rd = RawDataFlux::new(info.total_number_compartment, n_node);
@@ -53,21 +53,24 @@ fn connection_per_phase(
                 }
             }
         } else {
-            eprintln!(
-                "Ignored connection src:{} {}",
-                node.source.id, node.target.id
-            );
-            panic!("TODO: Handle error when flux doesnt work")
+            //Either the reactor id is unknown or the compartment does not exist in it
+            return Err(CMError::Custom(format!(
+                "Connection {}[{}] -> {}[{}] does not resolve to a compartment of the domain",
+                node.source.id,
+                node.source.compartment_id,
+                node.target.id,
+                node.target.compartment_id
+            )));
         }
     }
-    rd
+    Ok(rd)
 }
 
 pub fn parse_connection(
     info: &DomainInfo,
     connections: &generated_domain::ConnectionsType,
     mass_balance: &mut PfrGlobalMassBalance,
-) -> [RawDataFlux; 2] {
+) -> Result<[RawDataFlux; 2], CMError> {
     let liquid_connection: Vec<generated_domain::FluxType> = connections
         .flux
         .iter()
@@ -82,10 +85,10 @@ pub fn parse_connection(
         .cloned()
         .collect();
 
-    [
-        connection_per_phase(info, mass_balance, &liquid_connection, PhaseCM::Liquid),
-        connection_per_phase(info, mass_balance, &gas_connection, PhaseCM::Gas),
-    ]
+    Ok([
+        connection_per_phase(info, mass_balance, &liquid_connection, PhaseCM::Liquid)?,
+        connection_per_phase(info, mass_balance, &gas_connection, PhaseCM::Gas)?,
+    ])
 }
 
 ///Flux type is a "derivated" type of flux with all flux information + the flow value
@@ -106,14 +109,15 @@ fn parse_feed_phase(
     feeds: &[&FeedFluxType],
     phase: PhaseCM,
     mass_balance: &mut PfrGlobalMassBalance,
-) -> HashMap<String, FeedFlow> {
+) -> Result<HashMap<String, FeedFlow>, CMError> {
     let fluxes: Vec<generated_domain::FluxType> =
         feeds.iter().map(|&feed| FluxType::from(feed)).collect();
 
     let id: Vec<String> = feeds.iter().map(|feed| feed.id.clone()).collect();
-    let rd = connection_per_phase(info, mass_balance, &fluxes, phase);
+    let rd = connection_per_phase(info, mass_balance, &fluxes, phase)?;
 
-    rd.fluxes
+    Ok(rd
+        .fluxes
         .iter()
         .zip(id)
         .map(|(flux, id)| {
@@ -126,26 +130,23 @@ fn parse_feed_phase(
                 },
             )
         })
-        .collect()
+        .collect())
 }
 
 pub fn parse_feed(
     info: &DomainInfo,
     feeds: &generated_domain::FeedsType,
     mass_balance: &mut PfrGlobalMassBalance,
-) -> Option<ParsedFeeds> {
-    let (liquid_feeds, gas_feeds): (Vec<_>, Vec<_>) = feeds
-        .flux
-        .iter()
-        .partition(|f| f.phase == *"liquid")
-        .clone();
+) -> Result<Option<ParsedFeeds>, CMError> {
+    let (liquid_feeds, gas_feeds): (Vec<_>, Vec<_>) =
+        feeds.flux.iter().partition(|f| f.phase == *"liquid");
     if liquid_feeds.is_empty() && gas_feeds.is_empty() {
-        return None;
+        return Ok(None);
     }
-    Some(ParsedFeeds {
-        liq: parse_feed_phase(info, &liquid_feeds, PhaseCM::Liquid, mass_balance),
-        gas: parse_feed_phase(info, &gas_feeds, PhaseCM::Gas, mass_balance),
-    })
+    Ok(Some(ParsedFeeds {
+        liq: parse_feed_phase(info, &liquid_feeds, PhaseCM::Liquid, mass_balance)?,
+        gas: parse_feed_phase(info, &gas_feeds, PhaseCM::Gas, mass_balance)?,
+    }))
 }
 
 pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<DomainInfo, CMError> {

@@ -280,6 +280,63 @@ mod test {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    ///A typo in a connection id used to abort the process
+    #[test]
+    fn test_unknown_connection_id() {
+        let root = "/tmp/test_unknown_connection_id";
+        let xml = r#"<?xml version="1.0"?>
+<Root run_id="typo" version="3">
+  <Reactors>
+    <Reactor0D id="str">
+      <Size>
+        <Volume>5</Volume>
+      </Size>
+      <VolumeFraction>0</VolumeFraction>
+    </Reactor0D>
+  </Reactors>
+  <Connections>
+    <Flux phase="liquid">
+      <Source id="str" compartment_id="0"></Source>
+      <Target id="typo_here" compartment_id="0"></Target>
+      <Value unit="l/min">2</Value>
+    </Flux>
+  </Connections>
+</Root>"#;
+
+        let error = match crate::generate_and_write_domain(root, xml) {
+            Ok(_) => panic!("an unknown connection id must not generate"),
+            Err(error) => error.to_string(),
+        };
+        let _ = std::fs::remove_dir_all(root);
+
+        assert!(error.contains("typo_here"), "{}", error);
+    }
+
+    ///An unsupported schema version used to panic with "ALED"
+    #[test]
+    fn test_unsupported_version() {
+        let root = "/tmp/test_unsupported_version";
+        let xml = r#"<?xml version="1.0"?>
+<Root run_id="old" version="2">
+  <Reactors>
+    <Reactor0D id="str">
+      <Size>
+        <Volume>5</Volume>
+      </Size>
+      <VolumeFraction>0</VolumeFraction>
+    </Reactor0D>
+  </Reactors>
+</Root>"#;
+
+        let error = match crate::generate_and_write_domain(root, xml) {
+            Ok(_) => panic!("version 2 is not supported"),
+            Err(error) => error.to_string(),
+        };
+        let _ = std::fs::remove_dir_all(root);
+
+        assert!(error.contains("version"), "{}", error);
+    }
+
     ///A gas fraction outside [0, 1] used to panic in Reactor0DDescriptor::from_fraction
     #[test]
     fn test_invalid_gas_fraction() {

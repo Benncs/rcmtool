@@ -16,6 +16,9 @@ mod pfr_mb;
 use crate::ConnectionType;
 pub(super) use pfr_mb::PfrGlobalMassBalance;
 
+///Schema version of datamodel/main.xsd
+const EXPECTED_VERSION: i32 = 3;
+
 pub fn parse_domain(
     root: &generated_domain::RootElementType,
 ) -> Result<(DomainData, PfrGlobalMassBalance, Option<ConnectionType>), CMError> {
@@ -32,11 +35,12 @@ pub fn parse_domain(
     let raw_connections = root
         .connections
         .as_ref()
-        .map(|connections| parse_connection(&info, connections, &mut mass_balance));
+        .map(|connections| parse_connection(&info, connections, &mut mass_balance))
+        .transpose()?;
 
     let mut pfeeds = None;
     if let Some(feeds) = &root.feeds {
-        pfeeds = parse_feed(&info, feeds, &mut mass_balance);
+        pfeeds = parse_feed(&info, feeds, &mut mass_balance)?;
     }
     mass_balance.validate()?;
     let run_id = root.run_id.clone();
@@ -55,8 +59,11 @@ pub fn parse_domain(
 pub fn get_root(content: &str) -> Result<generated_domain::Root, CMError> {
     let root = serde_xml_rs::from_str::<generated_domain::Root>(content)?;
     eprintln!("WARNING: Some reactor may miss if xml is not parsed correctly");
-    if root.version != 3 {
-        panic!("ALED");
+    if root.version != EXPECTED_VERSION {
+        return Err(CMError::Custom(format!(
+            "Root version {} is not supported, expected {}",
+            root.version, EXPECTED_VERSION
+        )));
     }
     Ok(root)
 }
