@@ -150,7 +150,6 @@ pub fn parse_feed(
 
 pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<DomainInfo, CMError> {
     let mut domain_info = DomainInfo::default();
-    let mut cm_case_only = None;
     let mut in_place_cumsum = 0;
     //don't forget to |=
     for reactor in &reactors.content {
@@ -184,20 +183,12 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
                 domain_info.is_two_phase_flow |= case.is_two_phase_flow();
                 domain_info.total_number_compartment += n_c;
                 in_place_cumsum += n_c;
-
-                if cm_case_only.is_none() {
-                    cm_case_only = Some(reactor_from_file.path.clone());
-                } else {
-                    todo!("Existing flowmap merge")
-                }
-                println!("{:?}", cm_case_only);
             }
             generated_domain::ReactorsTypeContent::Reactor3D(reactor3_dtype) => {
                 todo!("{:?}", reactor3_dtype)
             }
         }
     }
-    domain_info.cm_case_only = cm_case_only;
     Ok(domain_info)
 }
 
