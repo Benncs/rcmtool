@@ -33,11 +33,8 @@ impl RawDataScalarWrapper {
     }
 
     pub fn write(&self, path: &str) -> PyResult<()> {
-        if self.0.write_raw(path).is_ok() {
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Scalar not found"))
-        }
+        self.0.write_raw(path).map_err(PythonError::from)?;
+        Ok(())
     }
 }
 
@@ -113,11 +110,8 @@ impl RawDataFluxWrapper {
     }
 
     pub fn write(&self, path: &str) -> PyResult<()> {
-        if self.0.write_raw(path).is_ok() {
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Vector not found"))
-        }
+        self.0.write_raw(path).map_err(PythonError::from)?;
+        Ok(())
     }
 }
 

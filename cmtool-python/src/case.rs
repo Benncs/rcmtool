@@ -25,9 +25,10 @@ impl From<CMExportTypeWrapper> for cmtool_data::CMAExportType {
             CMExportTypeWrapper::LiquidFlow => Self::LiquidFlow,
             CMExportTypeWrapper::GasFlow => Self::GasFlow,
             CMExportTypeWrapper::LiquidVolume => Self::LiquidVolume,
+            CMExportTypeWrapper::GasVolume => Self::GasVolume,
             CMExportTypeWrapper::EnergyDissipation => Self::EnergyDissipation,
             CMExportTypeWrapper::Kla => Self::Kla,
-            _ => Self::Other,
+            CMExportTypeWrapper::Other => Self::Other,
         }
     }
 }
