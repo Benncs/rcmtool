@@ -5,7 +5,7 @@
 
 use crate::{
     CoreError,
-    coordinates::{CartesianCoordinates, CartesianVec3, Coords3},
+    coordinates::{CartesianCoordinates, CartesianVec3},
     errors::ModelError,
     model::{
         compartments::{CompartmentInfo, CountVolumeElement, ElementVolumeInfo},
@@ -181,27 +181,17 @@ impl CMModel {
         todo!()
     }
 
-    fn get_average_velocity(
-        &self,
-        vector: &Vector,
-        _curent_inteface_element: &[usize],
-        __curent_inteface_area: &[f64],
-    ) -> Coords3 {
-        let total_area: f64 = __curent_inteface_area.iter().sum();
-        _curent_inteface_element
-            .iter()
-            .zip(__curent_inteface_area)
-            .fold([0.0f64; 3], |acc, (gid, a)| {
-                let v = CartesianVec3(vector.get_slice_xyz(*gid).to_owned());
-                let CartesianCoordinates(centroid) = self.geometry.volume_elements.xyz[*gid];
-                let theta = centroid[1].atan2(centroid[0]);
-                let cyl = v.to_cylindrical_vec(theta).0;
-                [
-                    acc[0] + cyl[0] * a / total_area,
-                    acc[1] + cyl[1] * a / total_area,
-                    acc[2] + cyl[2] * a / total_area,
-                ]
-            })
+    ///Velocity of one element along the normal of the interface it crosses.
+    ///
+    ///The velocity stays a vector up to here and is projected on the *local* normal: on a radial
+    ///or theta face the normal turns with theta, so it has to be taken at the position of the
+    ///element and not once for the whole interface.
+    fn normal_velocity(&self, vector: &Vector, element_global_id: usize, axis: usize) -> f64 {
+        let velocity = CartesianVec3(*vector.get_slice_xyz(element_global_id));
+        let CartesianCoordinates(centroid) = self.geometry.volume_elements.xyz[element_global_id];
+        let theta = centroid[1].atan2(centroid[0]);
+
+        velocity.to_cylindrical_vec(theta).0[axis]
     }
 
     pub fn compute_flux_between_compartments(
@@ -211,29 +201,27 @@ impl CMModel {
         let n_fluxes = self.interfaces.n_interfaces();
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
 
+        //Flux of an interface is the surface integral of the velocity over the area the elements
+        //really cover, element by element: sum(a_e * v_e.n_e). Taking an average velocity times
+        //the geometric face instead would count area the vessel does not have, which is what
+        //inflates the flow of the compartments sitting on its boundary.
+        //
+        //Both directions are accumulated separately, so a counter current inside one interface is
+        //kept as gross exchange and neither direction can come out negative.
         for (i_interface, flow) in flows.iter_mut().enumerate() {
             let axis: usize = self.interfaces.normal_axis[i_interface];
+            let areas = &self.interfaces.area[i_interface];
+            let elements = &self.interfaces.global_id_from_interface[i_interface];
 
-            let axis_oriented = crate::grid::index_to_oriented(axis);
+            for (&element_global_id, area) in elements.iter().zip(areas) {
+                let f = area * self.normal_velocity(&vector, element_global_id, axis);
 
-            let source_id = self.interfaces.ids[i_interface].source_id;
-            let theoretical_area = self
-                .geometry
-                .get_grid()
-                .unwrap()
-                .cell_surface(source_id, axis_oriented);
-
-            let current_interface_area = &self.interfaces.area[i_interface];
-            let curent_inteface_element = &self.interfaces.global_id_from_interface[i_interface];
-            let v_avg =
-                self.get_average_velocity(&vector, curent_inteface_element, current_interface_area);
-
-            let f = v_avg[axis] * theoretical_area;
-
-            if f > 0. {
-                flow.source_flow += f
-            } else if f < 0. {
-                flow.target_flow += f.abs()
+                //The normal of the interface points from its source to its target
+                if f > 0. {
+                    flow.source_flow += f;
+                } else {
+                    flow.target_flow -= f;
+                }
             }
         }
 
