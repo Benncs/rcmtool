@@ -82,7 +82,6 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
             unimplemented!("pfr needs length")
         }
         generated_domain::GeneralSizeType::Dimension(dim) => {
-            eprintln!("TODO: PFR GENERATION W/O FLOW RATES");
             let desc = PFRDescription::new(
                 current_pfr.compartments.get(),
                 dim.length.content,
@@ -92,7 +91,13 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
                 current_pfr.volume_fraction.content,
                 1e-9,
             )
-            .map_err(|e| CMError::Custom(format!("Invalid PFR descritor {}", e)))?;
+            //Flow comes from the Feeds/Connections of the reactor, a PFR without any is invalid
+            .map_err(|e| {
+                CMError::Custom(format!(
+                    "Invalid PFR descriptor of reactor '{}': {}, check the Feeds and Connections declaring its flow",
+                    current_pfr.id, e
+                ))
+            })?;
 
             let case: cmtool_data::CMCase = generator.generate_1d(desc, opt_path)?;
             if let Some(p) = &path {
@@ -271,6 +276,38 @@ mod test {
         assert_eq!(domain.info().total_number_compartment, 2);
 
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    ///A PFR gets its flow from the Feeds/Connections, without any it is invalid and the error
+    ///has to name the reactor
+    #[test]
+    fn test_pfr_without_feed() {
+        let root = "/tmp/test_pfr_without_feed";
+        let xml = r#"<?xml version="1.0"?>
+<Root run_id="no_feed" version="3">
+  <Reactors>
+    <Reactor1D id="pfr">
+      <Size>
+        <Dimension>
+          <Diameter unit="m">0.01</Diameter>
+          <Length unit="m">1</Length>
+        </Dimension>
+      </Size>
+      <VolumeFraction>0</VolumeFraction>
+      <Compartments>4</Compartments>
+      <Dispersion unit="m^2/s">0</Dispersion>
+    </Reactor1D>
+  </Reactors>
+</Root>"#;
+
+        let error = match crate::generate_and_write_domain(root, xml) {
+            Ok(_) => panic!("a PFR without flow must not generate"),
+            Err(error) => error.to_string(),
+        };
+        let _ = std::fs::remove_dir_all(root);
+
+        assert!(error.contains("pfr"), "{}", error);
+        assert!(error.contains("Feeds"), "{}", error);
     }
 
     ///A liquid-only reactor of a two-phase domain keeps its gas compartments, otherwise every
