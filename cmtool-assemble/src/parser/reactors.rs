@@ -152,7 +152,7 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
     let mut domain_info = DomainInfo::default();
     let mut cm_case_only = None;
     let mut in_place_cumsum = 0;
-
+    //don't forget to |=
     for reactor in &reactors.content {
         match reactor {
             generated_domain::ReactorsTypeContent::Reactor0D(reactor0_dtype) => {
@@ -161,7 +161,7 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
                     .insert(reactor0_dtype.id.clone(), in_place_cumsum);
                 domain_info.total_number_compartment += 1;
                 in_place_cumsum += 1;
-                domain_info.is_two_phase_flow = reactor0_dtype.volume_fraction.content != 0.;
+                domain_info.is_two_phase_flow |= reactor0_dtype.volume_fraction.content != 0.;
             }
             generated_domain::ReactorsTypeContent::Reactor1D(current_pfr) => {
                 domain_info
@@ -169,7 +169,7 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
                     .insert(current_pfr.id.clone(), in_place_cumsum);
                 let n_c = current_pfr.compartments;
                 domain_info.total_number_compartment += n_c.get();
-                domain_info.is_two_phase_flow = current_pfr.volume_fraction.content != 0.;
+                domain_info.is_two_phase_flow |= current_pfr.volume_fraction.content != 0.;
                 domain_info.pfr_names.push(current_pfr.id.clone());
                 in_place_cumsum += n_c.get();
             }
@@ -181,7 +181,7 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
                     .compartment_cumsum
                     .insert(reactor_from_file.id.clone(), in_place_cumsum);
                 let n_c = case.n_compartment() as usize;
-                domain_info.is_two_phase_flow = case.is_two_phase_flow();
+                domain_info.is_two_phase_flow |= case.is_two_phase_flow();
                 domain_info.total_number_compartment += n_c;
                 in_place_cumsum += n_c;
 
@@ -199,4 +199,45 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
     }
     domain_info.cm_case_only = cm_case_only;
     Ok(domain_info)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn reactor_0d(id: &str, gas_fraction: f32) -> generated_domain::ReactorsTypeContent {
+        generated_domain::ReactorsTypeContent::Reactor0D(generated_domain::Reactor0DType {
+            id: id.to_owned(),
+            volume_fraction: generated_domain::VolumeFractionType {
+                phase: None,
+                content: gas_fraction,
+            },
+            size: generated_domain::GeneralSizeType::Volume(generated_domain::DimensionType {
+                unit: None,
+                content: 1.,
+            }),
+        })
+    }
+
+    ///A single gas reactor makes the whole domain two-phase, whatever follows it
+    #[test]
+    fn test_keep_two_phase_flow() {
+        let reactors = generated_domain::ReactorsType {
+            content: vec![reactor_0d("gas", 0.1), reactor_0d("liquid", 0.)],
+        };
+
+        let info = parse_reactor(&reactors).unwrap();
+
+        assert!(info.is_two_phase_flow);
+        assert_eq!(info.total_number_compartment, 2);
+    }
+
+    #[test]
+    fn liquid_only_domain_is_not_two_phase() {
+        let reactors = generated_domain::ReactorsType {
+            content: vec![reactor_0d("liquid_1", 0.), reactor_0d("liquid_2", 0.)],
+        };
+
+        assert!(!parse_reactor(&reactors).unwrap().is_two_phase_flow);
+    }
 }
