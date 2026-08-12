@@ -2,9 +2,11 @@
 
 use std::sync::Arc;
 
-use cmtool_data::{DiscontinuousTransitioner, FlowMapTransitioner};
+use cmtool_data::{DataError, DiscontinuousTransitioner, FlowMapTransitioner};
 use numpy::PyArray1;
 use pyo3::prelude::*;
+
+use crate::PythonError;
 
 #[pyclass(name = "DiscontinuousTransitioner")]
 pub struct DiscontinuousTransitionerWrapper(DiscontinuousTransitioner);
@@ -28,18 +30,22 @@ impl DiscontinuousTransitionerWrapper {
         self.0.size()
     }
 
-    fn get_at(&self, idx: usize) -> IterationStateWrapper {
-        if let Some(opt) = self.0.get_at(idx) {
-            IterationStateWrapper(opt)
-        } else {
-            panic!("TODO")
-        }
+    fn get_at(&self, idx: usize) -> PyResult<IterationStateWrapper> {
+        let state = self
+            .0
+            .get_at(idx)
+            .ok_or(PythonError(DataError::OutOfRange {
+                index: idx,
+                size: self.0.size(),
+            }))?;
+        Ok(IterationStateWrapper(state))
     }
 }
 
 #[pyclass(name = "IterationState", frozen)]
 pub struct IterationStateWrapper(Arc<cmtool_data::IterationState>);
 
+//Use raw pointer because used in hot loop
 #[pyclass(name = "HydroState", frozen)]
 pub struct HydroStateWrapper(*const cmtool_data::HydroState);
 
@@ -96,7 +102,8 @@ impl IterationStateWrapper {
 }
 
 #[pyfunction]
-pub fn get_transitioner(root: &str) -> DiscontinuousTransitionerWrapper {
-    let t: DiscontinuousTransitioner = cmtool_data::get_transitioner(root).unwrap();
-    DiscontinuousTransitionerWrapper(t)
+pub fn get_transitioner(root: &str) -> PyResult<DiscontinuousTransitionerWrapper> {
+    let t: DiscontinuousTransitioner =
+        cmtool_data::get_transitioner(root).map_err(PythonError::from)?;
+    Ok(DiscontinuousTransitionerWrapper(t))
 }

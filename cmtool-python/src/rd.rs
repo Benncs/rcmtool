@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use cmtool_data::DataError;
 use cmtool_data::FluxFileHeader;
 use cmtool_data::RawData;
 use cmtool_data::RawDataFlux;
@@ -10,6 +11,8 @@ use numpy::PyArray2;
 use numpy::PyUntypedArrayMethods;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+
+use crate::PythonError;
 /* Scalar */
 
 #[pyclass(name = "RawDataScalar", frozen)]
@@ -40,11 +43,9 @@ impl RawDataScalarWrapper {
 
 #[pyfunction]
 pub fn read_rawscalar(path: &str) -> PyResult<RawDataScalarWrapper> {
-    if let Some(sc) = cmtool_data::RawDataScalar::read_raw(path) {
-        Ok(RawDataScalarWrapper(sc))
-    } else {
-        Err(PyValueError::new_err("Scalar not found"))
-    }
+    let scalar =
+        cmtool_data::RawDataScalar::read_raw(path).ok_or(PythonError(DataError::BadData))?;
+    Ok(RawDataScalarWrapper(scalar))
 }
 
 #[pyfunction]
@@ -121,8 +122,9 @@ impl RawDataFluxWrapper {
 }
 
 #[pyfunction]
-pub fn read_rawflow(path: &str) -> RawDataFluxWrapper {
-    RawDataFluxWrapper(cmtool_data::RawDataFlux::read_raw(path).unwrap())
+pub fn read_rawflow(path: &str) -> PyResult<RawDataFluxWrapper> {
+    let flux = cmtool_data::RawDataFlux::read_raw(path).ok_or(PythonError(DataError::BadData))?;
+    Ok(RawDataFluxWrapper(flux))
 }
 
 // impl FromPyObject for &[RawFluxWrapper]
@@ -210,9 +212,13 @@ impl FlowMapDescriptorWrapper {
 }
 
 #[pyfunction]
-pub fn read_flowmap(_py: Python<'_>, path: &str, path_2: &str) -> FlowMapDescriptorWrapper {
-    let f = cmtool_data::RawDataFlux::read_raw(path).unwrap();
-    let v = cmtool_data::RawDataScalar::read_raw(path_2).unwrap();
-    let fm = cmtool_data::FlowMapDescriptor::from_raw_data(&f, &v).unwrap();
-    FlowMapDescriptorWrapper(fm)
+pub fn read_flowmap(
+    _py: Python<'_>,
+    path: &str,
+    path_2: &str,
+) -> PyResult<FlowMapDescriptorWrapper> {
+    let f = cmtool_data::RawDataFlux::read_raw(path).ok_or(PythonError(DataError::BadData))?;
+    let v = cmtool_data::RawDataScalar::read_raw(path_2).ok_or(PythonError(DataError::BadData))?;
+    let fm = cmtool_data::FlowMapDescriptor::from_raw_data(&f, &v).map_err(PythonError::from)?;
+    Ok(FlowMapDescriptorWrapper(fm))
 }

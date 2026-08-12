@@ -53,6 +53,10 @@ pub enum DataError {
 
     #[error("Data is illed-format")]
     BadData,
+
+    /// An index does not address any element of the accessed collection.
+    #[error("Index {index} is out of range, {size} element(s) available")]
+    OutOfRange { index: usize, size: usize },
 }
 
 #[inline(always)]
