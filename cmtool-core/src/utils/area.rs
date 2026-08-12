@@ -93,6 +93,9 @@ const MAX_POLYGON_VERTICES: usize = 12;
 ///Index of the radial axis, the only face of a cylindrical compartment that is not a plane
 const RADIAL_AXIS: usize = 0;
 
+///Index of the axial axis, whose face is flat but bounded by two arcs
+const AXIAL_AXIS: usize = 2;
+
 ///A radial face is a cylindrical patch, every other face of the compartment is flat
 pub fn is_curved_face(face: &BoundedPlane) -> bool {
     face.axis == RADIAL_AXIS
@@ -134,7 +137,7 @@ pub fn tangent_plane_at(
 ///Half spaces bounding the face of a compartment, when all of them are planes.
 ///So a radial and a theta face are exactly clippable by half spaces, an axial face is not: its
 ///r bounds are cylinders, and that case is left to the caller.
-fn planar_bounds(plane: &BoundedPlane) -> Option<Vec<HalfSpace>> {
+fn planar_bounds(plane: &BoundedPlane) -> Vec<HalfSpace> {
     let z_bounds = |z0: f64, z1: f64| {
         [
             HalfSpace {
@@ -165,13 +168,16 @@ fn planar_bounds(plane: &BoundedPlane) -> Option<Vec<HalfSpace>> {
         ])
     };
 
+    let mut bounds = Vec::with_capacity(4);
     match plane.axis {
         //Radial face: theta and z bounds
         0 => {
-            let mut bounds = Vec::with_capacity(4);
-            bounds.extend(theta_bounds(plane.extent_u[0], plane.extent_u[1])?);
+            bounds.extend(
+                theta_bounds(plane.extent_u[0], plane.extent_u[1])
+                    .into_iter()
+                    .flatten(),
+            );
             bounds.extend(z_bounds(plane.extent_v[0], plane.extent_v[1]));
-            Some(bounds)
         }
         //Theta face: radial and z bounds, the radial direction is the one of the face itself
         1 => {
@@ -179,7 +185,6 @@ fn planar_bounds(plane: &BoundedPlane) -> Option<Vec<HalfSpace>> {
             let theta = origin[1].atan2(origin[0]);
             let radial = CartesianVec3([theta.cos(), theta.sin(), 0.]);
 
-            let mut bounds = Vec::with_capacity(4);
             bounds.push(HalfSpace {
                 normal: radial,
                 offset: plane.extent_u[0],
@@ -189,11 +194,87 @@ fn planar_bounds(plane: &BoundedPlane) -> Option<Vec<HalfSpace>> {
                 offset: -plane.extent_u[1],
             });
             bounds.extend(z_bounds(plane.extent_v[0], plane.extent_v[1]));
-            Some(bounds)
         }
-        //Axial face: the radial bounds are cylinders
-        _ => None,
+        //Axial face: only the theta bounds are planes, the radial ones are arcs
+        _ => bounds.extend(
+            theta_bounds(plane.extent_v[0], plane.extent_v[1])
+                .into_iter()
+                .flatten(),
+        ),
     }
+
+    bounds
+}
+
+///Signed area of the intersection between the triangle (origin, a, b) and the disk of radius
+///`radius` centred on the origin.
+///
+///Summed over the edges of a polygon it gives the area of that polygon clipped to the disk, the
+///same way the shoelace formula sums signed triangles. A piece of edge running outside the disk
+///contributes its circular sector instead of its triangle:
+///
+///```text
+///        b
+///       /                 outside -> sector of the circle
+///   ---+---___            inside  -> plain triangle
+///  /  p2       \
+/// |     \       |
+/// |      p1     |
+///  \      \    /
+///   ---    a---
+///```
+fn triangle_disk_area(a: [f64; 2], b: [f64; 2], radius: f64) -> f64 {
+    let cross = |u: [f64; 2], v: [f64; 2]| u[0] * v[1] - u[1] * v[0];
+    let dot = |u: [f64; 2], v: [f64; 2]| u[0] * v[0] + u[1] * v[1];
+    //Area swept on the circle between two directions
+    let sector = |u: [f64; 2], v: [f64; 2]| 0.5 * radius * radius * cross(u, v).atan2(dot(u, v));
+
+    let edge = [b[0] - a[0], b[1] - a[1]];
+    let quadratic_a = dot(edge, edge);
+    if quadratic_a < f64::EPSILON {
+        return 0.;
+    }
+    let quadratic_b = 2. * dot(a, edge);
+    let quadratic_c = dot(a, a) - radius * radius;
+    let discriminant = quadratic_b * quadratic_b - 4. * quadratic_a * quadratic_c;
+
+    if discriminant <= 0. {
+        return sector(a, b);
+    }
+
+    let root = discriminant.sqrt();
+    let entering = (-quadratic_b - root) / (2. * quadratic_a);
+    let leaving = (-quadratic_b + root) / (2. * quadratic_a);
+
+    //The edge crosses the circle outside of its own span
+    if entering > 1. || leaving < 0. {
+        return sector(a, b);
+    }
+
+    let at = |t: f64| [a[0] + t * edge[0], a[1] + t * edge[1]];
+    let entering_point = at(entering.clamp(0., 1.));
+    let leaving_point = at(leaving.clamp(0., 1.));
+
+    sector(a, entering_point)
+        + 0.5 * cross(entering_point, leaving_point)
+        + sector(leaving_point, b)
+}
+
+///Area of a polygon of the plane z = constant kept inside the annulus of the axial face
+fn polygon_annulus_area(polygon: &[Coords3], radii: [f64; 2]) -> f64 {
+    //A radius is never negative, whatever a caller passes as bounds
+    let radii = [radii[0].max(0.), radii[1].max(0.)];
+    let disk_area = |radius: f64| {
+        (0..polygon.len())
+            .map(|i| {
+                let current = polygon[i];
+                let next = polygon[(i + 1) % polygon.len()];
+                triangle_disk_area([current[0], current[1]], [next[0], next[1]], radius)
+            })
+            .sum::<f64>()
+    };
+
+    (disk_area(radii[1]) - disk_area(radii[0])).abs()
 }
 
 ///Points kept by the clipper are the ones with `normal . point >= offset`
@@ -392,30 +473,22 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
     let sorted = sort_points_ccw_3d(&intersection_points, normal);
 
     //Clip against the bounds of the face, an element straddling them contributes its share
-    if let Some(bounds) = planar_bounds(plane) {
-        let clipped = bounds
-            .iter()
-            .fold(Polygon::from_slice(&sorted), |polygon, half_space| {
-                polygon.clip(half_space)
-            });
-
-        if clipped.len < 3 {
-            return 0.0;
-        }
-        return polygon_area_3d(clipped.as_slice(), normal);
-    }
-
-    //Bounds that are not planes are still handled by dropping the outside vertices
-    let filtered: Vec<_> = sorted
+    let clipped = planar_bounds(plane)
         .iter()
-        .cloned()
-        .filter(|p| plane.is_point_inside(CartesianCoordinates(*p)))
-        .collect();
+        .fold(Polygon::from_slice(&sorted), |polygon, half_space| {
+            polygon.clip(half_space)
+        });
 
-    if filtered.len() < 3 {
+    if clipped.len < 3 {
         return 0.0;
     }
-    polygon_area_3d(&filtered, normal)
+
+    //An axial face is bounded in r by two arcs, which no half space can describe
+    if plane.axis == AXIAL_AXIS {
+        return polygon_annulus_area(clipped.as_slice(), plane.extent_u);
+    }
+
+    polygon_area_3d(clipped.as_slice(), normal)
 }
 
 pub fn compute_intersection_area(
@@ -579,6 +652,45 @@ mod test {
             CartesianCoordinates([1., -1., 2.]),
             CartesianCoordinates([1., 1., 0.]),
         ]
+    }
+
+    ///A polygon wrapping the whole annulus recovers its exact area
+    #[test]
+    fn test_annulus_area_of_a_surrounding_polygon() {
+        let square = [[-5., -5., 0.], [5., -5., 0.], [5., 5., 0.], [-5., 5., 0.]];
+
+        let area = polygon_annulus_area(&square, [1., 2.]);
+        let expected = std::f64::consts::PI * (4. - 1.);
+
+        assert!((area - expected).abs() < 1e-9, "{} != {}", area, expected);
+    }
+
+    ///A polygon inside the hole of the annulus carries no area
+    #[test]
+    fn test_annulus_area_inside_the_hole() {
+        let square = [
+            [-0.2, -0.2, 0.],
+            [0.2, -0.2, 0.],
+            [0.2, 0.2, 0.],
+            [-0.2, 0.2, 0.],
+        ];
+
+        assert!(polygon_annulus_area(&square, [1., 2.]).abs() < 1e-12);
+    }
+
+    ///A polygon of the annulus itself keeps its plain area, the arcs cut nothing
+    #[test]
+    fn test_annulus_area_of_an_inner_polygon() {
+        let patch = [
+            [1.2, -0.1, 0.],
+            [1.8, -0.1, 0.],
+            [1.8, 0.1, 0.],
+            [1.2, 0.1, 0.],
+        ];
+
+        let area = polygon_annulus_area(&patch, [1., 2.]);
+
+        assert!((area - 0.12).abs() < 1e-9, "{} != 0.12", area);
     }
 
     #[test]
