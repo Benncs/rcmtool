@@ -5,6 +5,18 @@ use crate::grid::NeighborDirection;
 use crate::model::CMGeometry;
 use crate::utils::compute_intersection_area;
 
+const REL_TOLERANCE_AREA: f64 = 0.1;
+
+///The interface areas of a face should add up to the surface of the cell, a face with no
+///geometric surface should carry no interface either
+fn is_area_mismatch(total_area: f64, theoretical_area: f64) -> bool {
+    if theoretical_area.abs() < f64::EPSILON {
+        return total_area.abs() > f64::EPSILON;
+    }
+
+    (total_area - theoretical_area).abs() / theoretical_area > REL_TOLERANCE_AREA
+}
+
 #[derive(Default, Clone)]
 pub struct InterfaceInfo {
     pub source_id: usize,
@@ -147,21 +159,12 @@ impl AInterfacesInfo {
                     .map(|(i, _)| self.area[i].iter().sum::<f64>())
                     .sum();
 
-                if ((total_area - theoretical_area).abs() / theoretical_area) < 0.1 {
+                if is_area_mismatch(total_area, theoretical_area) {
                     println!(
-                        "(areas): area incorect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
+                        "(areas): area incorrect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
                         axis_idx, cell_id, total_area, theoretical_area
                     );
                 }
-
-                // assert!(
-                //     ((total_area - theoretical_area).abs() / theoretical_area) < 0.1,
-                //     "RCMTOOL(areas): area incorect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
-                //     axis_idx,
-                //     cell_id,
-                //     total_area,
-                //     theoretical_area
-                // );
             }
         }
     }
@@ -232,5 +235,31 @@ impl AInterfacesInfo {
                 self.area[interface_id][i_facet] = area;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_matching_area_is_not_reported() {
+        assert!(!is_area_mismatch(10., 10.));
+        //Within the tolerance
+        assert!(!is_area_mismatch(10.5, 10.));
+    }
+
+    #[test]
+    fn test_mismatching_area_is_reported() {
+        assert!(is_area_mismatch(5., 10.));
+        assert!(is_area_mismatch(0., 10.));
+        assert!(is_area_mismatch(20., 10.));
+    }
+
+    ///A degenerate face divides by zero, which used to hide the mismatch behind a NaN
+    #[test]
+    fn test_area_without_geometric_surface() {
+        assert!(is_area_mismatch(1., 0.));
+        assert!(!is_area_mismatch(0., 0.));
     }
 }
