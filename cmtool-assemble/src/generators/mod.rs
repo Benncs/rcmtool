@@ -511,7 +511,7 @@ mod tests {
 
         let case = Generator::new()
             .generate_0d(
-                Reactor0DDescriptor::from_fraction(10., 0.2),
+                Reactor0DDescriptor::from_fraction(10., 0.2).expect("descriptor"),
                 Some(path.to_owned()),
             )
             .expect("case");
@@ -581,7 +581,7 @@ mod tests {
         let desc_pfr = g_descriptor_pfr();
         let alpha_g = desc_pfr.get_gas_fraction();
         let geo_volume = desc_pfr.geometrical_volume();
-        let desc_0d = Reactor0DDescriptor::from_fraction(v_0d, alpha_g);
+        let desc_0d = Reactor0DDescriptor::from_fraction(v_0d, alpha_g).expect("descriptor");
 
         let mut gene = Generator::new();
 

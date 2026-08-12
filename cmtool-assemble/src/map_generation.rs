@@ -42,7 +42,8 @@ fn _generate_reactor_0d<T: cmtool_data::CMCaseWriter>(
     let descriptor = crate::generators::Reactor0DDescriptor::from_fraction(
         volume,
         reactor0d.volume_fraction.content as f64,
-    );
+    )
+    .map_err(|e| CMError::Custom(format!("Reactor '{}': {}", reactor0d.id, e)))?;
 
     let case = generator.generate_0d(descriptor, opt_path)?;
 
@@ -94,7 +95,7 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
             //Flow comes from the Feeds/Connections of the reactor, a PFR without any is invalid
             .map_err(|e| {
                 CMError::Custom(format!(
-                    "Invalid PFR descriptor of reactor '{}': {}, check the Feeds and Connections declaring its flow",
+                    "Reactor '{}': {}, check the Feeds and Connections declaring its flow",
                     current_pfr.id, e
                 ))
             })?;
@@ -200,7 +201,8 @@ mod test {
         std::fs::create_dir_all(path).unwrap();
         let case = crate::generators::Generator::new()
             .generate_0d(
-                crate::generators::Reactor0DDescriptor::from_fraction(10., gas_fraction),
+                crate::generators::Reactor0DDescriptor::from_fraction(10., gas_fraction)
+                    .expect("descriptor"),
                 Some(path.to_owned()),
             )
             .expect("existing case");
@@ -276,6 +278,32 @@ mod test {
         assert_eq!(domain.info().total_number_compartment, 2);
 
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    ///A gas fraction outside [0, 1] used to panic in Reactor0DDescriptor::from_fraction
+    #[test]
+    fn test_invalid_gas_fraction() {
+        let root = "/tmp/test_invalid_gas_fraction";
+        let xml = r#"<?xml version="1.0"?>
+<Root run_id="bad_fraction" version="3">
+  <Reactors>
+    <Reactor0D id="str">
+      <Size>
+        <Volume>5</Volume>
+      </Size>
+      <VolumeFraction>1.5</VolumeFraction>
+    </Reactor0D>
+  </Reactors>
+</Root>"#;
+
+        let error = match crate::generate_and_write_domain(root, xml) {
+            Ok(_) => panic!("a gas fraction above 1 must not generate"),
+            Err(error) => error.to_string(),
+        };
+        let _ = std::fs::remove_dir_all(root);
+
+        assert!(error.contains("str"), "{}", error);
+        assert!(error.contains("Gas fraction"), "{}", error);
     }
 
     ///A PFR gets its flow from the Feeds/Connections, without any it is invalid and the error
