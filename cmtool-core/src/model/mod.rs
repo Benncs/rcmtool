@@ -116,6 +116,16 @@ impl CMModel {
     pub fn check_flow(&self, raw: &RawDataFlux, max_divergence: f64) -> Result<(), ModelError> {
         const ABS_TOLERANCE_DIVERGENCE_CELL: f64 = 1e-7;
 
+        //A field of zeros balances perfectly and transports nothing: it is missing data, not a
+        //valid flow map
+        if raw
+            .fluxes
+            .iter()
+            .all(|flux| flux.flux_source_target == 0. && flux.flux_target_source == 0.)
+        {
+            return Err(ModelError::EmptyFlow);
+        }
+
         let mut mass_balance: Vec<InterfaceFlow> =
             vec![InterfaceFlow::default(); raw.header.n_zone as usize];
         let mut id_max = u32::MIN;

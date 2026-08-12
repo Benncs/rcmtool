@@ -9,6 +9,9 @@ pub enum ModelError {
 
     #[error("Resulting flow has invalid value ")]
     InvalidFlow,
+
+    #[error("Resulting flow is empty: the velocity field carries no data")]
+    EmptyFlow,
 }
 
 #[derive(Error, Debug)]
