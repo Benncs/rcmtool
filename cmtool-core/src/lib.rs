@@ -55,15 +55,7 @@ impl CMHandle {
     ) -> Result<Self, CoreError> {
         let fullpath = format!("{}/{}", root, geometry_filename);
 
-        let task_io =
-            std::thread::spawn(move || ensight_gold::Geometry::new(Path::new(&fullpath.clone())));
-
-        let eg_geometry = Arc::new(
-            task_io
-                .join()
-                .map_err(|_| CoreError::Custom("Thread error".to_string()))?
-                .map_err(|_| CoreError::Custom("Arc error".to_string()))?,
-        ); //FIXME
+        let eg_geometry = Arc::new(ensight_gold::Geometry::new(Path::new(&fullpath))?);
 
         println!("{}", eg_geometry);
 
@@ -299,5 +291,26 @@ impl CMHandle {
         std::fs::write(path, vtk_bytes).unwrap();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    ///An unreadable geometry used to be reported as "Arc error" by the io thread
+    #[test]
+    fn test_init_reports_unreadable_geometry() {
+        let error = match CMHandle::init(
+            [1, 1, 1],
+            "/nonexistent",
+            "geometry.geo",
+            grid::MeshType::Cylindrical,
+        ) {
+            Ok(_) => panic!("a missing geometry must not build a handle"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(error, CoreError::IO(_)), "{}", error);
     }
 }
