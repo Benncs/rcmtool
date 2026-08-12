@@ -190,12 +190,12 @@ pub fn generate_flowmap(
 mod test {
     use cmtool_data::{CMAExportType, CMCaseJson, CMCaseReader, CMCaseWriter, RawData};
 
-    ///Existing case of a single liquid compartment, as a ReactorFromFile would point to
-    fn write_existing_case(path: &str) {
+    ///Existing case of a single compartment, as a ReactorFromFile would point to
+    fn write_existing_case(path: &str, gas_fraction: f64) {
         std::fs::create_dir_all(path).unwrap();
         let case = crate::generators::Generator::new()
             .generate_0d(
-                crate::generators::Reactor0DDescriptor::from_fraction(10., 0.),
+                crate::generators::Reactor0DDescriptor::from_fraction(10., gas_fraction),
                 Some(path.to_owned()),
             )
             .expect("existing case");
@@ -239,7 +239,7 @@ mod test {
         let root = "/tmp/test_reactor_from_file";
         let existing = format!("{}/existing", root);
         let _ = std::fs::remove_dir_all(root);
-        write_existing_case(&existing);
+        write_existing_case(&existing, 0.);
 
         let domain =
             crate::generate_and_write_domain(root, &domain_xml(&existing)).expect("domain");
@@ -269,6 +269,42 @@ mod test {
                 .any(|f| f.id_source == 0 && f.id_target == 1 && f.flux_source_target == 2.)
         );
         assert_eq!(domain.info().total_number_compartment, 2);
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    ///A liquid-only reactor of a two-phase domain keeps its gas compartments, otherwise every
+    ///gas id declared after it is shifted
+    #[test]
+    fn test_merge_gas_alignment() {
+        let root = "/tmp/test_merge_gas_alignment";
+        let existing = format!("{}/existing", root);
+        let _ = std::fs::remove_dir_all(root);
+        //Gas existing reactor, liquid only generated one
+        write_existing_case(&existing, 0.2);
+
+        crate::generate_and_write_domain(root, &domain_xml(&existing)).expect("domain");
+
+        let merged = CMCaseJson::read_case(std::path::Path::new(root).join("cma_case").as_path())
+            .expect("merged case");
+        let liquid = cmtool_data::RawDataScalar::read_raw(
+            merged
+                .resolve(root, CMAExportType::LiquidVolume)
+                .expect("volume"),
+        )
+        .expect("liquid volume");
+        let gas = cmtool_data::RawDataScalar::read_raw(
+            merged
+                .resolve(root, CMAExportType::GasVolume)
+                .expect("gas volume path"),
+        )
+        .expect("gas volume");
+
+        assert_eq!(liquid.values.len(), gas.values.len());
+        assert_eq!(gas.values.len(), 2);
+        assert_eq!(gas.values[0].value, 2.);
+        //The liquid only reactor contributes a neutral gas compartment
+        assert!(gas.values[1].value < 1e-6);
 
         std::fs::remove_dir_all(root).unwrap();
     }

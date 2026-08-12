@@ -53,18 +53,6 @@ fn raw_phase_from_flow_vol(
         .collect()
 }
 
-// Select specific phase type in a slice of phases
-// fn filter_phase(raw_phase: &[RawPhase], phase: PhaseCM) -> Vec<RawPhase> {
-//     raw_phase
-//         .iter()
-//         .filter(|p| p.identifier == phase)
-//         .cloned()
-//         .collect()
-// }
-fn filter_phase(raw_phase: &[RawPhase], phase: PhaseCM) -> impl Iterator<Item = &RawPhase> {
-    raw_phase.iter().filter(move |p| p.identifier == phase)
-}
-
 ///Neutral gas phase of a liquid-only reactor, so that gas compartment ids stay aligned with
 ///liquid ones when merging
 fn default_gas_phase(n_zone: usize) -> RawPhase {
@@ -172,8 +160,25 @@ impl Generator {
         &self,
         connections: Option<[RawDataFlux; 2]>,
     ) -> Result<GenerateContract, CMError> {
-        let liquid_phase = filter_phase(&self.raw_phase, PhaseCM::Liquid);
-        let gas_phase = filter_phase(&self.raw_phase, PhaseCM::Gas);
+        let reactors = self.phases_by_reactor();
+        let has_gas = reactors.iter().any(|(_, gas)| gas.is_some());
+
+        //A liquid-only reactor of a two-phase domain still occupies its gas compartments,
+        //skipping it would shift every gas id coming after it
+        let filler: Vec<Option<RawPhase>> = reactors
+            .iter()
+            .map(|(liquid, gas)| {
+                (has_gas && gas.is_none())
+                    .then(|| default_gas_phase(liquid.flow.header.n_zone as usize))
+            })
+            .collect();
+
+        let liquid_phase = reactors.iter().map(|(liquid, _)| *liquid);
+        let gas_phase = reactors
+            .iter()
+            .zip(&filler)
+            .filter_map(|((_, gas), filler)| gas.or(filler.as_ref()));
+
         let case = CMCase::default();
         let relative = Some(String::from(MERGE_FOLDER_NAME));
 
@@ -185,6 +190,23 @@ impl Generator {
             gas_phase,
             relative,
         ))
+    }
+
+    ///Phases of each reactor in declaration order. Every reactor pushes its liquid phase first
+    ///and its gas one right after when it has one, which is what pairs them back together.
+    fn phases_by_reactor(&self) -> Vec<(&RawPhase, Option<&RawPhase>)> {
+        let mut reactors: Vec<(&RawPhase, Option<&RawPhase>)> = Vec::new();
+        for phase in &self.raw_phase {
+            match phase.identifier {
+                PhaseCM::Liquid => reactors.push((phase, None)),
+                PhaseCM::Gas => {
+                    if let Some(reactor) = reactors.last_mut() {
+                        reactor.1 = Some(phase);
+                    }
+                }
+            }
+        }
+        reactors
     }
 
     ///Declare a reactor whose flow map already exists instead of being generated. Its case is
