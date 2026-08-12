@@ -206,6 +206,27 @@ mod test {
         assert_eq!(v, w);
     }
 
+    ///Three different axis sizes, so that the expected count cannot coincide with a wrong formula
+    #[test]
+    fn t_boundary_cylindrical_asymmetric() {
+        let (n_r, n_theta, n_z) = (3, 4, 5);
+        let ax1 = AxisDescriptor::new(0., MAX_AX1, n_r);
+        let ax2 = AxisDescriptor::new(-std::f64::consts::PI, std::f64::consts::PI, n_theta);
+        let ax3 = AxisDescriptor::new(0., MAX_AX3, n_z);
+        let mesh = get_mesh(MeshType::Cylindrical, [ax1, ax2, ax3]);
+
+        let mut v = mesh.get_boundary();
+
+        //Both z faces plus the outer r shell of the remaining slices
+        assert_eq!(v.len(), 2 * n_r * n_theta + n_theta * (n_z - 2));
+        assert!(v.iter().all(|&cell_id| cell_id < n_r * n_theta * n_z));
+
+        v.sort();
+        let n_before_dedup = v.len();
+        v.dedup();
+        assert_eq!(v.len(), n_before_dedup, "a cell is reported twice");
+    }
+
     #[test]
     fn test_theta_plane_neighbors() {
         let (mesh, step_r, step_theta, step_z) =

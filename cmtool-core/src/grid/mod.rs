@@ -746,7 +746,8 @@ impl CompartmentMeshManip for MeshCylindrical {
             self.n_points_axis(2),
         );
 
-        let expected = n_theta * (n_z - 2) + 2 * n_r * n_z;
+        //Both z faces plus the outer r shell, which excludes the cells already taken by the faces
+        let expected = 2 * n_r * n_theta + n_theta * (n_z - 2);
         let mut v = Vec::with_capacity(expected);
 
         for i in 0..n_r {
