@@ -461,12 +461,14 @@ impl Generator {
             phase.flow.fluxes.extend(connections.fluxes);
         }
 
+        //The header is accumulated apart from the fluxes, they cannot disagree
         if phase.flow.fluxes.len() != phase.flow.header.n_fluxes as usize {
-            panic!(
-                "TODO: handle merge error {} {}",
+            return Err(CMError::Custom(format!(
+                "Merged {:?} phase holds {} fluxes but its header declares {}",
+                phase.identifier,
                 phase.flow.fluxes.len(),
                 phase.flow.header.n_fluxes
-            );
+            )));
         }
 
         Ok(phase)

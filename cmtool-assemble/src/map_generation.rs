@@ -155,39 +155,20 @@ pub fn generate_flowmap(
 ) -> Result<Option<GenerateContract>, CMError> {
     let mut generator = Generator::new();
 
-    let save_intermediate = root.is_some();
-    //root is used only if save_intermediae is true
-    let _ids = generate_partial_flowmap::<CMCaseJson>(&mut generator, root.clone(), reactors, mb)?;
-    //TODO remove returning cm_path  merge and merge_from_memory dont need to return it cause it is 'root'
-    //Same when len(id)==1
-    // if _ids.len() > 1 {
-    //     let gc = if save_intermediate {
-    //         generator.merge(root.clone().unwrap(), &_ids, connections.clone())?;
-    //         None
-    //     } else {
-    //         Some(generator.merge_from_memory(connections.clone())?)
-    //     };
-    //     Ok((root.clone().unwrap().to_str().unwrap().to_owned(), gc))
-    // } else if _ids.len() == 1 && save_intermediate {
-    //     let r = root.unwrap();
-    //     let case_path = r.clone().join(&_ids[0]);
+    //A root means the partial cases are written next to the merged one
+    let ids = generate_partial_flowmap::<CMCaseJson>(&mut generator, root.clone(), reactors, mb)?;
 
-    //     let prep = format!("./{}", _ids[0]);
-    //     let case = CMCaseJson::read_case(&case_path)?.prepend_path(&prep);
-    //     let path = r.join("cma_case");
-    //     CMCaseJson::write_case(case, &path)?;
-    //     Ok((r.to_str().unwrap().to_owned(), None))
-    // } else {
-    //     Err(CMError::Custom("TODO ".to_owned()))
-    // }
-    if _ids.is_empty() {
+    if ids.is_empty() {
         return Err(CMError::Custom("No flowmap to generate".to_owned()));
     }
-    let gc = if save_intermediate {
-        generator.merge(root.clone().unwrap(), &_ids, connections.clone())?;
-        None
-    } else {
-        Some(generator.merge_from_memory(connections.clone())?)
+
+    //Merging in place needs no contract, the partial cases are already on disk
+    let gc = match root {
+        Some(root) => {
+            generator.merge(root, &ids, connections)?;
+            None
+        }
+        None => Some(generator.merge_from_memory(connections)?),
     };
     Ok(gc)
 }
