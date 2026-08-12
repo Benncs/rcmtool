@@ -117,8 +117,16 @@ fn check_mixing<T: FlowMapTransitioner>(mut fm_t: T, final_time: f64, n_step: us
 }
 
 fn main() {
-    let final_time: f64 = 50.;
-    let n_step: usize = 5000;
+    //Mixing time depends on the reactor, a run too short says nothing about how well it mixes
+    let read_env = |name: &str, default: f64| {
+        std::env::var(name)
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(default)
+    };
+
+    let final_time: f64 = read_env("MIXING_TIME", 50.);
+    let n_step: usize = read_env("MIXING_STEPS", 5000.) as usize;
 
     let root = std::env::var("EXAMPLE_ROOT").unwrap();
     //All fonctions use generic, specify iterator type here
