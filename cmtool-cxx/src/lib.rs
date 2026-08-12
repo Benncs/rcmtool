@@ -158,6 +158,8 @@ impl TransitionerWrapper {
     }
     #[inline]
     fn get_at(&self, index: usize) -> Box<IterationStateWrapper> {
+        //Precondition: index < size(), the shim is noexcept so a bad index aborts the process
+        //The Arc is dropped here, the state stays alive because the transitioner owns it
         Box::new(IterationStateWrapper(&*self.0.get_at(index).unwrap()))
     }
 }
@@ -189,6 +191,7 @@ impl IterationStateWrapper {
     }
 
     fn get_misc(self: &IterationStateWrapper, key: &str) -> &[f64] {
+        //Precondition: has_misc(key), the shim is noexcept so a missing key aborts the process
         unsafe { &*self.0 }.get(key).unwrap()
     }
 
