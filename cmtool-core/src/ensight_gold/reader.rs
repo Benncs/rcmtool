@@ -49,6 +49,10 @@ impl<const N: usize> Reader<N> {
         })
     }
 
+    pub fn path(&self) -> &Path {
+        &self.filepath
+    }
+
     pub fn check_lines_contains(&mut self, name: &str) -> std::io::Result<()> {
         if !self.get_line()?.to_string().contains(name) {
             return Err(std::io::Error::new(
