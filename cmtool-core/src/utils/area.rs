@@ -86,6 +86,156 @@ fn sort_points_ccw_3d(points: &[[f64; 3]], normal: &CartesianVec3) -> Vec<[f64; 
     indices.iter().map(|&i| points[i]).collect()
 }
 
+///A tetra cut by a plane gives at most 4 vertices, and clipping a convex polygon by a half space
+///adds at most one, so four bounds can never take it past 8
+const MAX_POLYGON_VERTICES: usize = 12;
+
+///Half spaces bounding the face of a compartment, when all of them are planes.
+///So a radial and a theta face are exactly clippable by half spaces, an axial face is not: its
+///r bounds are cylinders, and that case is left to the caller.
+fn planar_bounds(plane: &BoundedPlane) -> Option<Vec<HalfSpace>> {
+    let z_bounds = |z0: f64, z1: f64| {
+        [
+            HalfSpace {
+                normal: CartesianVec3([0., 0., 1.]),
+                offset: z0,
+            },
+            HalfSpace {
+                normal: CartesianVec3([0., 0., -1.]),
+                offset: -z1,
+            },
+        ]
+    };
+
+    //Two half spaces can only describe a sector narrower than a half turn
+    let theta_bounds = |theta0: f64, theta1: f64| {
+        if theta1 - theta0 >= std::f64::consts::PI {
+            return None;
+        }
+        Some([
+            HalfSpace {
+                normal: CartesianVec3([-theta0.sin(), theta0.cos(), 0.]),
+                offset: 0.,
+            },
+            HalfSpace {
+                normal: CartesianVec3([theta1.sin(), -theta1.cos(), 0.]),
+                offset: 0.,
+            },
+        ])
+    };
+
+    match plane.axis {
+        //Radial face: theta and z bounds
+        0 => {
+            let mut bounds = Vec::with_capacity(4);
+            bounds.extend(theta_bounds(plane.extent_u[0], plane.extent_u[1])?);
+            bounds.extend(z_bounds(plane.extent_v[0], plane.extent_v[1]));
+            Some(bounds)
+        }
+        //Theta face: radial and z bounds, the radial direction is the one of the face itself
+        1 => {
+            let CartesianCoordinates(origin) = plane.origin;
+            let theta = origin[1].atan2(origin[0]);
+            let radial = CartesianVec3([theta.cos(), theta.sin(), 0.]);
+
+            let mut bounds = Vec::with_capacity(4);
+            bounds.push(HalfSpace {
+                normal: radial,
+                offset: plane.extent_u[0],
+            });
+            bounds.push(HalfSpace {
+                normal: CartesianVec3([-radial.0[0], -radial.0[1], 0.]),
+                offset: -plane.extent_u[1],
+            });
+            bounds.extend(z_bounds(plane.extent_v[0], plane.extent_v[1]));
+            Some(bounds)
+        }
+        //Axial face: the radial bounds are cylinders
+        _ => None,
+    }
+}
+
+///Points kept by the clipper are the ones with `normal . point >= offset`
+struct HalfSpace {
+    normal: CartesianVec3,
+    offset: f64,
+}
+
+impl HalfSpace {
+    fn signed_distance(&self, point: &Coords3) -> f64 {
+        self.normal.dot(&CartesianVec3(*point)) - self.offset
+    }
+}
+
+///Convex polygon of the intersection, kept on the stack: this runs once per element per interface
+struct Polygon {
+    points: [Coords3; MAX_POLYGON_VERTICES],
+    len: usize,
+}
+
+impl Polygon {
+    fn from_slice(points: &[Coords3]) -> Self {
+        let mut polygon = Self {
+            points: [[0.; 3]; MAX_POLYGON_VERTICES],
+            len: points.len().min(MAX_POLYGON_VERTICES),
+        };
+        polygon.points[..polygon.len].copy_from_slice(&points[..polygon.len]);
+        polygon
+    }
+
+    fn as_slice(&self) -> &[Coords3] {
+        &self.points[..self.len]
+    }
+
+    fn push(&mut self, point: Coords3) {
+        if self.len < MAX_POLYGON_VERTICES {
+            self.points[self.len] = point;
+            self.len += 1;
+        }
+    }
+
+    ///Sutherland-Hodgman clipping of the polygon by one half space, the polygon has to be convex
+    ///and its vertices ordered. See https://en.wikipedia.org/wiki/Sutherland%E2%80%93Hodgman_algorithm
+    ///
+    ///        keep | drop            keep |
+    ///     +-------|---+          +-------+
+    ///     |       |  /           |      /
+    ///     |  poly | /     =      |     /
+    ///     |       |/             |    /
+    ///     +-------+              +---+
+    ///
+    fn clip(&self, half_space: &HalfSpace) -> Self {
+        let mut clipped = Self {
+            points: [[0.; 3]; MAX_POLYGON_VERTICES],
+            len: 0,
+        };
+
+        for i in 0..self.len {
+            let current = self.points[i];
+            let previous = self.points[(i + self.len - 1) % self.len];
+
+            let d_current = half_space.signed_distance(&current);
+            let d_previous = half_space.signed_distance(&previous);
+
+            //The edge crosses the boundary, the crossing point belongs to the clipped polygon
+            if (d_current >= 0.) != (d_previous >= 0.) {
+                let t = d_previous / (d_previous - d_current);
+                clipped.push([
+                    previous[0] + t * (current[0] - previous[0]),
+                    previous[1] + t * (current[1] - previous[1]),
+                    previous[2] + t * (current[2] - previous[2]),
+                ]);
+            }
+
+            if d_current >= 0. {
+                clipped.push(current);
+            }
+        }
+
+        clipped
+    }
+}
+
 fn polygon_area_3d(points: &[Coords3], normal: &CartesianVec3) -> f64 {
     let n = normal.normalized();
 
@@ -198,7 +348,24 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
         return 0.0;
     }
 
-    let filtered: Vec<_> = intersection_points
+    let sorted = sort_points_ccw_3d(&intersection_points, normal);
+
+    //Clip against the bounds of the face, an element straddling them contributes its share
+    if let Some(bounds) = planar_bounds(plane) {
+        let clipped = bounds
+            .iter()
+            .fold(Polygon::from_slice(&sorted), |polygon, half_space| {
+                polygon.clip(half_space)
+            });
+
+        if clipped.len < 3 {
+            return 0.0;
+        }
+        return polygon_area_3d(clipped.as_slice(), normal);
+    }
+
+    //Bounds that are not planes are still handled by dropping the outside vertices
+    let filtered: Vec<_> = sorted
         .iter()
         .cloned()
         .filter(|p| plane.is_point_inside(CartesianCoordinates(*p)))
@@ -207,9 +374,7 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
     if filtered.len() < 3 {
         return 0.0;
     }
-    // let sorted = sort_points_ccw_3d(&intersection_points, normal);
-    let sorted = sort_points_ccw_3d(&filtered, normal);
-    polygon_area_3d(&sorted, normal)
+    polygon_area_3d(&filtered, normal)
 }
 
 pub fn compute_intersection_area(
@@ -345,6 +510,66 @@ mod test {
             expected_area,
             area
         );
+    }
+
+    ///Theta face at theta = 0, so the face lies in the plane y = 0 and r is measured along x
+    fn theta_face(r: [f64; 2], z: [f64; 2]) -> BoundedPlane {
+        BoundedPlane {
+            normal: CartesianVec3([0., 1., 0.]),
+            origin: CartesianCoordinates([1., 0., 0.]),
+            extent_u: r,
+            extent_v: z,
+            axis: 1,
+        }
+    }
+
+    ///Tetra whose cut by y = 0 is the triangle (r,z) = (1,0), (2,0), (1,1), of area 1/2
+    ///   z
+    ///   1 +
+    ///     |\
+    ///     | \        cut of the tetra by the face
+    ///     |  \
+    ///   0 +---+---> r
+    ///     1   2
+    fn tetra_cut_by_theta_face() -> [CartesianCoordinates; 4] {
+        [
+            CartesianCoordinates([1., -1., 0.]),
+            CartesianCoordinates([3., -1., 0.]),
+            CartesianCoordinates([1., -1., 2.]),
+            CartesianCoordinates([1., 1., 0.]),
+        ]
+    }
+
+    #[test]
+    fn test_area_inside_bounds_is_kept_whole() {
+        let area = tetra_area(
+            tetra_cut_by_theta_face(),
+            &theta_face([0., 10.], [-10., 10.]),
+        );
+
+        assert!((area - 0.5).abs() < 1e-10, "expected 0.5, got {}", area);
+    }
+
+    ///An element straddling a bound used to be dropped, it now contributes its share.
+    ///Cutting the triangle at z = 0.5 leaves a trapezoid of area 1/2 - 1/8
+    #[test]
+    fn test_area_straddling_a_bound_is_clipped() {
+        let area = tetra_area(
+            tetra_cut_by_theta_face(),
+            &theta_face([0., 10.], [-10., 0.5]),
+        );
+
+        assert!((area - 0.375).abs() < 1e-10, "expected 0.375, got {}", area);
+    }
+
+    #[test]
+    fn test_area_outside_bounds_is_dropped() {
+        let area = tetra_area(
+            tetra_cut_by_theta_face(),
+            &theta_face([5., 10.], [-10., 10.]),
+        );
+
+        assert_eq!(area, 0.);
     }
 
     #[test]
