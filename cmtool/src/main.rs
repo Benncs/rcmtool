@@ -56,15 +56,36 @@ fn balance_settings(common: &CommonArgs, handle: &cmtool_core::CMHandle) -> Bala
     balance
 }
 
-fn three_paths(root: &str, files: &[String]) -> Option<[PathBuf; 3]> {
+///Flow map of one phase, out of what the export provides: a vector variable holds the velocity
+///directly, otherwise it comes as its three components and they have to be merged.
+fn dump_phase_flow(
+    handle: &cmtool_core::CMHandle,
+    root: &str,
+    files: &[String],
+    res_name: String,
+    fraction: Option<cmtool_core::model::Scalar>,
+) -> Result<(), CmtoolError> {
+    let path = |name: &String| Path::new(root).join(name);
+
     match files {
-        [i, j, k] => Some([
-            Path::new(root).join(i),
-            Path::new(root).join(j),
-            Path::new(root).join(k),
-        ]),
-        _ => None,
+        [vector] => match fraction {
+            Some(fraction) => {
+                handle.dump_vector_phase_fraction(res_name, path(vector), fraction)?
+            }
+            None => handle.dump_vector(res_name, path(vector))?,
+        },
+        [i, j, k] => {
+            handle.dump_vector_from_scalar(res_name, path(i), path(j), path(k), fraction)?;
+        }
+        _ => {
+            return Err(CmtoolError::Custom(format!(
+                "A phase is either one vector file or its three components, {} were given",
+                files.len()
+            )));
+        }
     }
+
+    Ok(())
 }
 
 ///Builds a case out of velocities given as separate scalar components, which is how a CFD export
@@ -109,7 +130,8 @@ fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolError> 
         false,
     );
 
-    if let Some(liquid) = three_paths(&args.root, &args.liquid) {
+    if !args.liquid.is_empty() {
+        //Liquid takes what the gas leaves
         let fraction = args
             .gas_fraction
             .as_ref()
@@ -119,23 +141,23 @@ fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolError> 
                     .map(|s| s.scalar_shift(1.))
             })
             .transpose()?;
-        handle.dump_vector_from_scalar(
+        dump_phase_flow(
+            &handle,
+            &args.root,
+            &args.liquid,
             out_path("flowL"),
-            &liquid[0],
-            &liquid[1],
-            &liquid[2],
             fraction,
         )?;
         case.add(CMAExportType::LiquidFlow, "flowL.raw");
         has_flow_map = true;
     }
 
-    if let Some(gas) = three_paths(&args.root, &args.gas) {
-        handle.dump_vector_from_scalar(
+    if !args.gas.is_empty() {
+        dump_phase_flow(
+            &handle,
+            &args.root,
+            &args.gas,
             out_path("flowG"),
-            &gas[0],
-            &gas[1],
-            &gas[2],
             gas_fraction,
         )?;
         case.add(CMAExportType::GasFlow, "flowG.raw");

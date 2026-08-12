@@ -35,11 +35,11 @@ pub struct ManualArgs {
     /// Geometry file, relative to the root
     pub geo_file: String,
 
-    /// The three scalar files holding the components of the liquid velocity
+    /// Liquid velocity: either one vector file, or its three components as scalar files
     #[clap(long, value_delimiter = ',')]
     pub liquid: Vec<String>,
 
-    /// The three scalar files holding the components of the gas velocity
+    /// Gas velocity: either one vector file, or its three components as scalar files
     #[clap(long, value_delimiter = ',')]
     pub gas: Vec<String>,
 
