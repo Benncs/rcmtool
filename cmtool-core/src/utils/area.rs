@@ -90,6 +90,47 @@ fn sort_points_ccw_3d(points: &[[f64; 3]], normal: &CartesianVec3) -> Vec<[f64; 
 ///adds at most one, so four bounds can never take it past 8
 const MAX_POLYGON_VERTICES: usize = 12;
 
+///Index of the radial axis, the only face of a cylindrical compartment that is not a plane
+const RADIAL_AXIS: usize = 0;
+
+///A radial face is a cylindrical patch, every other face of the compartment is flat
+pub fn is_curved_face(face: &BoundedPlane) -> bool {
+    face.axis == RADIAL_AXIS
+}
+
+///Plane to cut one element with, when the face it crosses is curved.
+///
+///`get_interface_plane` gives the plane tangent at the middle of the compartment, which drifts
+///away from the patch as theta moves:
+///
+///```text
+///      tangent at theta_c
+///     ------+------            an element sitting here never reaches the tangent plane,
+///      __--- ---__             it contributes no area at all
+///    _-     |     -_  <- patch
+///   /       |       \
+///          axis
+///```
+///
+///Taking the tangent at the angular position of the element keeps the error down to the curvature
+///over one element instead of over one compartment.
+pub fn tangent_plane_at(
+    patch: &BoundedPlane,
+    CartesianCoordinates(element_centroid): CartesianCoordinates,
+) -> BoundedPlane {
+    let CartesianCoordinates(patch_origin) = patch.origin;
+    let radius = patch_origin[0].hypot(patch_origin[1]);
+    let theta = element_centroid[1].atan2(element_centroid[0]);
+
+    BoundedPlane {
+        normal: CartesianVec3([theta.cos(), theta.sin(), 0.]),
+        origin: CartesianCoordinates([radius * theta.cos(), radius * theta.sin(), patch_origin[2]]),
+        extent_u: patch.extent_u,
+        extent_v: patch.extent_v,
+        axis: patch.axis,
+    }
+}
+
 ///Half spaces bounding the face of a compartment, when all of them are planes.
 ///So a radial and a theta face are exactly clippable by half spaces, an axial face is not: its
 ///r bounds are cylinders, and that case is left to the caller.
@@ -570,6 +611,77 @@ mod test {
         );
 
         assert_eq!(area, 0.);
+    }
+
+    ///Patch of radius 1 spanning a 60 degree sector, tangent plane taken at its middle
+    fn radial_patch() -> BoundedPlane {
+        BoundedPlane {
+            normal: CartesianVec3([1., 0., 0.]),
+            origin: CartesianCoordinates([1., 0., 0.]),
+            extent_u: [-0.5, 0.5],
+            extent_v: [0., 1.],
+            axis: RADIAL_AXIS,
+        }
+    }
+
+    ///Small tetra straddling the cylinder r = 1 at theta = 0.4, far from the middle of the patch
+    fn element_away_from_the_middle() -> [CartesianCoordinates; 4] {
+        let theta = 0.4;
+        let point = |r: f64, dtheta: f64, z: f64| {
+            CartesianCoordinates([r * (theta + dtheta).cos(), r * (theta + dtheta).sin(), z])
+        };
+        [
+            point(0.95, -0.02, 0.4),
+            point(1.05, -0.02, 0.4),
+            point(0.95, 0.02, 0.4),
+            point(0.95, -0.02, 0.5),
+        ]
+    }
+
+    #[test]
+    fn test_tangent_plane_follows_the_element() {
+        let element = element_away_from_the_middle();
+        let centroid = CartesianCoordinates([
+            element
+                .iter()
+                .map(|CartesianCoordinates(p)| p[0])
+                .sum::<f64>()
+                / 4.,
+            element
+                .iter()
+                .map(|CartesianCoordinates(p)| p[1])
+                .sum::<f64>()
+                / 4.,
+            element
+                .iter()
+                .map(|CartesianCoordinates(p)| p[2])
+                .sum::<f64>()
+                / 4.,
+        ]);
+
+        let patch = radial_patch();
+        let plane = tangent_plane_at(&patch, centroid);
+
+        //The plane stays on the cylinder and keeps the bounds of the patch
+        let CartesianCoordinates(origin) = plane.origin;
+        assert!((origin[0].hypot(origin[1]) - 1.).abs() < 1e-12);
+        assert_eq!(plane.extent_u, patch.extent_u);
+        assert_eq!(plane.axis, patch.axis);
+
+        //The element is cut by its own tangent plane, the one of the compartment misses it
+        let with_element_plane =
+            compute_intersection_area(&element, VolumeElementTypes::Tetra4, &plane).unwrap();
+        let with_patch_plane =
+            compute_intersection_area(&element, VolumeElementTypes::Tetra4, &patch).unwrap();
+
+        assert!(
+            with_element_plane > 0.,
+            "the element must be cut by its own tangent plane"
+        );
+        assert_eq!(
+            with_patch_plane, 0.,
+            "the tangent plane of the compartment does not reach this element"
+        );
     }
 
     #[test]

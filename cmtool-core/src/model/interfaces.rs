@@ -3,7 +3,7 @@
 use crate::coordinates::*;
 use crate::grid::NeighborDirection;
 use crate::model::CMGeometry;
-use crate::utils::compute_intersection_area;
+use crate::utils::{compute_intersection_area, is_curved_face, tangent_plane_at};
 
 const REL_TOLERANCE_AREA: f64 = 0.1;
 
@@ -224,13 +224,20 @@ impl AInterfacesInfo {
 
                 geometry.fill_vertices(volume_element_global_id, n_vertex, &mut local_vertices);
 
-                // let area = compute_intersection_area(&local_vertices, elem_type, plane)
-                //     .expect("Area between element");
-                // let area = area * plane.normal.0[plane.axis].signum();
-                // self.area[interface_id][i_facet] = area;
-                //
-                let area = compute_intersection_area(&local_vertices, elem_type, plane)
-                    .expect("Area between element");
+                //A curved face gives every element the tangent plane of its own position
+                let element_plane = is_curved_face(plane).then(|| {
+                    tangent_plane_at(
+                        plane,
+                        geometry.volume_elements.xyz[volume_element_global_id],
+                    )
+                });
+
+                let area = compute_intersection_area(
+                    &local_vertices,
+                    elem_type,
+                    element_plane.as_ref().unwrap_or(plane),
+                )
+                .expect("Area between element");
 
                 self.area[interface_id][i_facet] = area;
             }
