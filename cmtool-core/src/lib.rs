@@ -15,7 +15,6 @@ use grid::vtk::add_celldata_to_vtk;
 
 use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 use model::{CMGeometry, CMModel, Scalar, Vector};
-use std::cmp::Ordering;
 use std::{path::Path, sync::Arc};
 
 fn resolve_path(
@@ -96,20 +95,8 @@ impl CMHandle {
     ) -> Result<(), CoreError> {
         std::fs::create_dir_all(&root_export)?;
 
+        //Scalars and vectors are dumped independently, only the scalars are kept for the vtk export
         let mut rs = Vec::with_capacity(vars.len());
-        let mut v: Vec<ensight_gold::case::VariableInfo> = vars.to_owned();
-
-        v.sort_by(|a, _b| {
-            if a.get_type() == ensight_gold::case::VariableType::Scalar {
-                Ordering::Less
-            }
-            // } else if b.get_type() == ensight_gold::case::VariableType::Scalar {
-            //     Ordering::Less
-            // }
-            else {
-                Ordering::Equal
-            }
-        });
 
         for v in vars.iter() {
             match v.get_type() {
