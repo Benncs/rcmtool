@@ -37,12 +37,23 @@ pub enum ExportType {
 
 pub struct CMHandle {
     model: Arc<model::CMModel>,
+    ///Knobs of the balancing pass, the caller may replace them before generating
+    balance: model::BalanceSettings,
     _root_result: String, //TODO EITHER USE IT OR REMOVE
     eg_geometry: Arc<ensight_gold::Geometry>,
     cm_geometry: Arc<CMGeometry>,
 }
 
 impl CMHandle {
+    ///Replaces the balancing knobs used when a flow map is generated
+    pub fn set_balance_settings(&mut self, settings: model::BalanceSettings) {
+        self.balance = settings;
+    }
+
+    pub fn balance_settings(&self) -> &model::BalanceSettings {
+        &self.balance
+    }
+
     pub fn grid(&self) -> &dyn crate::grid::CompartmentMesh {
         self.model.grid()
     }
@@ -67,6 +78,7 @@ impl CMHandle {
 
         Ok(Self {
             model: Arc::new(CMModel::init(cm_geometry.clone())),
+            balance: Default::default(),
             _root_result: String::from("./test"),
             eg_geometry,
             cm_geometry,
@@ -178,7 +190,9 @@ impl CMHandle {
         let vector =
             Vector::new(v, &self.cm_geometry, &self.eg_geometry).scale_by(phase_fraction)?;
 
-        let flow_data = self.model.compute_flux_between_compartments(vector)?;
+        let flow_data = self
+            .model
+            .compute_flux_between_compartments(vector, &self.balance)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -189,7 +203,9 @@ impl CMHandle {
         res_name: impl AsRef<std::path::Path>,
         vector: Vector,
     ) -> Result<(), CoreError> {
-        let flow_data = self.model.compute_flux_between_compartments(vector)?;
+        let flow_data = self
+            .model
+            .compute_flux_between_compartments(vector, &self.balance)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -202,7 +218,9 @@ impl CMHandle {
     ) -> Result<(), CoreError> {
         let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
         let vector = Vector::new(v, &self.cm_geometry, &self.eg_geometry);
-        let flow_data = self.model.compute_flux_between_compartments(vector)?;
+        let flow_data = self
+            .model
+            .compute_flux_between_compartments(vector, &self.balance)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -228,7 +246,9 @@ impl CMHandle {
         path_k: impl AsRef<std::path::Path>,
     ) -> Result<RawDataFlux, CoreError> {
         let vector = self.vector_from_scalar(path_i, path_j, path_k)?;
-        let flow_data = self.model.compute_flux_between_compartments(vector)?;
+        let flow_data = self
+            .model
+            .compute_flux_between_compartments(vector, &self.balance)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(flow_data)

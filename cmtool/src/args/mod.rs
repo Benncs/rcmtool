@@ -13,6 +13,18 @@ pub struct CommonArgs {
     /// Output directory
     #[clap(short, long)]
     pub out: Option<String>,
+
+    /// Divergence the flow balancing aims for
+    #[clap(long)]
+    pub balance_tolerance: Option<f64>,
+
+    /// Iterations the flow balancing may spend
+    #[clap(long)]
+    pub balance_iterations: Option<usize>,
+
+    /// Divergence above which the generated flow map is rejected
+    #[clap(long)]
+    pub max_divergence: Option<f64>,
 }
 
 #[derive(Parser, Default, Clone)]

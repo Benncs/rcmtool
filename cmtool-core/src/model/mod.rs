@@ -21,7 +21,35 @@ mod interfaces;
 mod scalar;
 mod vectors;
 pub use scalar::Scalar;
+pub use vectors::Vector as ModelVector;
 pub use vectors::Vector;
+
+///Knobs of the balancing pass, `Default` is what the CLI uses unless it is told otherwise
+#[derive(Debug, Clone, Copy)]
+pub struct BalanceSettings {
+    ///Iterations the balancing may spend before giving up
+    pub max_iterations: usize,
+    ///Divergence it aims for, convergence is linear so asking for much less costs iterations
+    pub tolerance: f64,
+    ///Divergence above which the resulting flow map is rejected
+    pub max_divergence: f64,
+}
+
+impl Default for BalanceSettings {
+    fn default() -> Self {
+        Self {
+            max_iterations: 1000,
+            tolerance: 1e-6,
+            max_divergence: 1e-2,
+        }
+    }
+}
+
+///What the balancing pass achieved, so that a caller can tell a converged map from a giving up one
+pub struct BalanceReport {
+    pub iterations: usize,
+    pub residual: f64,
+}
 
 pub struct CMModel {
     geometry: Arc<CMGeometry>,
@@ -85,8 +113,7 @@ impl CMModel {
             && rf.id_target < n_zone
     }
 
-    pub fn check_flow(&self, raw: &RawDataFlux) -> Result<(), ModelError> {
-        const REL_TOLERANCE_DIVERGENCE_CELL: f64 = 1e-2;
+    pub fn check_flow(&self, raw: &RawDataFlux, max_divergence: f64) -> Result<(), ModelError> {
         const ABS_TOLERANCE_DIVERGENCE_CELL: f64 = 1e-7;
 
         let mut mass_balance: Vec<InterfaceFlow> =
@@ -119,11 +146,8 @@ impl CMModel {
             } else {
                 abs_diff
             };
-            if abs_diff > ABS_TOLERANCE_DIVERGENCE_CELL && err > REL_TOLERANCE_DIVERGENCE_CELL {
-                return Err(ModelError::CellToCellDivergence(
-                    err,
-                    REL_TOLERANCE_DIVERGENCE_CELL,
-                ));
+            if abs_diff > ABS_TOLERANCE_DIVERGENCE_CELL && err > max_divergence {
+                return Err(ModelError::CellToCellDivergence(err, max_divergence));
             }
         }
 
@@ -197,6 +221,7 @@ impl CMModel {
     pub fn compute_flux_between_compartments(
         &self,
         vector: Vector,
+        settings: &BalanceSettings,
     ) -> Result<cmtool_data::RawDataFlux, CoreError> {
         let n_fluxes = self.interfaces.n_interfaces();
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
@@ -225,92 +250,94 @@ impl CMModel {
             }
         }
 
-        self.clean(&mut flows);
+        let balance = self.balance(&mut flows, settings);
+        if balance.residual > settings.max_divergence {
+            return Err(ModelError::CellToCellDivergence(
+                balance.residual,
+                settings.max_divergence,
+            )
+            .into());
+        }
 
         let data_flow = get_data_flow(self.geometry.n_zone(), &self.interfaces.ids, &flows);
 
-        self.check_flow(&data_flow)?;
+        self.check_flow(&data_flow, settings.max_divergence)?;
         Ok(data_flow)
     }
 
     // pub fn export_volume_integral_per_zone(&self,scalar:&mut cmtool_data::RawDataScalar) {
     //     todo!()
     // }
-
-    fn clean(&self, flows: &mut [InterfaceFlow]) {
-        // const TOL: f64 = 1e-19;
-        const ABS_TOL_CONV: f64 = 1e-12;
-        const REL_TOL_CONV: f64 = 1e-6;
-
-        const MAX_IT: usize = 10000;
-        let mut balance = vec![0.0f64; self.geometry.n_zone()];
-        let n_interfaces_per_zone = {
-            let mut tmp = vec![0usize; self.geometry.n_zone()];
-            for i_interface in 0..flows.len() {
-                let source_id = self.interfaces.ids[i_interface].source_id;
-                let target_id = self.interfaces.ids[i_interface].target_id;
-                tmp[source_id] += 1;
-                tmp[target_id] += 1;
-            }
-            tmp
+    ///Scales the flows until every compartment sends out what it receives.
+    ///
+    ///A flow is only ever multiplied by a positive factor, so it can never turn negative, which
+    ///the raw format forbids: `RawFlux::from_bytes` refuses to read a negative flux. Scaling the
+    ///flows leaving a compartment by `sqrt(in / out)` moves it halfway to its balance, and
+    ///repeating it converges the same way Sinkhorn balancing does.
+    ///
+    ///```text
+    ///        in = 1        in = 2        in = 2
+    ///     ->[ z ]->     ->[ z ]->     ->[ z ]->
+    ///        out = 4       out = 2       out = 2
+    ///     scale by sqrt(1/4) = 1/2, then again, until both agree
+    ///```
+    fn balance(&self, flows: &mut [InterfaceFlow], settings: &BalanceSettings) -> BalanceReport {
+        let n_zone = self.geometry.n_zone();
+        let mut inflow = vec![0.0f64; n_zone];
+        let mut outflow = vec![0.0f64; n_zone];
+        let mut report = BalanceReport {
+            iterations: 0,
+            residual: f64::INFINITY,
         };
 
-        // let f_err = |_balance: &mut [f64], _flows: &[InterfaceFlow]| {
-        //     for (i_interface, flow) in _flows.iter().enumerate() {
-        //         let source_id = self.interfaces.ids[i_interface].source_id;
-        //         let target_id = self.interfaces.ids[i_interface].target_id;
-        //         _balance[source_id] += flow.target_flow - flow.source_flow;
-        //         _balance[target_id] += flow.source_flow - flow.target_flow;
-        //     }
-        //     _balance.iter().map(|x| x.abs()).fold(0.0f64, f64::max)
-        // };
-
-        let f_err = |_balance: &mut [f64], _flows: &[InterfaceFlow]| {
-            for (i_interface, flow) in _flows.iter().enumerate() {
+        for iteration in 0..settings.max_iterations {
+            inflow.fill(0.);
+            outflow.fill(0.);
+            for (i_interface, flow) in flows.iter().enumerate() {
                 let source_id = self.interfaces.ids[i_interface].source_id;
                 let target_id = self.interfaces.ids[i_interface].target_id;
-                _balance[source_id] += flow.target_flow - flow.source_flow;
-                _balance[target_id] += flow.source_flow - flow.target_flow;
+                outflow[source_id] += flow.source_flow;
+                inflow[target_id] += flow.source_flow;
+                outflow[target_id] += flow.target_flow;
+                inflow[source_id] += flow.target_flow;
             }
-            // let total_balance = _balance.iter().map(|&x| x.abs()).sum::<f64>();
-            let total_balance = _balance.iter().map(|&x| x * x).sum::<f64>().sqrt();
-            let total_flow = _flows
-                .iter()
-                .map(|flow| flow.target_flow + flow.source_flow)
-                .sum::<f64>();
 
-            if total_flow > f64::EPSILON {
-                total_balance / total_flow
-            } else {
-                total_balance
-            }
-        };
+            report.iterations = iteration;
+            report.residual = (0..n_zone)
+                .map(|zone| {
+                    let total = inflow[zone].abs() + outflow[zone].abs();
+                    if total > f64::EPSILON {
+                        2. * (inflow[zone] - outflow[zone]).abs() / total
+                    } else {
+                        0.
+                    }
+                })
+                .fold(0.0f64, f64::max);
 
-        let mut conv = false;
-        let mut it = 0;
-        let mut err = 0.;
-
-        while it < MAX_IT && !conv {
-            balance.fill(0.0);
-            let max_err = f_err(&mut balance, flows);
-
-            let delta = (err - max_err).abs();
-
-            conv = delta < ABS_TOL_CONV || delta / err.max(f64::EPSILON) < REL_TOL_CONV;
-            if conv {
+            if report.residual < settings.tolerance {
                 break;
             }
-            err = max_err;
-            it += 1;
+
+            //A compartment with no flow either way has nothing to scale
+            let factor: Vec<f64> = (0..n_zone)
+                .map(|zone| {
+                    if inflow[zone] > f64::EPSILON && outflow[zone] > f64::EPSILON {
+                        (inflow[zone] / outflow[zone]).sqrt()
+                    } else {
+                        1.
+                    }
+                })
+                .collect();
+
             for (i_interface, flow) in flows.iter_mut().enumerate() {
                 let source_id = self.interfaces.ids[i_interface].source_id;
                 let target_id = self.interfaces.ids[i_interface].target_id;
-                let corr = (balance[source_id] - balance[target_id])
-                    / (n_interfaces_per_zone[source_id] + n_interfaces_per_zone[target_id]) as f64;
-                flow.source_flow += corr;
-                flow.target_flow -= corr;
+                flow.source_flow *= factor[source_id];
+                flow.target_flow *= factor[target_id];
             }
         }
+
+        report
     }
 
     pub fn export_volume_integral_per_zone(

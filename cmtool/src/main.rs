@@ -49,13 +49,26 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
 
     std::fs::create_dir_all(&root_dir).unwrap();
 
-    let handle = cmtool_core::CMHandle::init(
+    let mut handle = cmtool_core::CMHandle::init(
         [common.n_i, common.n_j, common.n_k],
         &case.root,
         &case.geometry_file_path,
         cmtool_core::grid::MeshType::Cylindrical,
     )
     .unwrap();
+
+    //Flow balancing keeps its defaults unless the command line says otherwise
+    let mut balance = *handle.balance_settings();
+    if let Some(tolerance) = common.balance_tolerance {
+        balance.tolerance = tolerance;
+    }
+    if let Some(iterations) = common.balance_iterations {
+        balance.max_iterations = iterations;
+    }
+    if let Some(max_divergence) = common.max_divergence {
+        balance.max_divergence = max_divergence;
+    }
+    handle.set_balance_settings(balance);
 
     handle
         .dump_all(format!("{}/{}", root_dir, stem), &case.root, &case.paths)
