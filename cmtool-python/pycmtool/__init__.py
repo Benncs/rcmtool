@@ -20,23 +20,16 @@ Please contact:
 - Casale Benjamin: casale@insa-toulouse.fr
 """
 
-from .pycmtool import *  # noqa: F403
-from typing import Iterator, Tuple, Optional
+from typing import Tuple, Optional
+
 import scipy.sparse
 
-__doc__ = []
-__doc__.extend([pycmtool.data.__doc__])  # noqa: F405
+from . import pycmtool as _native
+from .pycmtool import *  # noqa: F403
 
-__all__ = []
-__doc__ = pycmtool.__doc__  # noqa: F405
-if hasattr(pycmtool, "__all__"):  # noqa: F405
-    __all__ = pycmtool.__all__  # noqa: F405
+__doc__ = _native.__doc__
 
-
-if hasattr(pycmtool, "__all__"):  # noqa: F405
-    __all__ = pycmtool.__all__  # noqa: F405
-
-
+__all__ = list(getattr(_native, "__all__", []))
 __all__.extend(["sparse_array_from_triplet", "get_sparse_transition_matrix"])
 
 
