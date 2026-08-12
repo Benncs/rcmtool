@@ -74,13 +74,15 @@ fn get_data_flow(
 }
 
 impl CMModel {
+    ///Both directions must carry a usable flow and both ids must address a compartment,
+    ///check_flow indexes mass_balance with them right after
     fn check_flux(n_zone: u32, rf: &RawFlux) -> bool {
-        let mut flag = false;
-        flag |= rf.flux_source_target.is_finite();
-        flag |= rf.flux_source_target.is_sign_positive();
-        flag |= rf.id_source < n_zone;
-        flag |= rf.id_target < n_zone;
-        flag
+        let is_flow_valid = |flow: f64| flow.is_finite() && flow.is_sign_positive();
+
+        is_flow_valid(rf.flux_source_target)
+            && is_flow_valid(rf.flux_target_source)
+            && rf.id_source < n_zone
+            && rf.id_target < n_zone
     }
 
     pub fn check_flow(&self, raw: &RawDataFlux) -> Result<(), ModelError> {
@@ -356,5 +358,42 @@ impl CMModel {
             .iter()
             .map(|zone| zone.iter().map(|v| v.volume).sum())
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const N_ZONE: u32 = 2;
+
+    fn flux(id_source: u32, id_target: u32, source_target: f64, target_source: f64) -> RawFlux {
+        RawFlux {
+            id_source,
+            id_target,
+            flux_source_target: source_target,
+            flux_target_source: target_source,
+        }
+    }
+
+    #[test]
+    fn test_check_flux_accepts_valid_flux() {
+        assert!(CMModel::check_flux(N_ZONE, &flux(0, 1, 2., 0.)));
+    }
+
+    ///An id out of range would index mass_balance out of bounds in check_flow
+    #[test]
+    fn test_check_flux_rejects_unknown_compartment() {
+        assert!(!CMModel::check_flux(N_ZONE, &flux(N_ZONE, 1, 2., 0.)));
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, N_ZONE, 2., 0.)));
+    }
+
+    #[test]
+    fn test_check_flux_rejects_unusable_flow() {
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, 1, f64::NAN, 0.)));
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, 1, -2., 0.)));
+        //Both directions are checked, not only source to target
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, 1, 2., f64::INFINITY)));
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, 1, 2., -1.)));
     }
 }
