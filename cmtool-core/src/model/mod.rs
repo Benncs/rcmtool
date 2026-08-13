@@ -15,6 +15,7 @@ use crate::{
 use std::{f64, sync::Arc};
 mod data;
 use cmtool_data::{FluxFileHeader, RawDataFlux, RawDataScalar, RawFlux};
+mod balance;
 mod compartments;
 mod geometry;
 mod interfaces;
@@ -24,32 +25,7 @@ pub use scalar::Scalar;
 pub use vectors::Vector as ModelVector;
 pub use vectors::Vector;
 
-///Knobs of the balancing pass, `Default` is what the CLI uses unless it is told otherwise
-#[derive(Debug, Clone, Copy)]
-pub struct BalanceSettings {
-    ///Iterations the balancing may spend before giving up
-    pub max_iterations: usize,
-    ///Divergence it aims for, convergence is linear so asking for much less costs iterations
-    pub tolerance: f64,
-    ///Divergence above which the resulting flow map is rejected
-    pub max_divergence: f64,
-}
-
-impl Default for BalanceSettings {
-    fn default() -> Self {
-        Self {
-            max_iterations: 1000,
-            tolerance: 1e-6,
-            max_divergence: 1e-2,
-        }
-    }
-}
-
-///What the balancing pass achieved, so that a caller can tell a converged map from a giving up one
-pub struct BalanceReport {
-    pub iterations: usize,
-    pub residual: f64,
-}
+pub use balance::{BalanceReport, BalanceSettings};
 
 pub struct CMModel {
     geometry: Arc<CMGeometry>,
@@ -81,24 +57,6 @@ fn get_data_flow(
         },
         fluxes,
     }
-
-    // let mut flux_field = RawDataFlux::new(n_zones, i_flow.len());
-    // for (i_interface, rd) in flux_field.fluxes.iter_mut().enumerate() {
-    //     let InterfaceInfo {
-    //         source_id,
-    //         target_id,
-    //     } = i_info[i_interface];
-    //     rd.id_source = source_id as u32;
-    //     rd.id_target = target_id as u32;
-    //     let InterfaceFlow {
-    //         source_flow,
-    //         target_flow,
-    //     } = &i_flow[i_interface];
-    //     rd.flux_source_target = *source_flow;
-    //     rd.flux_target_source = *target_flow;
-    // }
-
-    // flux_field
 }
 
 impl CMModel {
@@ -278,19 +236,12 @@ impl CMModel {
     // pub fn export_volume_integral_per_zone(&self,scalar:&mut cmtool_data::RawDataScalar) {
     //     todo!()
     // }
-    ///Scales the flows until every compartment sends out what it receives.
+
+    ///Balance flow
     ///
-    ///A flow is only ever multiplied by a positive factor, so it can never turn negative, which
-    ///the raw format forbids: `RawFlux::from_bytes` refuses to read a negative flux. Scaling the
+    ///A flow is only ever multiplied by a positive factor. Scaling the
     ///flows leaving a compartment by `sqrt(in / out)` moves it halfway to its balance, and
     ///repeating it converges the same way Sinkhorn balancing does.
-    ///
-    ///```text
-    ///        in = 1        in = 2        in = 2
-    ///     ->[ z ]->     ->[ z ]->     ->[ z ]->
-    ///        out = 4       out = 2       out = 2
-    ///     scale by sqrt(1/4) = 1/2, then again, until both agree
-    ///```
     fn balance(&self, flows: &mut [InterfaceFlow], settings: &BalanceSettings) -> BalanceReport {
         let n_zone = self.geometry.n_zone();
         let mut inflow = vec![0.0f64; n_zone];

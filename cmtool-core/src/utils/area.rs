@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use super::polygon::{HalfSpace, Polygon};
 use crate::{
     coordinates::*,
     ensight_gold::types::{ElementsType, VolumeElementTypes},
@@ -85,10 +86,6 @@ fn sort_points_ccw_3d(points: &[[f64; 3]], normal: &CartesianVec3) -> Vec<[f64; 
 
     indices.iter().map(|&i| points[i]).collect()
 }
-
-///A tetra cut by a plane gives at most 4 vertices, and clipping a convex polygon by a half space
-///adds at most one, so four bounds can never take it past 8
-const MAX_POLYGON_VERTICES: usize = 12;
 
 ///Index of the radial axis, the only face of a cylindrical compartment that is not a plane
 const RADIAL_AXIS: usize = 0;
@@ -277,87 +274,6 @@ fn polygon_annulus_area(polygon: &[Coords3], radii: [f64; 2]) -> f64 {
     (disk_area(radii[1]) - disk_area(radii[0])).abs()
 }
 
-///Points kept by the clipper are the ones with `normal . point >= offset`
-struct HalfSpace {
-    normal: CartesianVec3,
-    offset: f64,
-}
-
-impl HalfSpace {
-    fn signed_distance(&self, point: &Coords3) -> f64 {
-        self.normal.dot(&CartesianVec3(*point)) - self.offset
-    }
-}
-
-///Convex polygon of the intersection, kept on the stack: this runs once per element per interface
-struct Polygon {
-    points: [Coords3; MAX_POLYGON_VERTICES],
-    len: usize,
-}
-
-impl Polygon {
-    fn from_slice(points: &[Coords3]) -> Self {
-        let mut polygon = Self {
-            points: [[0.; 3]; MAX_POLYGON_VERTICES],
-            len: points.len().min(MAX_POLYGON_VERTICES),
-        };
-        polygon.points[..polygon.len].copy_from_slice(&points[..polygon.len]);
-        polygon
-    }
-
-    fn as_slice(&self) -> &[Coords3] {
-        &self.points[..self.len]
-    }
-
-    fn push(&mut self, point: Coords3) {
-        if self.len < MAX_POLYGON_VERTICES {
-            self.points[self.len] = point;
-            self.len += 1;
-        }
-    }
-
-    ///Sutherland-Hodgman clipping of the polygon by one half space, the polygon has to be convex
-    ///and its vertices ordered. See https://en.wikipedia.org/wiki/Sutherland%E2%80%93Hodgman_algorithm
-    ///
-    ///        keep | drop            keep |
-    ///     +-------|---+          +-------+
-    ///     |       |  /           |      /
-    ///     |  poly | /     =      |     /
-    ///     |       |/             |    /
-    ///     +-------+              +---+
-    ///
-    fn clip(&self, half_space: &HalfSpace) -> Self {
-        let mut clipped = Self {
-            points: [[0.; 3]; MAX_POLYGON_VERTICES],
-            len: 0,
-        };
-
-        for i in 0..self.len {
-            let current = self.points[i];
-            let previous = self.points[(i + self.len - 1) % self.len];
-
-            let d_current = half_space.signed_distance(&current);
-            let d_previous = half_space.signed_distance(&previous);
-
-            //The edge crosses the boundary, the crossing point belongs to the clipped polygon
-            if (d_current >= 0.) != (d_previous >= 0.) {
-                let t = d_previous / (d_previous - d_current);
-                clipped.push([
-                    previous[0] + t * (current[0] - previous[0]),
-                    previous[1] + t * (current[1] - previous[1]),
-                    previous[2] + t * (current[2] - previous[2]),
-                ]);
-            }
-
-            if d_current >= 0. {
-                clipped.push(current);
-            }
-        }
-
-        clipped
-    }
-}
-
 fn polygon_area_3d(points: &[Coords3], normal: &CartesianVec3) -> f64 {
     let n = normal.normalized();
 
@@ -479,7 +395,7 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
             polygon.clip(half_space)
         });
 
-    if clipped.len < 3 {
+    if clipped.as_slice().len() < 3 {
         return 0.0;
     }
 

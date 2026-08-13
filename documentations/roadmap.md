@@ -6,9 +6,6 @@
 
 ## Core
 
-- CFD-to_CMA algo doesn't work because of bad interface area calculation
-  - Scalar field ok 
-  - vector field direction seems to be good but magnitude false because of area
 
 ## Assemble
 

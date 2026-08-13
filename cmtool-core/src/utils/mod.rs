@@ -4,6 +4,7 @@ use crate::coordinates::*;
 use crate::ensight_gold::types::{ElementsType, VolumeElementTypes};
 mod area;
 pub use area::*;
+mod polygon;
 
 #[inline(always)]
 pub fn linear_index_2d_matrix_row_major(i_coord: usize, i_axis: usize, n_col: usize) -> usize {
