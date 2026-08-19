@@ -172,6 +172,24 @@ impl CMHandle {
         )
     }
 
+    ///Integrates a scalar over each compartment, weighting every element by `phase_fraction`
+    ///first, so a field carried by one phase is integrated over the volume that phase occupies.
+    ///Scaling the compartment integral afterwards is not the same number unless the field and
+    ///the fraction are uncorrelated inside the compartment.
+    pub fn dump_scalar_fraction(
+        &self,
+        res_name: impl AsRef<std::path::Path>,
+        path: impl AsRef<std::path::Path>,
+        phase_fraction: Scalar,
+    ) -> Result<RawDataScalar, CoreError> {
+        let scalar = self.get_scalar(path)?.element_wise(&phase_fraction)?;
+        let scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
+
+        scalar_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
+
+        Ok(scalar_data)
+    }
+
     pub fn dump_real_volume(&self, res_name: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
         let volumes_data: RawDataScalar = self.model.get_real_volume().into();
 
@@ -295,7 +313,7 @@ impl CMHandle {
     // }
 
     #[cfg(feature = "use_vtk")]
-    fn export_vtk(
+    pub fn export_vtk(
         &self,
         path: impl AsRef<std::path::Path>,
         sc: Vec<(RawDataScalar, String)>,
