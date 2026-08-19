@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 mod case;
+mod generate;
 mod rd;
 mod transitionner;
 
@@ -33,6 +34,7 @@ impl From<DataError> for PythonError {
 #[pymodule]
 mod pycmtool {
     use super::case as _c;
+    use super::generate as _g;
     use super::rd::*;
     use super::transitionner::*;
     use pyo3::pymodule;
@@ -52,5 +54,11 @@ mod pycmtool {
     mod case {
         #[pymodule_export]
         use super::_c::{CMCaseWrapper, CMExportTypeWrapper, make_cm_case, read_cm_case};
+    }
+
+    #[pymodule]
+    mod generate {
+        #[pymodule_export]
+        use super::_g::CMHandleWrapper;
     }
 }

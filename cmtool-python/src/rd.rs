@@ -16,7 +16,7 @@ use crate::PythonError;
 /* Scalar */
 
 #[pyclass(name = "RawDataScalar", frozen)]
-pub struct RawDataScalarWrapper(cmtool_data::RawDataScalar);
+pub struct RawDataScalarWrapper(pub(crate) cmtool_data::RawDataScalar);
 #[pymethods]
 impl RawDataScalarWrapper {
     #[getter]
