@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Pinned: an unpinned maturin auto-upgraded and broke the free-threaded step.
+  MATURIN_VERSION: "1.14.1"
+
 jobs:
   linux:
     runs-on: ${{ matrix.platform.runner }}
@@ -35,6 +39,7 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: "${{ env.MATURIN_VERSION }}"
           target: ${{ matrix.platform.target }}
           args: --release --out dist
           sccache: "true"
@@ -42,8 +47,9 @@ jobs:
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: "${{ env.MATURIN_VERSION }}"
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13t
+          args: --release --out dist -i python3.14t
           sccache: "true"
           manylinux: auto
       - name: Upload wheels
@@ -94,6 +100,7 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: "${{ env.MATURIN_VERSION }}"
           target: ${{ matrix.platform.target }}
           args: --release --out dist
           sccache: "true"
@@ -101,8 +108,9 @@ jobs:
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: "${{ env.MATURIN_VERSION }}"
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13t
+          args: --release --out dist -i python3.14t
           sccache: "true"
           manylinux: musllinux_1_2
       - name: Upload wheels
@@ -164,7 +172,7 @@ jobs:
   #uses: PyO3/maturin-action@v1
   #with:
   #target: ${{ matrix.platform.target }}
-  #args: --release --out dist -i python3.13t
+  #args: --release --out dist -i python3.14t
   #sccache: 'true'
   #- name: Upload wheels
   #uses: actions/upload-artifact@v4
@@ -197,14 +205,19 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: "${{ env.MATURIN_VERSION }}"
           target: ${{ matrix.platform.target }}
           args: --release --out dist
           sccache: "true"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14t"
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: "${{ env.MATURIN_VERSION }}"
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13t
+          args: --release --out dist -i python3.14t
           sccache: "true"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -227,6 +240,7 @@ jobs:
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: "${{ env.MATURIN_VERSION }}"
           command: sdist
           args: --out dist
       - name: Upload sdist
