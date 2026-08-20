@@ -43,8 +43,10 @@ fn get_transition_from_fm(fm: Array2<f64>) -> (CooMatrix<f64>, Vec<f64>) {
         for i_col in 0..n_compartments {
             if i_row != i_col {
                 let val = *fm.get((i_row, i_col)).expect("Bad formated flowmap");
-                transition.push(i_row, i_col, val);
-                row_sum[i_row] += val;
+                if val != 0.0 {
+                    transition.push(i_row, i_col, val);
+                    row_sum[i_row] += val;
+                }
             }
         }
     });
