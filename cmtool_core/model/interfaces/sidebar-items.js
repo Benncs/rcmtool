@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["REL_TOLERANCE_AREA"],"fn":["is_area_mismatch"],"struct":["AInterfacesInfo","InterfaceFlow","InterfaceInfo"]};

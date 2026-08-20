@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["CartesianVec3","CylindricalVec3"],"trait":["Vec3"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["AXIAL_AXIS","RADIAL_AXIS"],"fn":["compute_intersection_area","is_curved_face","planar_bounds","polygon_annulus_area","polygon_area_3d","project_points_to_plane_2d","sort_points_ccw_3d","tangent_plane_at","tetra_area","triangle_disk_area"]};

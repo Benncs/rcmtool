@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["case","geo","reader","scalar","types","variable","vectors"],"struct":["Geometry","Part","Reader"],"trait":["RawField"]};

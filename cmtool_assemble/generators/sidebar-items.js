@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["GAS_PAIR","LIQUID_PAIR","MERGE_FOLDER_NAME","PAIRS"],"fn":["default_gas_phase","path_str","raw_phase_from_flow_vol","read_case_phases"],"mod":["artefact","descriptors"],"struct":["Field0D","Generator"],"type":["PairType"]};

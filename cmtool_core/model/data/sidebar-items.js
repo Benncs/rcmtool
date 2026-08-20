@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["C_MAX_NUMBER_VERTEX_PER_VOLUME_ELEM"],"struct":["VerticesData","VolumeElementData"]};

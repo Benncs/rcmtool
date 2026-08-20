@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["__pyo3_pymodule"],"mod":["case","data","generate"]};

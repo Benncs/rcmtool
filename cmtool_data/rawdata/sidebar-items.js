@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["FluxFileHeader","RawDataFlux","RawDataScalar","RawFlux","RawPhase","RawScalar","ScalarFileHeader"],"trait":["FromBytes","RawData","ToBytes"],"type":["ScalarValueType"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["NUMBER_OF_AXIS"],"fn":["get_normal","orthonormal_basis"],"mod":["points","vec3"],"struct":["BoundedPlane","CartesianCoordinates","CartesianVec3","CylindricalCoordinates","CylindricalVec3","Plane"],"trait":["Vec3"],"type":["Coords3"]};

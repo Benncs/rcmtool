@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CartesianAxis","CylindricalAxis","OrientedAxis"],"fn":["cylindrical_index","index_to_oriented","oriented_to_cylindrical"],"struct":["AxisDescriptor","CoordAxis"]};

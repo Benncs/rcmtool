@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAXIMAL_NUMBER_OF_MESH_ELEMENT_TYPE","MAXIMAL_NUMBER_OF_PART"],"fn":["is_section_end","read_section_header","section_end"],"struct":["Geometry","MeshElementType","Part","SectionEnd"]};

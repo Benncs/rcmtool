@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_CASE_FILE_NAME"],"fn":["read_case"],"struct":["CCMCaseInfo","CMCase","CMCaseJson"],"trait":["CMCaseReader","CMCaseWriter"]};

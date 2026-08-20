@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["compute_centroid","compute_intersection_area","compute_volume","is_curved_face","linear_index_2d_matrix_row_major","linear_index_coordinates_matrix","tangent_plane_at","tetra_volume"],"mod":["area","polygon"],"type":["AxisPoints"]};

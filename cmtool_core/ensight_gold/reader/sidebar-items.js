@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ENSIGHT_GOLDER_BINARY_FORMAT_LINE_SIZE"],"struct":["FileBuffer","Reader"],"type":["EnsightGoldReader"]};
