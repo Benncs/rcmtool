@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::{CMCase, DataError, states::IterationState};
 use std::sync::Arc;
 mod buffer;
@@ -90,14 +92,16 @@ pub trait FlowMapTransitioner {
     where
         Self: Sized,
     {
-        let buffer = if case.is_reursive {
-            let folders = case.get_folders(root);
+        let buffer = if case.is_recursive {
+            let folders = case.get_folders(root)?;
 
-            let mut buffers = Vec::new();
+            let mut buffers = Vec::with_capacity(folders.len());
             for folder in folders.iter() {
-                buffers.push(read_descriptors(&format!("{}/{}", root, folder), case).unwrap());
+                buffers.push(read_descriptors(&format!("{}/{}", root, folder), case)?);
             }
-            FlowMapBuffer::new(buffers).unwrap()
+            // `None` here means no `i_*` folder was found, or that some of them
+            // carry a gas phase and others do not.
+            FlowMapBuffer::new(buffers).ok_or(DataError::BadData)?
         } else {
             let buffer = read_descriptors(root, case)?;
             FlowMapBuffer::new_unique(buffer)

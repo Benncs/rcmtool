@@ -5,7 +5,7 @@
 
 use crate::{
     CoreError,
-    coordinates::{CartesianCoordinates, CartesianVec3, Coords3},
+    coordinates::{CartesianCoordinates, CartesianVec3},
     errors::ModelError,
     model::{
         compartments::{CompartmentInfo, CountVolumeElement, ElementVolumeInfo},
@@ -15,13 +15,17 @@ use crate::{
 use std::{f64, sync::Arc};
 mod data;
 use cmtool_data::{FluxFileHeader, RawDataFlux, RawDataScalar, RawFlux};
+mod balance;
 mod compartments;
 mod geometry;
 mod interfaces;
 mod scalar;
 mod vectors;
 pub use scalar::Scalar;
+pub use vectors::Vector as ModelVector;
 pub use vectors::Vector;
+
+pub use balance::{BalanceReport, BalanceSettings};
 
 pub struct CMModel {
     geometry: Arc<CMGeometry>,
@@ -53,39 +57,32 @@ fn get_data_flow(
         },
         fluxes,
     }
-
-    // let mut flux_field = RawDataFlux::new(n_zones, i_flow.len());
-    // for (i_interface, rd) in flux_field.fluxes.iter_mut().enumerate() {
-    //     let InterfaceInfo {
-    //         source_id,
-    //         target_id,
-    //     } = i_info[i_interface];
-    //     rd.id_source = source_id as u32;
-    //     rd.id_target = target_id as u32;
-    //     let InterfaceFlow {
-    //         source_flow,
-    //         target_flow,
-    //     } = &i_flow[i_interface];
-    //     rd.flux_source_target = *source_flow;
-    //     rd.flux_target_source = *target_flow;
-    // }
-
-    // flux_field
 }
 
 impl CMModel {
+    ///Both directions must carry a usable flow and both ids must address a compartment,
+    ///check_flow indexes mass_balance with them right after
     fn check_flux(n_zone: u32, rf: &RawFlux) -> bool {
-        let mut flag = false;
-        flag |= rf.flux_source_target.is_finite();
-        flag |= rf.flux_source_target.is_sign_positive();
-        flag |= rf.id_source < n_zone;
-        flag |= rf.id_target < n_zone;
-        flag
+        let is_flow_valid = |flow: f64| flow.is_finite() && flow.is_sign_positive();
+
+        is_flow_valid(rf.flux_source_target)
+            && is_flow_valid(rf.flux_target_source)
+            && rf.id_source < n_zone
+            && rf.id_target < n_zone
     }
 
-    pub fn check_flow(&self, raw: &RawDataFlux) -> Result<(), ModelError> {
-        const REL_TOLERANCE_DIVERGENCE_CELL: f64 = 1e-2;
+    pub fn check_flow(&self, raw: &RawDataFlux, max_divergence: f64) -> Result<(), ModelError> {
         const ABS_TOLERANCE_DIVERGENCE_CELL: f64 = 1e-7;
+
+        //A field of zeros balances perfectly and transports nothing: it is missing data, not a
+        //valid flow map
+        if raw
+            .fluxes
+            .iter()
+            .all(|flux| flux.flux_source_target == 0. && flux.flux_target_source == 0.)
+        {
+            return Err(ModelError::EmptyFlow);
+        }
 
         let mut mass_balance: Vec<InterfaceFlow> =
             vec![InterfaceFlow::default(); raw.header.n_zone as usize];
@@ -117,11 +114,8 @@ impl CMModel {
             } else {
                 abs_diff
             };
-            if abs_diff > ABS_TOLERANCE_DIVERGENCE_CELL && err > REL_TOLERANCE_DIVERGENCE_CELL {
-                return Err(ModelError::CellToCellDivergence(
-                    err,
-                    REL_TOLERANCE_DIVERGENCE_CELL,
-                ));
+            if abs_diff > ABS_TOLERANCE_DIVERGENCE_CELL && err > max_divergence {
+                return Err(ModelError::CellToCellDivergence(err, max_divergence));
             }
         }
 
@@ -179,67 +173,63 @@ impl CMModel {
         todo!()
     }
 
-    fn get_average_velocity(
-        &self,
-        vector: &Vector,
-        _curent_inteface_element: &[usize],
-        __curent_inteface_area: &[f64],
-    ) -> Coords3 {
-        let total_area: f64 = __curent_inteface_area.iter().sum();
-        _curent_inteface_element
-            .iter()
-            .zip(__curent_inteface_area)
-            .fold([0.0f64; 3], |acc, (gid, a)| {
-                let v = CartesianVec3(vector.get_slice_xyz(*gid).to_owned());
-                let CartesianCoordinates(centroid) = self.geometry.volume_elements.xyz[*gid];
-                let theta = centroid[1].atan2(centroid[0]);
-                let cyl = v.to_cylindrical_vec(theta).0;
-                [
-                    acc[0] + cyl[0] * a / total_area,
-                    acc[1] + cyl[1] * a / total_area,
-                    acc[2] + cyl[2] * a / total_area,
-                ]
-            })
+    ///Velocity of one element along the normal of the interface it crosses.
+    ///
+    ///The velocity stays a vector up to here and is projected on the *local* normal: on a radial
+    ///or theta face the normal turns with theta, so it has to be taken at the position of the
+    ///element and not once for the whole interface.
+    fn normal_velocity(&self, vector: &Vector, element_global_id: usize, axis: usize) -> f64 {
+        let velocity = CartesianVec3(*vector.get_slice_xyz(element_global_id));
+        let CartesianCoordinates(centroid) = self.geometry.volume_elements.xyz[element_global_id];
+        let theta = centroid[1].atan2(centroid[0]);
+
+        velocity.to_cylindrical_vec(theta).0[axis]
     }
 
     pub fn compute_flux_between_compartments(
         &self,
         vector: Vector,
+        settings: &BalanceSettings,
     ) -> Result<cmtool_data::RawDataFlux, CoreError> {
         let n_fluxes = self.interfaces.n_interfaces();
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
 
+        //Flux of an interface is the surface integral of the velocity over the area the elements
+        //really cover, element by element: sum(a_e * v_e.n_e). Taking an average velocity times
+        //the geometric face instead would count area the vessel does not have, which is what
+        //inflates the flow of the compartments sitting on its boundary.
+        //
+        //Both directions are accumulated separately, so a counter current inside one interface is
+        //kept as gross exchange and neither direction can come out negative.
         for (i_interface, flow) in flows.iter_mut().enumerate() {
             let axis: usize = self.interfaces.normal_axis[i_interface];
+            let areas = &self.interfaces.area[i_interface];
+            let elements = &self.interfaces.global_id_from_interface[i_interface];
 
-            let axis_oriented = crate::grid::index_to_oriented(axis);
+            for (&element_global_id, area) in elements.iter().zip(areas) {
+                let f = area * self.normal_velocity(&vector, element_global_id, axis);
 
-            let source_id = self.interfaces.ids[i_interface].source_id;
-            let theoretical_area = self
-                .geometry
-                .get_grid()
-                .unwrap()
-                .cell_surface(source_id, axis_oriented);
-
-            let current_interface_area = &self.interfaces.area[i_interface];
-            let curent_inteface_element = &self.interfaces.global_id_from_interface[i_interface];
-            let v_avg =
-                self.get_average_velocity(&vector, curent_inteface_element, current_interface_area);
-
-            let f = v_avg[axis] * theoretical_area;
-
-            if f > 0. {
-                flow.source_flow += f
-            } else if f < 0. {
-                flow.target_flow += f.abs()
+                //The normal of the interface points from its source to its target
+                if f > 0. {
+                    flow.source_flow += f;
+                } else {
+                    flow.target_flow -= f;
+                }
             }
         }
 
-        self.clean(&mut flows);
+        let balance = self.balance(&mut flows, settings);
+        if balance.residual > settings.max_divergence {
+            return Err(ModelError::CellToCellDivergence(
+                balance.residual,
+                settings.max_divergence,
+            )
+            .into());
+        }
 
         let data_flow = get_data_flow(self.geometry.n_zone(), &self.interfaces.ids, &flows);
 
-        self.check_flow(&data_flow)?;
+        self.check_flow(&data_flow, settings.max_divergence)?;
         Ok(data_flow)
     }
 
@@ -247,80 +237,68 @@ impl CMModel {
     //     todo!()
     // }
 
-    fn clean(&self, flows: &mut [InterfaceFlow]) {
-        // const TOL: f64 = 1e-19;
-        const ABS_TOL_CONV: f64 = 1e-12;
-        const REL_TOL_CONV: f64 = 1e-6;
-
-        const MAX_IT: usize = 10000;
-        let mut balance = vec![0.0f64; self.geometry.n_zone()];
-        let n_interfaces_per_zone = {
-            let mut tmp = vec![0usize; self.geometry.n_zone()];
-            for i_interface in 0..flows.len() {
-                let source_id = self.interfaces.ids[i_interface].source_id;
-                let target_id = self.interfaces.ids[i_interface].target_id;
-                tmp[source_id] += 1;
-                tmp[target_id] += 1;
-            }
-            tmp
+    ///Balance flow
+    ///
+    ///A flow is only ever multiplied by a positive factor. Scaling the
+    ///flows leaving a compartment by `sqrt(in / out)` moves it halfway to its balance, and
+    ///repeating it converges the same way Sinkhorn balancing does.
+    fn balance(&self, flows: &mut [InterfaceFlow], settings: &BalanceSettings) -> BalanceReport {
+        let n_zone = self.geometry.n_zone();
+        let mut inflow = vec![0.0f64; n_zone];
+        let mut outflow = vec![0.0f64; n_zone];
+        let mut report = BalanceReport {
+            iterations: 0,
+            residual: f64::INFINITY,
         };
 
-        // let f_err = |_balance: &mut [f64], _flows: &[InterfaceFlow]| {
-        //     for (i_interface, flow) in _flows.iter().enumerate() {
-        //         let source_id = self.interfaces.ids[i_interface].source_id;
-        //         let target_id = self.interfaces.ids[i_interface].target_id;
-        //         _balance[source_id] += flow.target_flow - flow.source_flow;
-        //         _balance[target_id] += flow.source_flow - flow.target_flow;
-        //     }
-        //     _balance.iter().map(|x| x.abs()).fold(0.0f64, f64::max)
-        // };
-
-        let f_err = |_balance: &mut [f64], _flows: &[InterfaceFlow]| {
-            for (i_interface, flow) in _flows.iter().enumerate() {
+        for iteration in 0..settings.max_iterations {
+            inflow.fill(0.);
+            outflow.fill(0.);
+            for (i_interface, flow) in flows.iter().enumerate() {
                 let source_id = self.interfaces.ids[i_interface].source_id;
                 let target_id = self.interfaces.ids[i_interface].target_id;
-                _balance[source_id] += flow.target_flow - flow.source_flow;
-                _balance[target_id] += flow.source_flow - flow.target_flow;
+                outflow[source_id] += flow.source_flow;
+                inflow[target_id] += flow.source_flow;
+                outflow[target_id] += flow.target_flow;
+                inflow[source_id] += flow.target_flow;
             }
-            // let total_balance = _balance.iter().map(|&x| x.abs()).sum::<f64>();
-            let total_balance = _balance.iter().map(|&x| x * x).sum::<f64>().sqrt();
-            let total_flow = _flows
-                .iter()
-                .map(|flow| flow.target_flow + flow.source_flow)
-                .sum::<f64>();
 
-            if total_flow > f64::EPSILON {
-                total_balance / total_flow
-            } else {
-                total_balance
-            }
-        };
+            report.iterations = iteration;
+            report.residual = (0..n_zone)
+                .map(|zone| {
+                    let total = inflow[zone].abs() + outflow[zone].abs();
+                    if total > f64::EPSILON {
+                        2. * (inflow[zone] - outflow[zone]).abs() / total
+                    } else {
+                        0.
+                    }
+                })
+                .fold(0.0f64, f64::max);
 
-        let mut conv = false;
-        let mut it = 0;
-        let mut err = 0.;
-
-        while it < MAX_IT && !conv {
-            balance.fill(0.0);
-            let max_err = f_err(&mut balance, flows);
-
-            let delta = (err - max_err).abs();
-
-            conv = delta < ABS_TOL_CONV || delta / err.max(f64::EPSILON) < REL_TOL_CONV;
-            if conv {
+            if report.residual < settings.tolerance {
                 break;
             }
-            err = max_err;
-            it += 1;
+
+            //A compartment with no flow either way has nothing to scale
+            let factor: Vec<f64> = (0..n_zone)
+                .map(|zone| {
+                    if inflow[zone] > f64::EPSILON && outflow[zone] > f64::EPSILON {
+                        (inflow[zone] / outflow[zone]).sqrt()
+                    } else {
+                        1.
+                    }
+                })
+                .collect();
+
             for (i_interface, flow) in flows.iter_mut().enumerate() {
                 let source_id = self.interfaces.ids[i_interface].source_id;
                 let target_id = self.interfaces.ids[i_interface].target_id;
-                let corr = (balance[source_id] - balance[target_id])
-                    / (n_interfaces_per_zone[source_id] + n_interfaces_per_zone[target_id]) as f64;
-                flow.source_flow += corr;
-                flow.target_flow -= corr;
+                flow.source_flow *= factor[source_id];
+                flow.target_flow *= factor[target_id];
             }
         }
+
+        report
     }
 
     pub fn export_volume_integral_per_zone(
@@ -356,5 +334,42 @@ impl CMModel {
             .iter()
             .map(|zone| zone.iter().map(|v| v.volume).sum())
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const N_ZONE: u32 = 2;
+
+    fn flux(id_source: u32, id_target: u32, source_target: f64, target_source: f64) -> RawFlux {
+        RawFlux {
+            id_source,
+            id_target,
+            flux_source_target: source_target,
+            flux_target_source: target_source,
+        }
+    }
+
+    #[test]
+    fn test_check_flux_accepts_valid_flux() {
+        assert!(CMModel::check_flux(N_ZONE, &flux(0, 1, 2., 0.)));
+    }
+
+    ///An id out of range would index mass_balance out of bounds in check_flow
+    #[test]
+    fn test_check_flux_rejects_unknown_compartment() {
+        assert!(!CMModel::check_flux(N_ZONE, &flux(N_ZONE, 1, 2., 0.)));
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, N_ZONE, 2., 0.)));
+    }
+
+    #[test]
+    fn test_check_flux_rejects_unusable_flow() {
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, 1, f64::NAN, 0.)));
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, 1, -2., 0.)));
+        //Both directions are checked, not only source to target
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, 1, 2., f64::INFINITY)));
+        assert!(!CMModel::check_flux(N_ZONE, &flux(0, 1, 2., -1.)));
     }
 }

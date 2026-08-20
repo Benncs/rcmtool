@@ -1,24 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::fs::File;
-use std::fs;
 use std::io::Write;
+use std::{fs, path::PathBuf};
 use xsd_parser::{
     Config, Error,
     config::{GeneratorFlags, InterpreterFlags, OptimizerFlags, ParserFlags, RenderStep, Schema},
     generate,
 };
 
-static ROOT: &str = "./datamodel";
+static ROOT: &str = "datamodel";
+// static ROOT: &str = "./datamodel";
 
 fn domain_schema() -> Result<(), Box<Error>> {
-    // let files = [
-    //     format!("{}/units.xsd", ROOT),
-    //     format!("{}/reactors.xsd", ROOT),
-    //     format!("{}/connections.xsd", ROOT),
-    //     format!("{}/main.xsd", ROOT),
-    // ];
-    let mut cfg = Config::default().with_schema(Schema::File(format!("{}/main.xsd", ROOT).into()));
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR variable not found");
+    let path = PathBuf::from(manifest_dir).join(ROOT).join("main.xsd");
+    let mut cfg = Config::default().with_schema(Schema::File(path));
     cfg = cfg.set_parser_flags(ParserFlags::RESOLVE_INCLUDES | ParserFlags::DEFAULT_NAMESPACES);
     cfg = cfg.with_render_steps([
         //RenderStep::Types,
@@ -47,17 +45,19 @@ fn domain_schema() -> Result<(), Box<Error>> {
         - GeneratorFlags::USE_SCHEMA_MODULES;
 
     let code = generate(cfg).expect("Failed to generate Rust code from XSD");
+    let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
 
-    let mut file = File::create("src/parser/generated_domain.rs").unwrap();
+    let generated = out.join("generated_domain.rs");
+    let mut file = File::create(generated).unwrap();
 
-    file.write_all(
-        b"
-#![allow(clippy::all)]
-#![allow(dead_code)]
-#![allow(unused_imports)]
-",
-    )
-    .unwrap();
+    //     file.write_all(
+    //         b"
+    // #![allow(clippy::all)]
+    // #![allow(dead_code)]
+    // #![allow(unused_imports)]
+    // ",
+    //     )
+    //     .unwrap();
 
     file.write_all(code.to_string().as_bytes()).unwrap();
     Ok(())

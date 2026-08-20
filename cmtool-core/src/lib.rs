@@ -15,7 +15,6 @@ use grid::vtk::add_celldata_to_vtk;
 
 use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 use model::{CMGeometry, CMModel, Scalar, Vector};
-use std::cmp::Ordering;
 use std::{path::Path, sync::Arc};
 
 fn resolve_path(
@@ -38,12 +37,23 @@ pub enum ExportType {
 
 pub struct CMHandle {
     model: Arc<model::CMModel>,
+    ///Knobs of the balancing pass, the caller may replace them before generating
+    balance: model::BalanceSettings,
     _root_result: String, //TODO EITHER USE IT OR REMOVE
     eg_geometry: Arc<ensight_gold::Geometry>,
     cm_geometry: Arc<CMGeometry>,
 }
 
 impl CMHandle {
+    ///Replaces the balancing knobs used when a flow map is generated
+    pub fn set_balance_settings(&mut self, settings: model::BalanceSettings) {
+        self.balance = settings;
+    }
+
+    pub fn balance_settings(&self) -> &model::BalanceSettings {
+        &self.balance
+    }
+
     pub fn grid(&self) -> &dyn crate::grid::CompartmentMesh {
         self.model.grid()
     }
@@ -56,15 +66,7 @@ impl CMHandle {
     ) -> Result<Self, CoreError> {
         let fullpath = format!("{}/{}", root, geometry_filename);
 
-        let task_io =
-            std::thread::spawn(move || ensight_gold::Geometry::new(Path::new(&fullpath.clone())));
-
-        let eg_geometry = Arc::new(
-            task_io
-                .join()
-                .map_err(|_| CoreError::Custom("Thread error".to_string()))?
-                .map_err(|_| CoreError::Custom("Arc error".to_string()))?,
-        ); //FIXME
+        let eg_geometry = Arc::new(ensight_gold::Geometry::new(Path::new(&fullpath))?);
 
         println!("{}", eg_geometry);
 
@@ -76,6 +78,7 @@ impl CMHandle {
 
         Ok(Self {
             model: Arc::new(CMModel::init(cm_geometry.clone())),
+            balance: Default::default(),
             _root_result: String::from("./test"),
             eg_geometry,
             cm_geometry,
@@ -96,20 +99,8 @@ impl CMHandle {
     ) -> Result<(), CoreError> {
         std::fs::create_dir_all(&root_export)?;
 
+        //Scalars and vectors are dumped independently, only the scalars are kept for the vtk export
         let mut rs = Vec::with_capacity(vars.len());
-        let mut v: Vec<ensight_gold::case::VariableInfo> = vars.to_owned();
-
-        v.sort_by(|a, _b| {
-            if a.get_type() == ensight_gold::case::VariableType::Scalar {
-                Ordering::Less
-            }
-            // } else if b.get_type() == ensight_gold::case::VariableType::Scalar {
-            //     Ordering::Less
-            // }
-            else {
-                Ordering::Equal
-            }
-        });
 
         for v in vars.iter() {
             match v.get_type() {
@@ -181,6 +172,24 @@ impl CMHandle {
         )
     }
 
+    ///Integrates a scalar over each compartment, weighting every element by `phase_fraction`
+    ///first, so a field carried by one phase is integrated over the volume that phase occupies.
+    ///Scaling the compartment integral afterwards is not the same number unless the field and
+    ///the fraction are uncorrelated inside the compartment.
+    pub fn dump_scalar_fraction(
+        &self,
+        res_name: impl AsRef<std::path::Path>,
+        path: impl AsRef<std::path::Path>,
+        phase_fraction: Scalar,
+    ) -> Result<RawDataScalar, CoreError> {
+        let scalar = self.get_scalar(path)?.element_wise(&phase_fraction)?;
+        let scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
+
+        scalar_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
+
+        Ok(scalar_data)
+    }
+
     pub fn dump_real_volume(&self, res_name: impl AsRef<std::path::Path>) -> Result<(), CoreError> {
         let volumes_data: RawDataScalar = self.model.get_real_volume().into();
 
@@ -199,7 +208,9 @@ impl CMHandle {
         let vector =
             Vector::new(v, &self.cm_geometry, &self.eg_geometry).scale_by(phase_fraction)?;
 
-        let flow_data = self.model.compute_flux_between_compartments(vector)?;
+        let flow_data = self
+            .model
+            .compute_flux_between_compartments(vector, &self.balance)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -210,7 +221,9 @@ impl CMHandle {
         res_name: impl AsRef<std::path::Path>,
         vector: Vector,
     ) -> Result<(), CoreError> {
-        let flow_data = self.model.compute_flux_between_compartments(vector)?;
+        let flow_data = self
+            .model
+            .compute_flux_between_compartments(vector, &self.balance)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -223,7 +236,9 @@ impl CMHandle {
     ) -> Result<(), CoreError> {
         let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
         let vector = Vector::new(v, &self.cm_geometry, &self.eg_geometry);
-        let flow_data = self.model.compute_flux_between_compartments(vector)?;
+        let flow_data = self
+            .model
+            .compute_flux_between_compartments(vector, &self.balance)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -241,15 +256,29 @@ impl CMHandle {
         Vector::from_scalar([s, sj, sk], &self.cm_geometry, &self.eg_geometry)
     }
 
+    ///Volume of each compartment, as covered by the mesh
+    pub fn real_volume(&self) -> Vec<f64> {
+        self.model.get_real_volume()
+    }
+
+    ///Flow map out of the three components of a velocity, optionally scaled by the volume
+    ///fraction of its phase: a phase only carries its own share of the flow
     pub fn dump_vector_from_scalar(
         &self,
         res_name: impl AsRef<std::path::Path>,
         path_i: impl AsRef<std::path::Path>,
         path_j: impl AsRef<std::path::Path>,
         path_k: impl AsRef<std::path::Path>,
+        phase_fraction: Option<Scalar>,
     ) -> Result<RawDataFlux, CoreError> {
         let vector = self.vector_from_scalar(path_i, path_j, path_k)?;
-        let flow_data = self.model.compute_flux_between_compartments(vector)?;
+        let vector = match phase_fraction {
+            Some(fraction) => vector.scale_by(fraction)?,
+            None => vector,
+        };
+        let flow_data = self
+            .model
+            .compute_flux_between_compartments(vector, &self.balance)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(flow_data)
@@ -284,7 +313,7 @@ impl CMHandle {
     // }
 
     #[cfg(feature = "use_vtk")]
-    fn export_vtk(
+    pub fn export_vtk(
         &self,
         path: impl AsRef<std::path::Path>,
         sc: Vec<(RawDataScalar, String)>,
@@ -312,5 +341,26 @@ impl CMHandle {
         std::fs::write(path, vtk_bytes).unwrap();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    ///An unreadable geometry used to be reported as "Arc error" by the io thread
+    #[test]
+    fn test_init_reports_unreadable_geometry() {
+        let error = match CMHandle::init(
+            [1, 1, 1],
+            "/nonexistent",
+            "geometry.geo",
+            grid::MeshType::Cylindrical,
+        ) {
+            Ok(_) => panic!("a missing geometry must not build a handle"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(error, CoreError::IO(_)), "{}", error);
     }
 }

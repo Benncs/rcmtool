@@ -42,7 +42,8 @@ fn _generate_reactor_0d<T: cmtool_data::CMCaseWriter>(
     let descriptor = crate::generators::Reactor0DDescriptor::from_fraction(
         volume,
         reactor0d.volume_fraction.content as f64,
-    );
+    )
+    .map_err(|e| CMError::Custom(format!("Reactor '{}': {}", reactor0d.id, e)))?;
 
     let case = generator.generate_0d(descriptor, opt_path)?;
 
@@ -82,7 +83,6 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
             unimplemented!("pfr needs length")
         }
         generated_domain::GeneralSizeType::Dimension(dim) => {
-            eprintln!("TODO: PFR GENERATION W/O FLOW RATES");
             let desc = PFRDescription::new(
                 current_pfr.compartments.get(),
                 dim.length.content,
@@ -92,7 +92,13 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
                 current_pfr.volume_fraction.content,
                 1e-9,
             )
-            .map_err(|e| CMError::Custom(format!("Invalid PFR descritor {}", e)))?;
+            //Flow comes from the Feeds/Connections of the reactor, a PFR without any is invalid
+            .map_err(|e| {
+                CMError::Custom(format!(
+                    "Reactor '{}': {}, check the Feeds and Connections declaring its flow",
+                    current_pfr.id, e
+                ))
+            })?;
 
             let case: cmtool_data::CMCase = generator.generate_1d(desc, opt_path)?;
             if let Some(p) = &path {
@@ -102,6 +108,17 @@ fn _generate_reactor_1d<T: cmtool_data::CMCaseWriter>(
         }
     };
     Ok(())
+}
+
+///The flow map of a ReactorFromFile is not generated, it is read back from the case it points to
+fn _generate_reactor_from_file(
+    generator: &mut Generator,
+    root: &Option<impl AsRef<std::path::Path>>,
+    ids: &mut Vec<String>,
+    reactor: &generated_domain::ReactorFromFileType,
+) -> Result<(), CMError> {
+    ids.push(reactor.id.clone());
+    generator.add_existing_case(&reactor.id, &reactor.path, root.is_none())
 }
 
 fn generate_partial_flowmap<T: cmtool_data::CMCaseWriter>(
@@ -122,8 +139,8 @@ fn generate_partial_flowmap<T: cmtool_data::CMCaseWriter>(
             generated_domain::ReactorsTypeContent::Reactor3D(reactor3_dtype) => {
                 todo!("{:?}", reactor3_dtype)
             }
-            generated_domain::ReactorsTypeContent::ReactorFromFile(_) => {
-                todo!("generate_partial_flowmap::ReactorFromFile")
+            generated_domain::ReactorsTypeContent::ReactorFromFile(r) => {
+                _generate_reactor_from_file(generator, &root, &mut ids, r)?;
             }
         }
     }
@@ -138,41 +155,262 @@ pub fn generate_flowmap(
 ) -> Result<Option<GenerateContract>, CMError> {
     let mut generator = Generator::new();
 
-    let save_intermediate = root.is_some();
-    //root is used only if save_intermediae is true
-    let _ids = generate_partial_flowmap::<CMCaseJson>(&mut generator, root.clone(), reactors, mb)?;
-    //TODO remove returning cm_path  merge and merge_from_memory dont need to return it cause it is 'root'
-    //Same when len(id)==1
-    // if _ids.len() > 1 {
-    //     let gc = if save_intermediate {
-    //         generator.merge(root.clone().unwrap(), &_ids, connections.clone())?;
-    //         None
-    //     } else {
-    //         Some(generator.merge_from_memory(connections.clone())?)
-    //     };
-    //     Ok((root.clone().unwrap().to_str().unwrap().to_owned(), gc))
-    // } else if _ids.len() == 1 && save_intermediate {
-    //     let r = root.unwrap();
-    //     let case_path = r.clone().join(&_ids[0]);
+    //A root means the partial cases are written next to the merged one
+    let ids = generate_partial_flowmap::<CMCaseJson>(&mut generator, root.clone(), reactors, mb)?;
 
-    //     let prep = format!("./{}", _ids[0]);
-    //     let case = CMCaseJson::read_case(&case_path)?.prepend_path(&prep);
-    //     let path = r.join("cma_case");
-    //     CMCaseJson::write_case(case, &path)?;
-    //     Ok((r.to_str().unwrap().to_owned(), None))
-    // } else {
-    //     Err(CMError::Custom("TODO ".to_owned()))
-    // }
-    if _ids.is_empty() {
+    if ids.is_empty() {
         return Err(CMError::Custom("No flowmap to generate".to_owned()));
     }
-    let gc = if save_intermediate {
-        generator.merge(root.clone().unwrap(), &_ids, connections.clone())?;
-        None
-    } else {
-        Some(generator.merge_from_memory(connections.clone())?)
+
+    //Merging in place needs no contract, the partial cases are already on disk
+    let gc = match root {
+        Some(root) => {
+            generator.merge(root, &ids, connections)?;
+            None
+        }
+        None => Some(generator.merge_from_memory(connections)?),
     };
     Ok(gc)
+}
+
+#[cfg(test)]
+mod test {
+    use cmtool_data::{CMAExportType, CMCaseJson, CMCaseReader, CMCaseWriter, RawData};
+
+    ///Existing case of a single compartment, as a ReactorFromFile would point to
+    fn write_existing_case(path: &str, gas_fraction: f64) {
+        std::fs::create_dir_all(path).unwrap();
+        let case = crate::generators::Generator::new()
+            .generate_0d(
+                crate::generators::Reactor0DDescriptor::from_fraction(10., gas_fraction)
+                    .expect("descriptor"),
+                Some(path.to_owned()),
+            )
+            .expect("existing case");
+        CMCaseJson::write_case(
+            case,
+            &std::path::Path::new(path).join(cmtool_data::DEFAULT_CASE_FILE_NAME),
+        )
+        .expect("existing cma_case");
+    }
+
+    fn domain_xml(existing_path: &str) -> String {
+        format!(
+            r#"<?xml version="1.0"?>
+<Root run_id="from_file" version="3">
+  <Reactors>
+    <ReactorFromFile id="existing">
+      <Path>{existing_path}</Path>
+    </ReactorFromFile>
+    <Reactor0D id="str">
+      <Size>
+        <Volume>5</Volume>
+      </Size>
+      <VolumeFraction>0</VolumeFraction>
+    </Reactor0D>
+  </Reactors>
+  <Connections>
+    <Flux phase="liquid">
+      <Source id="existing" compartment_id="0"></Source>
+      <Target id="str" compartment_id="0"></Target>
+      <Value unit="l/min">2</Value>
+    </Flux>
+  </Connections>
+</Root>"#
+        )
+    }
+
+    ///A ReactorFromFile is a reactor like the others: its existing flow map is merged with the
+    ///generated ones instead of replacing the whole domain
+    #[test]
+    fn test_merge_reactor_from_file_with_generated_reactor() {
+        let root = "/tmp/test_reactor_from_file";
+        let existing = format!("{}/existing", root);
+        let _ = std::fs::remove_dir_all(root);
+        write_existing_case(&existing, 0.);
+
+        let domain =
+            crate::generate_and_write_domain(root, &domain_xml(&existing)).expect("domain");
+
+        let merged = CMCaseJson::read_case(std::path::Path::new(root).join("cma_case").as_path())
+            .expect("merged case");
+        let flow_path = merged
+            .resolve(root, CMAExportType::LiquidFlow)
+            .expect("flow");
+        let volume_path = merged
+            .resolve(root, CMAExportType::LiquidVolume)
+            .expect("volume");
+
+        let flow = cmtool_data::RawDataFlux::read_raw(flow_path).expect("liquid flow");
+        let volume = cmtool_data::RawDataScalar::read_raw(volume_path).expect("liquid volume");
+
+        //The existing compartment comes first, the generated one is offset behind it
+        assert_eq!(flow.header.n_zone, 2);
+        assert_eq!(volume.values.len(), 2);
+        assert_eq!(volume.values[0].value, 10.);
+        assert_eq!(volume.values[1].value, 5.);
+
+        //The connection between both reactors survived the merge
+        assert!(
+            flow.fluxes
+                .iter()
+                .any(|f| f.id_source == 0 && f.id_target == 1 && f.flux_source_target == 2.)
+        );
+        assert_eq!(domain.info().total_number_compartment, 2);
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    ///A typo in a connection id used to abort the process
+    #[test]
+    fn test_unknown_connection_id() {
+        let root = "/tmp/test_unknown_connection_id";
+        let xml = r#"<?xml version="1.0"?>
+<Root run_id="typo" version="3">
+  <Reactors>
+    <Reactor0D id="str">
+      <Size>
+        <Volume>5</Volume>
+      </Size>
+      <VolumeFraction>0</VolumeFraction>
+    </Reactor0D>
+  </Reactors>
+  <Connections>
+    <Flux phase="liquid">
+      <Source id="str" compartment_id="0"></Source>
+      <Target id="typo_here" compartment_id="0"></Target>
+      <Value unit="l/min">2</Value>
+    </Flux>
+  </Connections>
+</Root>"#;
+
+        let error = match crate::generate_and_write_domain(root, xml) {
+            Ok(_) => panic!("an unknown connection id must not generate"),
+            Err(error) => error.to_string(),
+        };
+        let _ = std::fs::remove_dir_all(root);
+
+        assert!(error.contains("typo_here"), "{}", error);
+    }
+
+    ///An unsupported schema version used to panic with "ALED"
+    #[test]
+    fn test_unsupported_version() {
+        let root = "/tmp/test_unsupported_version";
+        let xml = r#"<?xml version="1.0"?>
+<Root run_id="old" version="2">
+  <Reactors>
+    <Reactor0D id="str">
+      <Size>
+        <Volume>5</Volume>
+      </Size>
+      <VolumeFraction>0</VolumeFraction>
+    </Reactor0D>
+  </Reactors>
+</Root>"#;
+
+        let error = match crate::generate_and_write_domain(root, xml) {
+            Ok(_) => panic!("version 2 is not supported"),
+            Err(error) => error.to_string(),
+        };
+        let _ = std::fs::remove_dir_all(root);
+
+        assert!(error.contains("version"), "{}", error);
+    }
+
+    ///A gas fraction outside [0, 1] used to panic in Reactor0DDescriptor::from_fraction
+    #[test]
+    fn test_invalid_gas_fraction() {
+        let root = "/tmp/test_invalid_gas_fraction";
+        let xml = r#"<?xml version="1.0"?>
+<Root run_id="bad_fraction" version="3">
+  <Reactors>
+    <Reactor0D id="str">
+      <Size>
+        <Volume>5</Volume>
+      </Size>
+      <VolumeFraction>1.5</VolumeFraction>
+    </Reactor0D>
+  </Reactors>
+</Root>"#;
+
+        let error = match crate::generate_and_write_domain(root, xml) {
+            Ok(_) => panic!("a gas fraction above 1 must not generate"),
+            Err(error) => error.to_string(),
+        };
+        let _ = std::fs::remove_dir_all(root);
+
+        assert!(error.contains("str"), "{}", error);
+        assert!(error.contains("Gas fraction"), "{}", error);
+    }
+
+    ///A PFR gets its flow from the Feeds/Connections, without any it is invalid and the error
+    ///has to name the reactor
+    #[test]
+    fn test_pfr_without_feed() {
+        let root = "/tmp/test_pfr_without_feed";
+        let xml = r#"<?xml version="1.0"?>
+<Root run_id="no_feed" version="3">
+  <Reactors>
+    <Reactor1D id="pfr">
+      <Size>
+        <Dimension>
+          <Diameter unit="m">0.01</Diameter>
+          <Length unit="m">1</Length>
+        </Dimension>
+      </Size>
+      <VolumeFraction>0</VolumeFraction>
+      <Compartments>4</Compartments>
+      <Dispersion unit="m^2/s">0</Dispersion>
+    </Reactor1D>
+  </Reactors>
+</Root>"#;
+
+        let error = match crate::generate_and_write_domain(root, xml) {
+            Ok(_) => panic!("a PFR without flow must not generate"),
+            Err(error) => error.to_string(),
+        };
+        let _ = std::fs::remove_dir_all(root);
+
+        assert!(error.contains("pfr"), "{}", error);
+        assert!(error.contains("Feeds"), "{}", error);
+    }
+
+    ///A liquid-only reactor of a two-phase domain keeps its gas compartments, otherwise every
+    ///gas id declared after it is shifted
+    #[test]
+    fn test_merge_gas_alignment() {
+        let root = "/tmp/test_merge_gas_alignment";
+        let existing = format!("{}/existing", root);
+        let _ = std::fs::remove_dir_all(root);
+        //Gas existing reactor, liquid only generated one
+        write_existing_case(&existing, 0.2);
+
+        crate::generate_and_write_domain(root, &domain_xml(&existing)).expect("domain");
+
+        let merged = CMCaseJson::read_case(std::path::Path::new(root).join("cma_case").as_path())
+            .expect("merged case");
+        let liquid = cmtool_data::RawDataScalar::read_raw(
+            merged
+                .resolve(root, CMAExportType::LiquidVolume)
+                .expect("volume"),
+        )
+        .expect("liquid volume");
+        let gas = cmtool_data::RawDataScalar::read_raw(
+            merged
+                .resolve(root, CMAExportType::GasVolume)
+                .expect("gas volume path"),
+        )
+        .expect("gas volume");
+
+        assert_eq!(liquid.values.len(), gas.values.len());
+        assert_eq!(gas.values.len(), 2);
+        assert_eq!(gas.values[0].value, 2.);
+        //The liquid only reactor contributes a neutral gas compartment
+        assert!(gas.values[1].value < 1e-6);
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }
 
 // fn parse_generate()

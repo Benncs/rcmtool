@@ -1,20 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 mod case;
+mod generate;
 mod rd;
 mod transitionner;
 
 use cmtool_data::DataError;
 use pyo3::prelude::*;
 
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyIOError, PyIndexError, PyRuntimeError, PyValueError};
 
 #[derive(Debug)]
 struct PythonError(DataError);
 
 impl From<PythonError> for PyErr {
     fn from(error: PythonError) -> Self {
-        PyRuntimeError::new_err(error.0.to_string())
+        let message = error.0.to_string();
+        match error.0 {
+            DataError::IO(_) => PyIOError::new_err(message),
+            DataError::Serde | DataError::BadData => PyValueError::new_err(message),
+            DataError::OutOfRange { .. } => PyIndexError::new_err(message),
+            DataError::Unknown => PyRuntimeError::new_err(message),
+        }
     }
 }
 
@@ -27,6 +34,7 @@ impl From<DataError> for PythonError {
 #[pymodule]
 mod pycmtool {
     use super::case as _c;
+    use super::generate as _g;
     use super::rd::*;
     use super::transitionner::*;
     use pyo3::pymodule;
@@ -45,6 +53,12 @@ mod pycmtool {
     #[pymodule]
     mod case {
         #[pymodule_export]
-        use super::_c::{CMCaseWrapper, make_cm_case, read_cm_case};
+        use super::_c::{CMCaseWrapper, CMExportTypeWrapper, make_cm_case, read_cm_case};
+    }
+
+    #[pymodule]
+    mod generate {
+        #[pymodule_export]
+        use super::_g::CMHandleWrapper;
     }
 }

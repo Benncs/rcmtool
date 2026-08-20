@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use super::polygon::{HalfSpace, Polygon};
 use crate::{
     coordinates::*,
     ensight_gold::types::{ElementsType, VolumeElementTypes},
@@ -84,6 +85,193 @@ fn sort_points_ccw_3d(points: &[[f64; 3]], normal: &CartesianVec3) -> Vec<[f64; 
     });
 
     indices.iter().map(|&i| points[i]).collect()
+}
+
+///Index of the radial axis, the only face of a cylindrical compartment that is not a plane
+const RADIAL_AXIS: usize = 0;
+
+///Index of the axial axis, whose face is flat but bounded by two arcs
+const AXIAL_AXIS: usize = 2;
+
+///A radial face is a cylindrical patch, every other face of the compartment is flat
+pub fn is_curved_face(face: &BoundedPlane) -> bool {
+    face.axis == RADIAL_AXIS
+}
+
+///Plane to cut one element with, when the face it crosses is curved.
+///
+///`get_interface_plane` gives the plane tangent at the middle of the compartment, which drifts
+///away from the patch as theta moves:
+///
+///```text
+///      tangent at theta_c
+///     ------+------            an element sitting here never reaches the tangent plane,
+///      __--- ---__             it contributes no area at all
+///    _-     |     -_  <- patch
+///   /       |       \
+///          axis
+///```
+///
+///Taking the tangent at the angular position of the element keeps the error down to the curvature
+///over one element instead of over one compartment.
+pub fn tangent_plane_at(
+    patch: &BoundedPlane,
+    CartesianCoordinates(element_centroid): CartesianCoordinates,
+) -> BoundedPlane {
+    let CartesianCoordinates(patch_origin) = patch.origin;
+    let radius = patch_origin[0].hypot(patch_origin[1]);
+    let theta = element_centroid[1].atan2(element_centroid[0]);
+
+    BoundedPlane {
+        normal: CartesianVec3([theta.cos(), theta.sin(), 0.]),
+        origin: CartesianCoordinates([radius * theta.cos(), radius * theta.sin(), patch_origin[2]]),
+        extent_u: patch.extent_u,
+        extent_v: patch.extent_v,
+        axis: patch.axis,
+    }
+}
+
+///Half spaces bounding the face of a compartment, when all of them are planes.
+///So a radial and a theta face are exactly clippable by half spaces, an axial face is not: its
+///r bounds are cylinders, and that case is left to the caller.
+fn planar_bounds(plane: &BoundedPlane) -> Vec<HalfSpace> {
+    let z_bounds = |z0: f64, z1: f64| {
+        [
+            HalfSpace {
+                normal: CartesianVec3([0., 0., 1.]),
+                offset: z0,
+            },
+            HalfSpace {
+                normal: CartesianVec3([0., 0., -1.]),
+                offset: -z1,
+            },
+        ]
+    };
+
+    //Two half spaces can only describe a sector narrower than a half turn
+    let theta_bounds = |theta0: f64, theta1: f64| {
+        if theta1 - theta0 >= std::f64::consts::PI {
+            return None;
+        }
+        Some([
+            HalfSpace {
+                normal: CartesianVec3([-theta0.sin(), theta0.cos(), 0.]),
+                offset: 0.,
+            },
+            HalfSpace {
+                normal: CartesianVec3([theta1.sin(), -theta1.cos(), 0.]),
+                offset: 0.,
+            },
+        ])
+    };
+
+    let mut bounds = Vec::with_capacity(4);
+    match plane.axis {
+        //Radial face: theta and z bounds
+        0 => {
+            bounds.extend(
+                theta_bounds(plane.extent_u[0], plane.extent_u[1])
+                    .into_iter()
+                    .flatten(),
+            );
+            bounds.extend(z_bounds(plane.extent_v[0], plane.extent_v[1]));
+        }
+        //Theta face: radial and z bounds, the radial direction is the one of the face itself
+        1 => {
+            let CartesianCoordinates(origin) = plane.origin;
+            let theta = origin[1].atan2(origin[0]);
+            let radial = CartesianVec3([theta.cos(), theta.sin(), 0.]);
+
+            bounds.push(HalfSpace {
+                normal: radial,
+                offset: plane.extent_u[0],
+            });
+            bounds.push(HalfSpace {
+                normal: CartesianVec3([-radial.0[0], -radial.0[1], 0.]),
+                offset: -plane.extent_u[1],
+            });
+            bounds.extend(z_bounds(plane.extent_v[0], plane.extent_v[1]));
+        }
+        //Axial face: only the theta bounds are planes, the radial ones are arcs
+        _ => bounds.extend(
+            theta_bounds(plane.extent_v[0], plane.extent_v[1])
+                .into_iter()
+                .flatten(),
+        ),
+    }
+
+    bounds
+}
+
+///Signed area of the intersection between the triangle (origin, a, b) and the disk of radius
+///`radius` centred on the origin.
+///
+///Summed over the edges of a polygon it gives the area of that polygon clipped to the disk, the
+///same way the shoelace formula sums signed triangles. A piece of edge running outside the disk
+///contributes its circular sector instead of its triangle:
+///
+///```text
+///        b
+///       /                 outside -> sector of the circle
+///   ---+---___            inside  -> plain triangle
+///  /  p2       \
+/// |     \       |
+/// |      p1     |
+///  \      \    /
+///   ---    a---
+///```
+fn triangle_disk_area(a: [f64; 2], b: [f64; 2], radius: f64) -> f64 {
+    let cross = |u: [f64; 2], v: [f64; 2]| u[0] * v[1] - u[1] * v[0];
+    let dot = |u: [f64; 2], v: [f64; 2]| u[0] * v[0] + u[1] * v[1];
+    //Area swept on the circle between two directions
+    let sector = |u: [f64; 2], v: [f64; 2]| 0.5 * radius * radius * cross(u, v).atan2(dot(u, v));
+
+    let edge = [b[0] - a[0], b[1] - a[1]];
+    let quadratic_a = dot(edge, edge);
+    if quadratic_a < f64::EPSILON {
+        return 0.;
+    }
+    let quadratic_b = 2. * dot(a, edge);
+    let quadratic_c = dot(a, a) - radius * radius;
+    let discriminant = quadratic_b * quadratic_b - 4. * quadratic_a * quadratic_c;
+
+    if discriminant <= 0. {
+        return sector(a, b);
+    }
+
+    let root = discriminant.sqrt();
+    let entering = (-quadratic_b - root) / (2. * quadratic_a);
+    let leaving = (-quadratic_b + root) / (2. * quadratic_a);
+
+    //The edge crosses the circle outside of its own span
+    if entering > 1. || leaving < 0. {
+        return sector(a, b);
+    }
+
+    let at = |t: f64| [a[0] + t * edge[0], a[1] + t * edge[1]];
+    let entering_point = at(entering.clamp(0., 1.));
+    let leaving_point = at(leaving.clamp(0., 1.));
+
+    sector(a, entering_point)
+        + 0.5 * cross(entering_point, leaving_point)
+        + sector(leaving_point, b)
+}
+
+///Area of a polygon of the plane z = constant kept inside the annulus of the axial face
+fn polygon_annulus_area(polygon: &[Coords3], radii: [f64; 2]) -> f64 {
+    //A radius is never negative, whatever a caller passes as bounds
+    let radii = [radii[0].max(0.), radii[1].max(0.)];
+    let disk_area = |radius: f64| {
+        (0..polygon.len())
+            .map(|i| {
+                let current = polygon[i];
+                let next = polygon[(i + 1) % polygon.len()];
+                triangle_disk_area([current[0], current[1]], [next[0], next[1]], radius)
+            })
+            .sum::<f64>()
+    };
+
+    (disk_area(radii[1]) - disk_area(radii[0])).abs()
 }
 
 fn polygon_area_3d(points: &[Coords3], normal: &CartesianVec3) -> f64 {
@@ -198,18 +386,25 @@ fn tetra_area(vertices: [CartesianCoordinates; 4], plane: &BoundedPlane) -> f64 
         return 0.0;
     }
 
-    let filtered: Vec<_> = intersection_points
-        .iter()
-        .cloned()
-        .filter(|p| plane.is_point_inside(CartesianCoordinates(*p)))
-        .collect();
+    let sorted = sort_points_ccw_3d(&intersection_points, normal);
 
-    if filtered.len() < 3 {
+    //Clip against the bounds of the face, an element straddling them contributes its share
+    let clipped = planar_bounds(plane)
+        .iter()
+        .fold(Polygon::from_slice(&sorted), |polygon, half_space| {
+            polygon.clip(half_space)
+        });
+
+    if clipped.as_slice().len() < 3 {
         return 0.0;
     }
-    // let sorted = sort_points_ccw_3d(&intersection_points, normal);
-    let sorted = sort_points_ccw_3d(&filtered, normal);
-    polygon_area_3d(&sorted, normal)
+
+    //An axial face is bounded in r by two arcs, which no half space can describe
+    if plane.axis == AXIAL_AXIS {
+        return polygon_annulus_area(clipped.as_slice(), plane.extent_u);
+    }
+
+    polygon_area_3d(clipped.as_slice(), normal)
 }
 
 pub fn compute_intersection_area(
@@ -344,6 +539,176 @@ mod test {
             "Expected area {}, got {}",
             expected_area,
             area
+        );
+    }
+
+    ///Theta face at theta = 0, so the face lies in the plane y = 0 and r is measured along x
+    fn theta_face(r: [f64; 2], z: [f64; 2]) -> BoundedPlane {
+        BoundedPlane {
+            normal: CartesianVec3([0., 1., 0.]),
+            origin: CartesianCoordinates([1., 0., 0.]),
+            extent_u: r,
+            extent_v: z,
+            axis: 1,
+        }
+    }
+
+    ///Tetra whose cut by y = 0 is the triangle (r,z) = (1,0), (2,0), (1,1), of area 1/2
+    ///   z
+    ///   1 +
+    ///     |\
+    ///     | \        cut of the tetra by the face
+    ///     |  \
+    ///   0 +---+---> r
+    ///     1   2
+    fn tetra_cut_by_theta_face() -> [CartesianCoordinates; 4] {
+        [
+            CartesianCoordinates([1., -1., 0.]),
+            CartesianCoordinates([3., -1., 0.]),
+            CartesianCoordinates([1., -1., 2.]),
+            CartesianCoordinates([1., 1., 0.]),
+        ]
+    }
+
+    ///A polygon wrapping the whole annulus recovers its exact area
+    #[test]
+    fn test_annulus_area_of_a_surrounding_polygon() {
+        let square = [[-5., -5., 0.], [5., -5., 0.], [5., 5., 0.], [-5., 5., 0.]];
+
+        let area = polygon_annulus_area(&square, [1., 2.]);
+        let expected = std::f64::consts::PI * (4. - 1.);
+
+        assert!((area - expected).abs() < 1e-9, "{} != {}", area, expected);
+    }
+
+    ///A polygon inside the hole of the annulus carries no area
+    #[test]
+    fn test_annulus_area_inside_the_hole() {
+        let square = [
+            [-0.2, -0.2, 0.],
+            [0.2, -0.2, 0.],
+            [0.2, 0.2, 0.],
+            [-0.2, 0.2, 0.],
+        ];
+
+        assert!(polygon_annulus_area(&square, [1., 2.]).abs() < 1e-12);
+    }
+
+    ///A polygon of the annulus itself keeps its plain area, the arcs cut nothing
+    #[test]
+    fn test_annulus_area_of_an_inner_polygon() {
+        let patch = [
+            [1.2, -0.1, 0.],
+            [1.8, -0.1, 0.],
+            [1.8, 0.1, 0.],
+            [1.2, 0.1, 0.],
+        ];
+
+        let area = polygon_annulus_area(&patch, [1., 2.]);
+
+        assert!((area - 0.12).abs() < 1e-9, "{} != 0.12", area);
+    }
+
+    #[test]
+    fn test_area_inside_bounds_is_kept_whole() {
+        let area = tetra_area(
+            tetra_cut_by_theta_face(),
+            &theta_face([0., 10.], [-10., 10.]),
+        );
+
+        assert!((area - 0.5).abs() < 1e-10, "expected 0.5, got {}", area);
+    }
+
+    ///An element straddling a bound used to be dropped, it now contributes its share.
+    ///Cutting the triangle at z = 0.5 leaves a trapezoid of area 1/2 - 1/8
+    #[test]
+    fn test_area_straddling_a_bound_is_clipped() {
+        let area = tetra_area(
+            tetra_cut_by_theta_face(),
+            &theta_face([0., 10.], [-10., 0.5]),
+        );
+
+        assert!((area - 0.375).abs() < 1e-10, "expected 0.375, got {}", area);
+    }
+
+    #[test]
+    fn test_area_outside_bounds_is_dropped() {
+        let area = tetra_area(
+            tetra_cut_by_theta_face(),
+            &theta_face([5., 10.], [-10., 10.]),
+        );
+
+        assert_eq!(area, 0.);
+    }
+
+    ///Patch of radius 1 spanning a 60 degree sector, tangent plane taken at its middle
+    fn radial_patch() -> BoundedPlane {
+        BoundedPlane {
+            normal: CartesianVec3([1., 0., 0.]),
+            origin: CartesianCoordinates([1., 0., 0.]),
+            extent_u: [-0.5, 0.5],
+            extent_v: [0., 1.],
+            axis: RADIAL_AXIS,
+        }
+    }
+
+    ///Small tetra straddling the cylinder r = 1 at theta = 0.4, far from the middle of the patch
+    fn element_away_from_the_middle() -> [CartesianCoordinates; 4] {
+        let theta = 0.4;
+        let point = |r: f64, dtheta: f64, z: f64| {
+            CartesianCoordinates([r * (theta + dtheta).cos(), r * (theta + dtheta).sin(), z])
+        };
+        [
+            point(0.95, -0.02, 0.4),
+            point(1.05, -0.02, 0.4),
+            point(0.95, 0.02, 0.4),
+            point(0.95, -0.02, 0.5),
+        ]
+    }
+
+    #[test]
+    fn test_tangent_plane_follows_the_element() {
+        let element = element_away_from_the_middle();
+        let centroid = CartesianCoordinates([
+            element
+                .iter()
+                .map(|CartesianCoordinates(p)| p[0])
+                .sum::<f64>()
+                / 4.,
+            element
+                .iter()
+                .map(|CartesianCoordinates(p)| p[1])
+                .sum::<f64>()
+                / 4.,
+            element
+                .iter()
+                .map(|CartesianCoordinates(p)| p[2])
+                .sum::<f64>()
+                / 4.,
+        ]);
+
+        let patch = radial_patch();
+        let plane = tangent_plane_at(&patch, centroid);
+
+        //The plane stays on the cylinder and keeps the bounds of the patch
+        let CartesianCoordinates(origin) = plane.origin;
+        assert!((origin[0].hypot(origin[1]) - 1.).abs() < 1e-12);
+        assert_eq!(plane.extent_u, patch.extent_u);
+        assert_eq!(plane.axis, patch.axis);
+
+        //The element is cut by its own tangent plane, the one of the compartment misses it
+        let with_element_plane =
+            compute_intersection_area(&element, VolumeElementTypes::Tetra4, &plane).unwrap();
+        let with_patch_plane =
+            compute_intersection_area(&element, VolumeElementTypes::Tetra4, &patch).unwrap();
+
+        assert!(
+            with_element_plane > 0.,
+            "the element must be cut by its own tangent plane"
+        );
+        assert_eq!(
+            with_patch_plane, 0.,
+            "the tangent plane of the compartment does not reach this element"
         );
     }
 

@@ -5,6 +5,8 @@ mod descriptors;
 mod flowmap;
 mod rawdata;
 mod states;
+#[cfg(test)]
+mod test_utils;
 mod transitioner;
 pub use case::{
     CCMCaseInfo, CMCase, CMCaseJson, CMCaseReader, CMCaseWriter, DEFAULT_CASE_FILE_NAME, read_case,
@@ -51,6 +53,10 @@ pub enum DataError {
 
     #[error("Data is illed-format")]
     BadData,
+
+    /// An index does not address any element of the accessed collection.
+    #[error("Index {index} is out of range, {size} element(s) available")]
+    OutOfRange { index: usize, size: usize },
 }
 
 #[inline(always)]
@@ -67,7 +73,7 @@ fn linear_index_col_major(n_row: usize, _n_col: usize, i: usize, j: usize) -> us
 
 ///Create transitioner
 pub fn get_transitioner<T: FlowMapTransitioner>(root: &str) -> Result<T, DataError> {
-    let case_path = format!("{}/cma_case", root);
+    let case_path = format!("{}/{}", root, DEFAULT_CASE_FILE_NAME);
     let p = std::path::Path::new(&case_path);
     let case = read_case(p)?;
 

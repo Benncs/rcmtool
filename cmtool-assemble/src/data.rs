@@ -33,9 +33,6 @@ pub struct DomainInfo {
     pub(crate) total_number_compartment: usize,
     ///Reactor id of pfr names, needed to ensure global mass balance
     pub(crate) pfr_names: Vec<String>,
-    //TODO improve it
-    ///Indicates if case only contains cfd-based reator
-    pub(crate) cm_case_only: Option<String>,
     pub(crate) is_two_phase_flow: bool,
 }
 impl DomainInfo {
@@ -77,9 +74,5 @@ impl DomainData {
 
     pub fn get_case_path(&self) -> impl AsRef<std::path::Path> {
         &self.case_path
-    }
-
-    pub fn is_already_generated(&self) -> bool {
-        self.info().cm_case_only.is_some()
     }
 }

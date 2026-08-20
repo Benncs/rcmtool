@@ -22,7 +22,13 @@ pub struct CMCase {
     pub description: String,
     pub time_per_flow_map: f64,
     paths: HashMap<CMAExportType, String>,
-    pub is_reursive: bool,
+    /// Whether the case is spread over sibling `i_0/`, `i_1/`, … folders.
+    ///
+    /// The serialized name is misspelled (`is_reursive`) and is kept as-is for
+    /// backwards compatibility with every case file already written; the
+    /// correctly spelled `is_recursive` is accepted on read as well.
+    #[serde(rename = "is_reursive", alias = "is_recursive")]
+    pub is_recursive: bool,
 }
 
 impl std::fmt::Display for CMCase {
@@ -49,7 +55,7 @@ impl std::fmt::Display for CMCase {
         writeln!(
             f,
             "  - Recursive: {}",
-            if self.is_reursive { "Yes" } else { "No" }
+            if self.is_recursive { "Yes" } else { "No" }
         )?;
         Ok(())
     }
@@ -66,7 +72,7 @@ impl CMCase {
     }
 
     pub fn toggle_recursive(&mut self) {
-        self.is_reursive = !self.is_reursive;
+        self.is_recursive = !self.is_recursive;
     }
 
     pub fn is_two_phase_flow(&self) -> bool {
@@ -81,6 +87,29 @@ impl CMCase {
         let rel = self.paths.get(&stype)?;
         Some(Path::new(root).join(rel).to_str()?.to_string())
     }
+
+    pub fn resolve_all(&self, root: &str, stype: CMAExportType) -> Option<Vec<String>> {
+        let rel = self.paths.get(&stype)?;
+        if self.is_recursive {
+            Some(
+                self.get_folders(root)
+                    .ok()?
+                    .iter()
+                    .map(|folder_name| {
+                        Path::new(root)
+                            .join(folder_name)
+                            .join(rel)
+                            .to_str()
+                            .map(|s| s.to_string())
+                    })
+                    .collect::<Option<Vec<_>>>()?,
+            )
+        } else {
+            let pa = self.resolve(root, stype)?;
+            Some(vec![pa])
+        }
+    }
+
     pub fn prepend_path(mut self, prep: &str) -> Self {
         for (_key, path) in self.paths.iter_mut() {
             *path = format!("{}/{}", prep, path);
@@ -88,34 +117,24 @@ impl CMCase {
         self
     }
 
-    pub fn get_folders(&self, root: &str) -> Vec<String> {
-        let mut folders: Vec<String> = std::fs::read_dir(root)
-            .unwrap()
+    /// Lists the `i_<n>` sub-folders of `root`, ordered by `<n>`.
+    ///
+    /// # Errors
+    /// Returns `DataError::IO` if `root` cannot be read (missing, not a
+    /// directory, no permission).
+    pub fn get_folders(&self, root: &str) -> Result<Vec<String>, DataError> {
+        let mut folders: Vec<(usize, String)> = std::fs::read_dir(root)?
             .filter_map(|entry| {
-                if let Ok(dir) = entry {
-                    let file_name = dir.file_name();
-                    let file_name_str = file_name.to_string_lossy();
-                    if let Some(index_str) = file_name_str.strip_prefix("i_") {
-                        if index_str.parse::<usize>().is_ok() {
-                            Some(file_name_str.to_string())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+                let dir = entry.ok()?;
+                let file_name = dir.file_name();
+                let file_name_str = file_name.to_string_lossy();
+                let index: usize = file_name_str.strip_prefix("i_")?.parse().ok()?;
+                Some((index, file_name_str.to_string()))
             })
             .collect();
 
-        folders.sort_by(|a, b| {
-            let index_a: usize = a.trim_start_matches("i_").parse().unwrap_or(0);
-            let index_b: usize = b.trim_start_matches("i_").parse().unwrap_or(0);
-            index_a.cmp(&index_b)
-        });
-        folders
+        folders.sort_by_key(|(index, _)| *index);
+        Ok(folders.into_iter().map(|(_, name)| name).collect())
     }
 
     fn check(&self) -> bool {
@@ -152,7 +171,7 @@ impl CMCase {
         Self {
             n_div,
             time_per_flow_map,
-            is_reursive: recursive,
+            is_recursive: recursive,
             description,
             paths: HashMap::new(),
         }
@@ -241,19 +260,22 @@ impl CMCaseReader for CCMCaseInfo {
     fn read_case(path: &Path) -> Result<CMCase, DataError> {
         //C Caseformat do not have recursive flag, manual detection here:
 
-        let root = path.parent().unwrap();
-        let is_recursive = if root.is_dir() {
-            std::fs::read_dir(root).unwrap().any(|entry| {
-                if let Ok(dir) = entry {
-                    let file_name = dir.file_name();
-                    let file_name_str = file_name.to_string_lossy();
-                    return file_name_str.starts_with("i_");
-                }
-                false
-            })
-        } else {
-            false
+        // `parent()` is `None` only for a root path, and `Some("")` for a bare
+        // file name — both mean "the current directory" here.
+        let root = match path.parent() {
+            Some(p) if !p.as_os_str().is_empty() => p,
+            _ => Path::new("."),
         };
+        let is_recursive = std::fs::read_dir(root)
+            .map(|entries| {
+                entries.flatten().any(|dir| {
+                    dir.file_name()
+                        .to_string_lossy()
+                        .strip_prefix("i_")
+                        .is_some_and(|index| index.parse::<usize>().is_ok())
+                })
+            })
+            .unwrap_or(false);
 
         let file = fs::File::open(path)?;
         let mut buffer = BufReader::new(file);
@@ -276,7 +298,7 @@ impl CMCaseReader for CCMCaseInfo {
 
         let mut string_buf = vec![0; string_size as usize];
         buffer.read_exact(&mut string_buf)?;
-        case.description = unsafe { String::from_utf8_unchecked(string_buf) };
+        case.description = String::from_utf8(string_buf).map_err(|_| DataError::BadData)?;
 
         buffer.read_exact(&mut buffer_8bytes)?;
 
@@ -295,7 +317,7 @@ impl CMCaseReader for CCMCaseInfo {
 
             let mut string_buf = vec![0; string_size as usize];
             buffer.read_exact(&mut string_buf)?;
-            let value = unsafe { String::from_utf8_unchecked(string_buf) };
+            let value = String::from_utf8(string_buf).map_err(|_| DataError::BadData)?;
 
             case.paths.insert(key, value);
         }
@@ -429,7 +451,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
-            is_reursive: false,
+            is_recursive: false,
         };
 
         T::write_case(case, path).map_err(|_| ())?;
@@ -448,7 +470,7 @@ mod test {
             description: "Test".to_string(),
             time_per_flow_map: 0.01,
             paths: HashMap::new(),
-            is_reursive: false,
+            is_recursive: false,
         };
 
         CMCaseJson::write_case(case, path).expect("Failed to write case");
@@ -465,5 +487,82 @@ mod test {
         let path = Path::new("test_case_common.json");
         common_write_read_test::<CMCaseJson>(path).expect("Common write-read test failed");
         remove_file(path).expect("Failed to remove test file");
+    }
+
+    #[test]
+    fn get_folders_on_missing_root_is_an_error() {
+        let case = CMCase::new([1, 1, 1], 1., None, true);
+
+        assert!(case.get_folders("./this_directory_does_not_exist").is_err());
+        assert!(
+            case.resolve_all("./this_directory_does_not_exist", CMAExportType::LiquidFlow)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn get_folders_is_ordered_numerically() {
+        let root = std::env::temp_dir().join("cmtool_get_folders_test");
+        let _ = std::fs::remove_dir_all(&root);
+        // Created out of order, and with decoys that must be skipped.
+        for name in ["i_10", "i_2", "i_0", "i_notanumber", "raw"] {
+            std::fs::create_dir_all(root.join(name)).unwrap();
+        }
+
+        let case = CMCase::new([1, 1, 1], 1., None, true);
+        let folders = case.get_folders(root.to_str().unwrap()).unwrap();
+
+        assert_eq!(folders, vec!["i_0", "i_2", "i_10"]);
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// The legacy binary reader used to build its strings with
+    /// `from_utf8_unchecked`, which made a corrupt file undefined behaviour.
+    #[test]
+    fn c_compatible_rejects_invalid_utf8() {
+        let path = std::env::temp_dir().join("cmtool_bad_utf8_cma_case");
+
+        let mut bytes = Vec::new();
+        for div in [6u32, 6, 12] {
+            bytes.extend_from_slice(&div.to_le_bytes());
+        }
+        let description = [0xff_u8, 0xfe, 0xfd, 0xfc]; // not valid UTF-8
+        bytes.extend_from_slice(&(description.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&description);
+        bytes.extend_from_slice(&0f64.to_le_bytes());
+        bytes.extend_from_slice(&0u64.to_le_bytes()); // empty path map
+        std::fs::write(&path, &bytes).unwrap();
+
+        assert!(matches!(
+            CCMCaseInfo::read_case(&path),
+            Err(DataError::BadData)
+        ));
+
+        remove_file(&path).unwrap();
+    }
+
+    /// The `is_recursive` field is serialized under its historical misspelling,
+    /// so already-written case files keep loading.
+    #[test]
+    fn recursive_flag_keeps_its_legacy_wire_name() {
+        let mut case = CMCase::new([1, 1, 1], 1., None, false);
+        case.toggle_recursive();
+        assert!(case.is_recursive);
+
+        let json = serde_json::to_string(&case).unwrap();
+        assert!(json.contains("\"is_reursive\":true"), "{}", json);
+
+        let legacy: CMCase = serde_json::from_str(
+            r#"{"n_div":[1,1,1],"description":"d","time_per_flow_map":1.0,"paths":{},"is_reursive":true}"#,
+        )
+        .unwrap();
+        assert!(legacy.is_recursive);
+
+        let renamed: CMCase = serde_json::from_str(
+            r#"{"n_div":[1,1,1],"description":"d","time_per_flow_map":1.0,"paths":{},"is_recursive":true}"#,
+        )
+        .unwrap();
+        assert!(renamed.is_recursive);
     }
 }

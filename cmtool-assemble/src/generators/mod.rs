@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::CMError;
@@ -25,6 +26,8 @@ const PAIRS: (PairType, PairType) = (LIQUID_PAIR, GAS_PAIR);
 //TODO improve and change name
 pub struct Generator {
     raw_phase: Vec<RawPhase>,
+    ///Case directory of the reactors read from an existing flow map, by reactor id
+    existing_case: HashMap<String, PathBuf>,
 }
 
 struct Field0D {
@@ -33,16 +36,6 @@ struct Field0D {
     #[allow(unused)]
     value: f64,
 }
-///wrapper Get absolute path from relative
-fn resolve_path(
-    case: &CMCase,
-    relative_path: impl AsRef<std::path::Path>,
-    value: CMAExportType,
-) -> Result<String, CMError> {
-    case.resolve(relative_path.as_ref().to_str().expect("UTF-8 path"), value)
-        .ok_or(CMError::Custom("Error resolving path".to_string()))
-}
-
 ///Create vector of raw phase from raw
 fn raw_phase_from_flow_vol(
     flows: Vec<RawDataFlux>,
@@ -60,16 +53,70 @@ fn raw_phase_from_flow_vol(
         .collect()
 }
 
-// Select specific phase type in a slice of phases
-// fn filter_phase(raw_phase: &[RawPhase], phase: PhaseCM) -> Vec<RawPhase> {
-//     raw_phase
-//         .iter()
-//         .filter(|p| p.identifier == phase)
-//         .cloned()
-//         .collect()
-// }
-fn filter_phase(raw_phase: &[RawPhase], phase: PhaseCM) -> impl Iterator<Item = &RawPhase> {
-    raw_phase.iter().filter(move |p| p.identifier == phase)
+///Neutral gas phase of a liquid-only reactor, so that gas compartment ids stay aligned with
+///liquid ones when merging
+fn default_gas_phase(n_zone: usize) -> RawPhase {
+    let mut volume = RawDataScalar::new(n_zone);
+    volume.values.push((1e-9).into());
+    RawPhase {
+        flow: RawDataFlux::new(n_zone, 1),
+        volume,
+        identifier: PhaseCM::Gas,
+    }
+}
+
+///Read the phases of a case directory, gas being None when the case does not declare one
+fn read_case_phases(
+    case_dir: &std::path::Path,
+) -> Result<(RawPhase, Option<RawPhase>, [u32; 3]), CMError> {
+    let case = CMCaseJson::read_case(&case_dir.join(DEFAULT_CASE_FILE_NAME))?;
+
+    let read_phase = |flow_type: CMAExportType,
+                      volume_type: CMAExportType,
+                      identifier: PhaseCM|
+     -> Result<Option<RawPhase>, CMError> {
+        let (Some(flow_path), Some(volume_path)) = (
+            case.resolve(path_str(case_dir)?, flow_type),
+            case.resolve(path_str(case_dir)?, volume_type),
+        ) else {
+            return Ok(None);
+        };
+
+        let (Some(flow), Some(volume)) = (
+            RawDataFlux::read_raw(flow_path),
+            RawDataScalar::read_raw(volume_path),
+        ) else {
+            return Err(CMError::Custom(format!(
+                "Error reading {:?} of case {}",
+                identifier,
+                case_dir.display()
+            )));
+        };
+
+        Ok(Some(RawPhase {
+            flow,
+            volume,
+            identifier,
+        }))
+    };
+
+    let (liquid_flow, liquid_volume) = PAIRS.0;
+    let (gas_flow, gas_volume) = PAIRS.1;
+
+    let liquid = read_phase(liquid_flow, liquid_volume, PhaseCM::Liquid)?.ok_or_else(|| {
+        CMError::Custom(format!(
+            "Case {} does not provide a liquid flow map",
+            case_dir.display()
+        ))
+    })?;
+    let gas = read_phase(gas_flow, gas_volume, PhaseCM::Gas)?;
+
+    Ok((liquid, gas, case.n_div))
+}
+
+fn path_str(path: &std::path::Path) -> Result<&str, CMError> {
+    path.to_str()
+        .ok_or_else(|| CMError::Custom(format!("Non UTF-8 path {}", path.display())))
 }
 
 const MERGE_FOLDER_NAME: &str = "merged";
@@ -79,6 +126,7 @@ impl Generator {
     pub fn new() -> Self {
         Self {
             raw_phase: Default::default(),
+            existing_case: Default::default(),
         }
     }
 
@@ -112,8 +160,25 @@ impl Generator {
         &self,
         connections: Option<[RawDataFlux; 2]>,
     ) -> Result<GenerateContract, CMError> {
-        let liquid_phase = filter_phase(&self.raw_phase, PhaseCM::Liquid);
-        let gas_phase = filter_phase(&self.raw_phase, PhaseCM::Gas);
+        let reactors = self.phases_by_reactor();
+        let has_gas = reactors.iter().any(|(_, gas)| gas.is_some());
+
+        //A liquid-only reactor of a two-phase domain still occupies its gas compartments,
+        //skipping it would shift every gas id coming after it
+        let filler: Vec<Option<RawPhase>> = reactors
+            .iter()
+            .map(|(liquid, gas)| {
+                (has_gas && gas.is_none())
+                    .then(|| default_gas_phase(liquid.flow.header.n_zone as usize))
+            })
+            .collect();
+
+        let liquid_phase = reactors.iter().map(|(liquid, _)| *liquid);
+        let gas_phase = reactors
+            .iter()
+            .zip(&filler)
+            .filter_map(|((_, gas), filler)| gas.or(filler.as_ref()));
+
         let case = CMCase::default();
         let relative = Some(String::from(MERGE_FOLDER_NAME));
 
@@ -127,29 +192,51 @@ impl Generator {
         ))
     }
 
+    ///Phases of each reactor in declaration order. Every reactor pushes its liquid phase first
+    ///and its gas one right after when it has one, which is what pairs them back together.
+    fn phases_by_reactor(&self) -> Vec<(&RawPhase, Option<&RawPhase>)> {
+        let mut reactors: Vec<(&RawPhase, Option<&RawPhase>)> = Vec::new();
+        for phase in &self.raw_phase {
+            match phase.identifier {
+                PhaseCM::Liquid => reactors.push((phase, None)),
+                PhaseCM::Gas => {
+                    if let Some(reactor) = reactors.last_mut() {
+                        reactor.1 = Some(phase);
+                    }
+                }
+            }
+        }
+        reactors
+    }
+
+    ///Declare a reactor whose flow map already exists instead of being generated. Its case is
+    ///read where it lies, merge resolves the reactor id through existing_case.
+    pub fn add_existing_case(
+        &mut self,
+        id: &str,
+        case_dir: &str,
+        keep_in_memory: bool,
+    ) -> Result<(), CMError> {
+        let case_dir = PathBuf::from(case_dir);
+
+        if keep_in_memory {
+            let (liquid, gas, _) = read_case_phases(&case_dir)?;
+            self.raw_phase.push(liquid);
+            if let Some(gas) = gas {
+                self.raw_phase.push(gas);
+            }
+        }
+
+        self.existing_case.insert(id.to_owned(), case_dir);
+        Ok(())
+    }
+
     pub fn merge(
         &self,
         root_dir: impl AsRef<std::path::Path>,
         ids: &[String],
         connections: Option<[RawDataFlux; 2]>,
     ) -> Result<GenerateContract, CMError> {
-        //helpers
-        let read_flux = |partial_case: &CMCase,
-                         relative_path: &std::path::PathBuf,
-                         key: CMAExportType|
-         -> Result<Option<RawDataFlux>, CMError> {
-            let p = resolve_path(partial_case, relative_path, key)?;
-            Ok(RawDataFlux::read_raw(p))
-        };
-
-        let read_scalar = |partial_case: &CMCase,
-                           relative_path: &std::path::PathBuf,
-                           key: CMAExportType|
-         -> Result<Option<RawDataScalar>, CMError> {
-            let p = resolve_path(partial_case, relative_path, key)?;
-            Ok(RawDataScalar::read_raw(p))
-        };
-
         let mut n_div = [0, 0, 0];
         //helper
         let mut add_ndiv = |n: &[u32; 3]| {
@@ -158,54 +245,35 @@ impl Generator {
             n_div[2] += n[2];
         };
 
-        let read_partial_case = |relative_path: &PathBuf| {
-            let case_path = relative_path.join(DEFAULT_CASE_FILE_NAME);
-            CMCaseJson::read_case(&case_path)
-        };
-
         //prealloc
         let mut liquid_flows = Vec::with_capacity(ids.len());
         let mut liquid_volumes = Vec::with_capacity(ids.len());
         let mut gas_flows = Vec::with_capacity(ids.len());
         let mut gas_volumes = Vec::with_capacity(ids.len());
 
-        let mut impl_merge_reactor = |id: &str| -> Result<(), CMError> {
-            let relative_path = root_dir.as_ref().join(id);
-            let partial_case = read_partial_case(&relative_path)?;
+        let mut impl_merge_reactor = |id: &String| -> Result<(), CMError> {
+            //An existing flow map stays where it is, a generated one is written next to its peers
+            let case_dir = self
+                .existing_case
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| root_dir.as_ref().join(id));
+            let (liquid, gas, partial_n_div) = read_case_phases(&case_dir)?;
 
-            let (liquid_flow, liquid_volume) = PAIRS.0;
-            let (gas_flow, gas_volume) = PAIRS.1;
+            let n_zone = liquid.flow.header.n_zone as usize;
+            add_ndiv(&partial_n_div);
+            liquid_flows.push(liquid.flow);
+            liquid_volumes.push(liquid.volume);
 
-            let raw_liquid_flow = read_flux(&partial_case, &relative_path, liquid_flow)?
-                .ok_or_else(|| CMError::Custom("Error reading liquid flow".into()))?;
-
-            let n_zone = raw_liquid_flow.header.n_zone as usize;
-            liquid_flows.push(raw_liquid_flow);
-            add_ndiv(&partial_case.n_div);
-
-            let sc_liquid_volume = read_scalar(&partial_case, &relative_path, liquid_volume)?
-                .ok_or_else(|| CMError::Custom("Error reading liquid volume".into()))?;
-            liquid_volumes.push(sc_liquid_volume);
-
-            // gas flow: fallback to default when missing
             // Default implementation of RawFlux implies correct workaround
-            let raw_flow_gas = read_flux(&partial_case, &relative_path, gas_flow)?
-                .unwrap_or_else(|| RawDataFlux::new(n_zone, 1));
-            gas_flows.push(raw_flow_gas);
-
-            // gas volume: fallback to default scalar when missing
-            let sc_gas_volume = read_scalar(&partial_case, &relative_path, gas_volume)?
-                .unwrap_or_else(|| {
-                    let mut sc = RawDataScalar::new(n_zone);
-                    sc.values.push((1e-9).into());
-                    sc
-                });
-            gas_volumes.push(sc_gas_volume);
+            let gas = gas.unwrap_or_else(|| default_gas_phase(n_zone));
+            gas_flows.push(gas.flow);
+            gas_volumes.push(gas.volume);
 
             Ok(())
         };
 
-        ids.iter().try_for_each(|id| impl_merge_reactor(id))?;
+        ids.iter().try_for_each(&mut impl_merge_reactor)?;
 
         let merge_path = root_dir.as_ref().join(MERGE_FOLDER_NAME);
 
@@ -393,12 +461,14 @@ impl Generator {
             phase.flow.fluxes.extend(connections.fluxes);
         }
 
+        //The header is accumulated apart from the fluxes, they cannot disagree
         if phase.flow.fluxes.len() != phase.flow.header.n_fluxes as usize {
-            panic!(
-                "TODO: handle merge error {} {}",
+            return Err(CMError::Custom(format!(
+                "Merged {:?} phase holds {} fluxes but its header declares {}",
+                phase.identifier,
                 phase.flow.fluxes.len(),
                 phase.flow.header.n_fluxes
-            );
+            )));
         }
 
         Ok(phase)
@@ -443,7 +513,7 @@ mod tests {
 
         let case = Generator::new()
             .generate_0d(
-                Reactor0DDescriptor::from_fraction(10., 0.2),
+                Reactor0DDescriptor::from_fraction(10., 0.2).expect("descriptor"),
                 Some(path.to_owned()),
             )
             .expect("case");
@@ -487,8 +557,9 @@ mod tests {
         let c = generator.merge_from_memory(None).expect("merge");
 
         let case = c.write(path).expect("write");
-        let liquid_volume_path =
-            resolve_path(&case, path, cmtool_data::CMAExportType::LiquidVolume).unwrap();
+        let liquid_volume_path = case
+            .resolve(path, cmtool_data::CMAExportType::LiquidVolume)
+            .unwrap();
 
         let liquid_volume: f64 = cmtool_data::RawDataScalar::read_raw(liquid_volume_path.clone())
             .expect("Liquid error")
@@ -512,7 +583,7 @@ mod tests {
         let desc_pfr = g_descriptor_pfr();
         let alpha_g = desc_pfr.get_gas_fraction();
         let geo_volume = desc_pfr.geometrical_volume();
-        let desc_0d = Reactor0DDescriptor::from_fraction(v_0d, alpha_g);
+        let desc_0d = Reactor0DDescriptor::from_fraction(v_0d, alpha_g).expect("descriptor");
 
         let mut gene = Generator::new();
 

@@ -25,9 +25,10 @@ impl From<CMExportTypeWrapper> for cmtool_data::CMAExportType {
             CMExportTypeWrapper::LiquidFlow => Self::LiquidFlow,
             CMExportTypeWrapper::GasFlow => Self::GasFlow,
             CMExportTypeWrapper::LiquidVolume => Self::LiquidVolume,
+            CMExportTypeWrapper::GasVolume => Self::GasVolume,
             CMExportTypeWrapper::EnergyDissipation => Self::EnergyDissipation,
             CMExportTypeWrapper::Kla => Self::Kla,
-            _ => Self::Other,
+            CMExportTypeWrapper::Other => Self::Other,
         }
     }
 }
@@ -50,8 +51,8 @@ impl CMCaseWrapper {
         cmtool_data::CMCaseJson::write_case(c, p).map_err(PythonError::from)?;
         Ok(())
     }
-    pub fn resolve(&self, root: &str, stype: CMExportTypeWrapper) -> Option<String> {
-        self.0.resolve(root, stype.into())
+    pub fn resolve(&self, root: &str, stype: CMExportTypeWrapper) -> Option<Vec<String>> {
+        self.0.resolve_all(root, stype.into())
     }
 }
 

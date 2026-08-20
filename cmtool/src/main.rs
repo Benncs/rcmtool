@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use cmtool::CmtoolError;
-use cmtool_data::{RawData, RawDataFlux};
+use cmtool_core::model::BalanceSettings;
+use cmtool_data::{
+    CMAExportType, CMCase, CMCaseJson, CMCaseWriter, DEFAULT_CASE_FILE_NAME, RawData, RawDataFlux,
+    RawDataScalar,
+};
 // use std::fmt::Write;
 
 // use std::fs;
@@ -27,7 +31,7 @@ fn main() -> Result<(), CmtoolError> {
                 Ok(())
             }
 
-            Mode::Manual(_manual_args) => todo!(),
+            Mode::Manual(manual_args) => manual_main(cfdargs.common, manual_args),
         },
         AllModes::Xml(xml) => {
             let path = PathBuf::from(out_or_default(xml.out_dir));
@@ -35,6 +39,183 @@ fn main() -> Result<(), CmtoolError> {
             Ok(())
         }
     }
+}
+
+///Balancing knobs, the command line only overrides what it was given
+fn balance_settings(common: &CommonArgs, handle: &cmtool_core::CMHandle) -> BalanceSettings {
+    let mut balance = *handle.balance_settings();
+    if let Some(tolerance) = common.balance_tolerance {
+        balance.tolerance = tolerance;
+    }
+    if let Some(iterations) = common.balance_iterations {
+        balance.max_iterations = iterations;
+    }
+    if let Some(max_divergence) = common.max_divergence {
+        balance.max_divergence = max_divergence;
+    }
+    balance
+}
+
+///Flow map of one phase, out of what the export provides: a vector variable holds the velocity
+///directly, otherwise it comes as its three components and they have to be merged.
+fn dump_phase_flow(
+    handle: &cmtool_core::CMHandle,
+    root: &str,
+    files: &[String],
+    res_name: String,
+    fraction: Option<cmtool_core::model::Scalar>,
+) -> Result<(), CmtoolError> {
+    let path = |name: &String| Path::new(root).join(name);
+
+    match files {
+        [vector] => match fraction {
+            Some(fraction) => {
+                handle.dump_vector_phase_fraction(res_name, path(vector), fraction)?
+            }
+            None => handle.dump_vector(res_name, path(vector))?,
+        },
+        [i, j, k] => {
+            handle.dump_vector_from_scalar(res_name, path(i), path(j), path(k), fraction)?;
+        }
+        _ => {
+            return Err(CmtoolError::Custom(format!(
+                "A phase is either one vector file or its three components, {} were given",
+                files.len()
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+///Builds a case out of velocities given as separate scalar components, which is how a CFD export
+///stores them when it holds no vector variable
+fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolError> {
+    if args.liquid.is_empty()
+        && args.gas.is_empty()
+        && args.vectors.is_empty()
+        && args.scalars.is_empty()
+    {
+        return Err(CmtoolError::Custom(String::from(
+            "Nothing to generate: give a scalar, a vector, or the three velocity components of a phase",
+        )));
+    }
+
+    let root_dir = out_or_default(common.out.clone());
+    std::fs::create_dir_all(&root_dir).map_err(cmtool_data::DataError::IO)?;
+
+    let mut handle = cmtool_core::CMHandle::init(
+        [common.n_i, common.n_j, common.n_k],
+        &args.root,
+        &args.geo_file,
+        cmtool_core::grid::MeshType::Cylindrical,
+    )?;
+    handle.set_balance_settings(balance_settings(&common, &handle));
+
+    let scalar_path = |name: &str| Path::new(&args.root).join(name);
+    let out_path = |name: &str| format!("{}/{}", root_dir, name);
+
+    //The gas fraction splits the phases: a phase carries its share of the flow and of the volume
+    let gas_fraction = args
+        .gas_fraction
+        .as_ref()
+        .map(|name| handle.get_scalar(scalar_path(name)))
+        .transpose()?;
+
+    let mut has_flow_map = false;
+    let mut case = CMCase::new(
+        [common.n_i as u32, common.n_j as u32, common.n_k as u32],
+        0.,
+        Some(String::from("generated from scalar components")),
+        false,
+    );
+
+    if !args.liquid.is_empty() {
+        //Liquid takes what the gas leaves
+        let fraction = args
+            .gas_fraction
+            .as_ref()
+            .map(|name| {
+                handle
+                    .get_scalar(scalar_path(name))
+                    .map(|s| s.scalar_shift(1.))
+            })
+            .transpose()?;
+        dump_phase_flow(
+            &handle,
+            &args.root,
+            &args.liquid,
+            out_path("flowL"),
+            fraction,
+        )?;
+        case.add(CMAExportType::LiquidFlow, "flowL.raw");
+        has_flow_map = true;
+    }
+
+    if !args.gas.is_empty() {
+        dump_phase_flow(
+            &handle,
+            &args.root,
+            &args.gas,
+            out_path("flowG"),
+            gas_fraction,
+        )?;
+        case.add(CMAExportType::GasFlow, "flowG.raw");
+    }
+
+    //Integrating the gas fraction over a compartment gives the volume the gas occupies in it
+    let total_volume = handle.real_volume();
+    let gas_volume = match &args.gas_fraction {
+        Some(name) => handle
+            .dump_scalar(out_path("vofG"), scalar_path(name))?
+            .values
+            .iter()
+            .map(|v| v.value)
+            .collect(),
+        None => vec![0.; total_volume.len()],
+    };
+
+    let liquid_volume: Vec<f64> = total_volume
+        .iter()
+        .zip(&gas_volume)
+        .map(|(total, gas)| total - gas)
+        .collect();
+
+    RawDataScalar::from(liquid_volume.as_slice()).write_raw(&out_path("vofL.raw"))?;
+    case.add(CMAExportType::LiquidVolume, "vofL.raw");
+    if args.gas_fraction.is_some() {
+        case.add(CMAExportType::GasVolume, "vofG.raw");
+    }
+
+    //A scalar is integrated over each compartment, a vector becomes a flow map of its own
+    let file_name = |path: &str| {
+        Path::new(path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(path)
+            .to_owned()
+    };
+
+    for scalar in &args.scalars {
+        handle.dump_scalar(out_path(&file_name(scalar)), scalar_path(scalar))?;
+    }
+
+    for vector in &args.vectors {
+        handle.dump_vector(out_path(&file_name(vector)), scalar_path(vector))?;
+    }
+
+    //A case needs a flow map to go with its volumes, dumping scalars alone does not make one
+    if has_flow_map {
+        CMCaseJson::write_case(case, &Path::new(&root_dir).join(DEFAULT_CASE_FILE_NAME))?;
+        println!("Case written in {}", root_dir);
+    } else {
+        println!(
+            "Files written in {}, no case: it holds no flow map",
+            root_dir
+        );
+    }
+
+    Ok(())
 }
 
 fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> {
@@ -49,13 +230,26 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
 
     std::fs::create_dir_all(&root_dir).unwrap();
 
-    let handle = cmtool_core::CMHandle::init(
+    let mut handle = cmtool_core::CMHandle::init(
         [common.n_i, common.n_j, common.n_k],
         &case.root,
         &case.geometry_file_path,
         cmtool_core::grid::MeshType::Cylindrical,
     )
     .unwrap();
+
+    //Flow balancing keeps its defaults unless the command line says otherwise
+    let mut balance = *handle.balance_settings();
+    if let Some(tolerance) = common.balance_tolerance {
+        balance.tolerance = tolerance;
+    }
+    if let Some(iterations) = common.balance_iterations {
+        balance.max_iterations = iterations;
+    }
+    if let Some(max_divergence) = common.max_divergence {
+        balance.max_divergence = max_divergence;
+    }
+    handle.set_balance_settings(balance);
 
     handle
         .dump_all(format!("{}/{}", root_dir, stem), &case.root, &case.paths)

@@ -21,7 +21,7 @@ fn connection_per_phase(
     mass_balance: &mut PfrGlobalMassBalance,
     phase_node: &[generated_domain::FluxType],
     phase: PhaseCM,
-) -> cmtool_data::RawDataFlux {
+) -> Result<cmtool_data::RawDataFlux, CMError> {
     let n_node = phase_node.len();
 
     let mut rd = RawDataFlux::new(info.total_number_compartment, n_node);
@@ -53,21 +53,24 @@ fn connection_per_phase(
                 }
             }
         } else {
-            eprintln!(
-                "Ignored connection src:{} {}",
-                node.source.id, node.target.id
-            );
-            panic!("TODO: Handle error when flux doesnt work")
+            //Either the reactor id is unknown or the compartment does not exist in it
+            return Err(CMError::Custom(format!(
+                "Connection {}[{}] -> {}[{}] does not resolve to a compartment of the domain",
+                node.source.id,
+                node.source.compartment_id,
+                node.target.id,
+                node.target.compartment_id
+            )));
         }
     }
-    rd
+    Ok(rd)
 }
 
 pub fn parse_connection(
     info: &DomainInfo,
     connections: &generated_domain::ConnectionsType,
     mass_balance: &mut PfrGlobalMassBalance,
-) -> [RawDataFlux; 2] {
+) -> Result<[RawDataFlux; 2], CMError> {
     let liquid_connection: Vec<generated_domain::FluxType> = connections
         .flux
         .iter()
@@ -82,10 +85,10 @@ pub fn parse_connection(
         .cloned()
         .collect();
 
-    [
-        connection_per_phase(info, mass_balance, &liquid_connection, PhaseCM::Liquid),
-        connection_per_phase(info, mass_balance, &gas_connection, PhaseCM::Gas),
-    ]
+    Ok([
+        connection_per_phase(info, mass_balance, &liquid_connection, PhaseCM::Liquid)?,
+        connection_per_phase(info, mass_balance, &gas_connection, PhaseCM::Gas)?,
+    ])
 }
 
 ///Flux type is a "derivated" type of flux with all flux information + the flow value
@@ -106,14 +109,15 @@ fn parse_feed_phase(
     feeds: &[&FeedFluxType],
     phase: PhaseCM,
     mass_balance: &mut PfrGlobalMassBalance,
-) -> HashMap<String, FeedFlow> {
+) -> Result<HashMap<String, FeedFlow>, CMError> {
     let fluxes: Vec<generated_domain::FluxType> =
         feeds.iter().map(|&feed| FluxType::from(feed)).collect();
 
     let id: Vec<String> = feeds.iter().map(|feed| feed.id.clone()).collect();
-    let rd = connection_per_phase(info, mass_balance, &fluxes, phase);
+    let rd = connection_per_phase(info, mass_balance, &fluxes, phase)?;
 
-    rd.fluxes
+    Ok(rd
+        .fluxes
         .iter()
         .zip(id)
         .map(|(flux, id)| {
@@ -126,33 +130,29 @@ fn parse_feed_phase(
                 },
             )
         })
-        .collect()
+        .collect())
 }
 
 pub fn parse_feed(
     info: &DomainInfo,
     feeds: &generated_domain::FeedsType,
     mass_balance: &mut PfrGlobalMassBalance,
-) -> Option<ParsedFeeds> {
-    let (liquid_feeds, gas_feeds): (Vec<_>, Vec<_>) = feeds
-        .flux
-        .iter()
-        .partition(|f| f.phase == *"liquid")
-        .clone();
+) -> Result<Option<ParsedFeeds>, CMError> {
+    let (liquid_feeds, gas_feeds): (Vec<_>, Vec<_>) =
+        feeds.flux.iter().partition(|f| f.phase == *"liquid");
     if liquid_feeds.is_empty() && gas_feeds.is_empty() {
-        return None;
+        return Ok(None);
     }
-    Some(ParsedFeeds {
-        liq: parse_feed_phase(info, &liquid_feeds, PhaseCM::Liquid, mass_balance),
-        gas: parse_feed_phase(info, &gas_feeds, PhaseCM::Gas, mass_balance),
-    })
+    Ok(Some(ParsedFeeds {
+        liq: parse_feed_phase(info, &liquid_feeds, PhaseCM::Liquid, mass_balance)?,
+        gas: parse_feed_phase(info, &gas_feeds, PhaseCM::Gas, mass_balance)?,
+    }))
 }
 
 pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<DomainInfo, CMError> {
     let mut domain_info = DomainInfo::default();
-    let mut cm_case_only = None;
     let mut in_place_cumsum = 0;
-
+    //don't forget to |=
     for reactor in &reactors.content {
         match reactor {
             generated_domain::ReactorsTypeContent::Reactor0D(reactor0_dtype) => {
@@ -161,7 +161,7 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
                     .insert(reactor0_dtype.id.clone(), in_place_cumsum);
                 domain_info.total_number_compartment += 1;
                 in_place_cumsum += 1;
-                domain_info.is_two_phase_flow = reactor0_dtype.volume_fraction.content != 0.;
+                domain_info.is_two_phase_flow |= reactor0_dtype.volume_fraction.content != 0.;
             }
             generated_domain::ReactorsTypeContent::Reactor1D(current_pfr) => {
                 domain_info
@@ -169,7 +169,7 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
                     .insert(current_pfr.id.clone(), in_place_cumsum);
                 let n_c = current_pfr.compartments;
                 domain_info.total_number_compartment += n_c.get();
-                domain_info.is_two_phase_flow = current_pfr.volume_fraction.content != 0.;
+                domain_info.is_two_phase_flow |= current_pfr.volume_fraction.content != 0.;
                 domain_info.pfr_names.push(current_pfr.id.clone());
                 in_place_cumsum += n_c.get();
             }
@@ -181,22 +181,55 @@ pub fn parse_reactor(reactors: &generated_domain::ReactorsType) -> Result<Domain
                     .compartment_cumsum
                     .insert(reactor_from_file.id.clone(), in_place_cumsum);
                 let n_c = case.n_compartment() as usize;
-                domain_info.is_two_phase_flow = case.is_two_phase_flow();
+                domain_info.is_two_phase_flow |= case.is_two_phase_flow();
                 domain_info.total_number_compartment += n_c;
                 in_place_cumsum += n_c;
-
-                if cm_case_only.is_none() {
-                    cm_case_only = Some(reactor_from_file.path.clone());
-                } else {
-                    todo!("Existing flowmap merge")
-                }
-                println!("{:?}", cm_case_only);
             }
             generated_domain::ReactorsTypeContent::Reactor3D(reactor3_dtype) => {
                 todo!("{:?}", reactor3_dtype)
             }
         }
     }
-    domain_info.cm_case_only = cm_case_only;
     Ok(domain_info)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn reactor_0d(id: &str, gas_fraction: f32) -> generated_domain::ReactorsTypeContent {
+        generated_domain::ReactorsTypeContent::Reactor0D(generated_domain::Reactor0DType {
+            id: id.to_owned(),
+            volume_fraction: generated_domain::VolumeFractionType {
+                phase: None,
+                content: gas_fraction,
+            },
+            size: generated_domain::GeneralSizeType::Volume(generated_domain::DimensionType {
+                unit: None,
+                content: 1.,
+            }),
+        })
+    }
+
+    ///A single gas reactor makes the whole domain two-phase, whatever follows it
+    #[test]
+    fn test_keep_two_phase_flow() {
+        let reactors = generated_domain::ReactorsType {
+            content: vec![reactor_0d("gas", 0.1), reactor_0d("liquid", 0.)],
+        };
+
+        let info = parse_reactor(&reactors).unwrap();
+
+        assert!(info.is_two_phase_flow);
+        assert_eq!(info.total_number_compartment, 2);
+    }
+
+    #[test]
+    fn liquid_only_domain_is_not_two_phase() {
+        let reactors = generated_domain::ReactorsType {
+            content: vec![reactor_0d("liquid_1", 0.), reactor_0d("liquid_2", 0.)],
+        };
+
+        assert!(!parse_reactor(&reactors).unwrap().is_two_phase_flow);
+    }
 }

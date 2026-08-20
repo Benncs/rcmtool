@@ -11,6 +11,10 @@ pub enum CMError {
     #[error("Cmtool error: {0}")]
     Custom(String),
 
+    ///Wrapped by the caller, which knows the reactor the descriptor belongs to
+    #[error("Invalid descriptor: {0}")]
+    Descriptor(String),
+
     #[error(
         "Cmtool: Mass balance error in PFR '{0}' with phase {1}. Check your inputs or calculations."
     )]

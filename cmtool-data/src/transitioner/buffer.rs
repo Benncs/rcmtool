@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::{CMCase, DataError, FlowMapDescriptor, IterationState, RawData, rawdata};
 use std::{collections::HashMap, ops::Index, sync::Arc};
 

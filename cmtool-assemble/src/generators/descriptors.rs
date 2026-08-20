@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use crate::CMError;
 use cmtool_data::PhaseCM;
 
 pub struct Reactor0DDescriptor {
@@ -16,34 +17,42 @@ impl Reactor0DDescriptor {
         self.gas_volume
     }
 
-    pub fn is_valid(&self) -> Result<(), String> {
+    pub fn is_valid(&self) -> Result<(), CMError> {
         if !self.liquid_volume.is_finite() || self.liquid_volume <= 0.0 {
-            return Err("Liquid volume must be a finite positive number".into());
+            return Err(CMError::Descriptor(
+                "Liquid volume must be a finite positive number".to_owned(),
+            ));
         }
         //TODO
         if self.gas_volume < 0. {
-            return Err("Gas volume must be a finite positive number".into());
+            return Err(CMError::Descriptor(
+                "Gas volume must be a finite positive number".to_owned(),
+            ));
         }
 
         Ok(())
     }
 
-    pub fn new<L, G>(liquid_volume: L, gas_volume: G) -> Self
+    pub fn new<L, G>(liquid_volume: L, gas_volume: G) -> Result<Self, CMError>
     where
         L: Into<f64>,
         G: Into<f64>,
     {
-        let _self = Self {
+        let reactor = Self {
             liquid_volume: liquid_volume.into(),
             gas_volume: gas_volume.into(),
         };
-        _self.is_valid().unwrap(); //TODO
-        _self
+
+        reactor.is_valid()?;
+        Ok(reactor)
     }
 
-    pub fn from_fraction(total_volume: f64, gas_fraction: f64) -> Self {
+    pub fn from_fraction(total_volume: f64, gas_fraction: f64) -> Result<Self, CMError> {
         if !(0. ..=1.).contains(&gas_fraction) {
-            panic!("TODO: handle error gas fraction generation 0d");
+            return Err(CMError::Descriptor(format!(
+                "Gas fraction must be between 0 and 1, got {}",
+                gas_fraction
+            )));
         }
         let gas_volume = gas_fraction * total_volume;
         let liquid_volume = total_volume - gas_volume;
@@ -71,7 +80,7 @@ impl PFRDescription {
         gas_flow: impl Into<f64>,
         gas_fraction: impl Into<f64>,
         axial_dispersion: impl Into<f64>,
-    ) -> Result<PFRDescription, String> {
+    ) -> Result<PFRDescription, CMError> {
         let pfr = Self {
             n_compartment,
             length: length.into(),
@@ -112,41 +121,59 @@ impl PFRDescription {
         }
     }
 
-    pub fn is_valid(&self) -> Result<(), String> {
+    pub fn is_valid(&self) -> Result<(), CMError> {
         if self.n_compartment == 0 {
-            return Err("n_compartment must be >= 1".into());
+            return Err(CMError::Descriptor("n_compartment must be >= 1".to_owned()));
         }
         if !self.length.is_finite() || self.length <= 0.0 {
-            return Err("length must be a finite positive number".into());
+            return Err(CMError::Descriptor(
+                "length must be a finite positive number".to_owned(),
+            ));
         }
         if !self.diameter.is_finite() || self.diameter <= 0.0 {
-            return Err("diameter must be a finite positive number".into());
+            return Err(CMError::Descriptor(
+                "diameter must be a finite positive number".to_owned(),
+            ));
         }
         if !self.liquid_flow.is_finite() || self.liquid_flow < 0.0 {
-            return Err("liquid_flow must be a finite non-negative number".into());
+            return Err(CMError::Descriptor(
+                "liquid_flow must be a finite non-negative number".to_owned(),
+            ));
         }
         if !self.gas_flow.is_finite() || self.gas_flow < 0.0 {
-            return Err("gas_flow must be a finite non-negative number".into());
+            return Err(CMError::Descriptor(
+                "gas_flow must be a finite non-negative number".to_owned(),
+            ));
         }
         if !self.gas_fraction.is_finite() || self.gas_fraction < 0.0 || self.gas_fraction > 1.0 {
-            return Err("gas_fraction must be between 0.0 and 1.0".into());
+            return Err(CMError::Descriptor(
+                "gas_fraction must be between 0.0 and 1.0".to_owned(),
+            ));
         }
         if !self.axial_dispersion.is_finite() || self.axial_dispersion < 0.0 {
-            return Err("axial_dispersion must be a finite non-negative number".into());
+            return Err(CMError::Descriptor(
+                "axial_dispersion must be a finite non-negative number".to_owned(),
+            ));
         }
 
         if self.liquid_flow == 0.0 && self.gas_flow == 0.0 {
-            return Err("At least one of liquid_flow or gas_flow must be positive".into());
+            return Err(CMError::Descriptor(
+                "At least one of liquid_flow or gas_flow must be positive".to_owned(),
+            ));
         }
         if (self.gas_flow > 0.0 && self.liquid_flow == 0.0)
             && (self.gas_fraction < 0.0 || self.gas_fraction > 1.0)
         {
-            return Err("Invalid gas_fraction given flows".into());
+            return Err(CMError::Descriptor(
+                "Invalid gas_fraction given flows".to_owned(),
+            ));
         }
 
         // geometric length should be >= diameter
         if self.length < self.diameter {
-            return Err("length should be greater than or equal to diameter".into());
+            return Err(CMError::Descriptor(
+                "length should be greater than or equal to diameter".to_owned(),
+            ));
         }
 
         Ok(())

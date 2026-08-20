@@ -63,7 +63,7 @@ pub enum ElementsType {
     GNfaced,
     VolumeElementType(VolumeElementTypes),
 }
-
+#[allow(clippy::derivable_impls)]
 impl Default for ElementsType {
     fn default() -> Self {
         Self::Point

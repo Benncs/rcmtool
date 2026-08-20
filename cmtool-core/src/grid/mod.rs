@@ -645,9 +645,9 @@ impl CompartmentMeshManip for MeshCylindrical {
             .map(|(ax, cell_p)| ax.edges[cell_p + 1] - ax.edges[*cell_p])
             .collect();
 
-        let min_max = if points_indices[0] == 0 { 1 } else { 0 };
-
-        let r = self.axes[0].edges[points_indices[0] + min_max];
+        //The radial face of a cell sits on its outer edge, which is where get_interface_plane
+        //places the interface as well
+        let r = self.axes[0].edges[points_indices[0] + 1];
         match i_axis {
             CylindricalAxis::R => r * delta_ijk[1] * delta_ijk[2], // ds=r*dtheta*dz
             CylindricalAxis::Theta => delta_ijk[0] * delta_ijk[2], // ds = dr*dz
@@ -746,7 +746,8 @@ impl CompartmentMeshManip for MeshCylindrical {
             self.n_points_axis(2),
         );
 
-        let expected = n_theta * (n_z - 2) + 2 * n_r * n_z;
+        //Both z faces plus the outer r shell, which excludes the cells already taken by the faces
+        let expected = 2 * n_r * n_theta + n_theta * (n_z - 2);
         let mut v = Vec::with_capacity(expected);
 
         for i in 0..n_r {

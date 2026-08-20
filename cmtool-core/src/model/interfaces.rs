@@ -3,7 +3,19 @@
 use crate::coordinates::*;
 use crate::grid::NeighborDirection;
 use crate::model::CMGeometry;
-use crate::utils::compute_intersection_area;
+use crate::utils::{compute_intersection_area, is_curved_face, tangent_plane_at};
+
+const REL_TOLERANCE_AREA: f64 = 0.1;
+
+///The interface areas of a face should add up to the surface of the cell, a face with no
+///geometric surface should carry no interface either
+fn is_area_mismatch(total_area: f64, theoretical_area: f64) -> bool {
+    if theoretical_area.abs() < f64::EPSILON {
+        return total_area.abs() > f64::EPSILON;
+    }
+
+    (total_area - theoretical_area).abs() / theoretical_area > REL_TOLERANCE_AREA
+}
 
 #[derive(Default, Clone)]
 pub struct InterfaceInfo {
@@ -147,21 +159,12 @@ impl AInterfacesInfo {
                     .map(|(i, _)| self.area[i].iter().sum::<f64>())
                     .sum();
 
-                if ((total_area - theoretical_area).abs() / theoretical_area) < 0.1 {
+                if is_area_mismatch(total_area, theoretical_area) {
                     println!(
-                        "(areas): area incorect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
+                        "(areas): area incorrect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
                         axis_idx, cell_id, total_area, theoretical_area
                     );
                 }
-
-                // assert!(
-                //     ((total_area - theoretical_area).abs() / theoretical_area) < 0.1,
-                //     "RCMTOOL(areas): area incorect : axis: {}\r\n -cell_id:{}\r\n -total_area: {}\r\n -theoretical: {}",
-                //     axis_idx,
-                //     cell_id,
-                //     total_area,
-                //     theoretical_area
-                // );
             }
         }
     }
@@ -221,16 +224,49 @@ impl AInterfacesInfo {
 
                 geometry.fill_vertices(volume_element_global_id, n_vertex, &mut local_vertices);
 
-                // let area = compute_intersection_area(&local_vertices, elem_type, plane)
-                //     .expect("Area between element");
-                // let area = area * plane.normal.0[plane.axis].signum();
-                // self.area[interface_id][i_facet] = area;
-                //
-                let area = compute_intersection_area(&local_vertices, elem_type, plane)
-                    .expect("Area between element");
+                //A curved face gives every element the tangent plane of its own position
+                let element_plane = is_curved_face(plane).then(|| {
+                    tangent_plane_at(
+                        plane,
+                        geometry.volume_elements.xyz[volume_element_global_id],
+                    )
+                });
+
+                let area = compute_intersection_area(
+                    &local_vertices,
+                    elem_type,
+                    element_plane.as_ref().unwrap_or(plane),
+                )
+                .expect("Area between element");
 
                 self.area[interface_id][i_facet] = area;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_matching_area_is_not_reported() {
+        assert!(!is_area_mismatch(10., 10.));
+        //Within the tolerance
+        assert!(!is_area_mismatch(10.5, 10.));
+    }
+
+    #[test]
+    fn test_mismatching_area_is_reported() {
+        assert!(is_area_mismatch(5., 10.));
+        assert!(is_area_mismatch(0., 10.));
+        assert!(is_area_mismatch(20., 10.));
+    }
+
+    ///A degenerate face divides by zero, which used to hide the mismatch behind a NaN
+    #[test]
+    fn test_area_without_geometric_surface() {
+        assert!(is_area_mismatch(1., 0.));
+        assert!(!is_area_mismatch(0., 0.));
     }
 }
