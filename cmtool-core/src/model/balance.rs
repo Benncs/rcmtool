@@ -3,6 +3,7 @@
 ///Knobs of the balancing pass, `Default` is what the CLI uses unless it is told otherwise
 #[derive(Debug, Clone, Copy)]
 pub struct BalanceSettings {
+    pub do_balance: bool,
     ///Iterations the balancing may spend before giving up
     pub max_iterations: usize,
     ///Divergence it aims for, convergence is linear so asking for much less costs iterations
@@ -14,6 +15,7 @@ pub struct BalanceSettings {
 impl Default for BalanceSettings {
     fn default() -> Self {
         Self {
+            do_balance: true,
             max_iterations: 1000,
             tolerance: 1e-6,
             max_divergence: 1e-2,

@@ -265,8 +265,15 @@ impl CMHandleWrapper {
         numpy::PyArray1::from_owned_array(py, numpy::ndarray::Array1::from(volumes)).unbind()
     }
 
-    fn set_balance_settings(&mut self, max_iterations: usize, tolerance: f64, max_divergence: f64) {
+    fn set_balance_settings(
+        &mut self,
+        do_balance: bool,
+        max_iterations: usize,
+        tolerance: f64,
+        max_divergence: f64,
+    ) {
         self.handle.set_balance_settings(BalanceSettings {
+            do_balance,
             max_iterations,
             tolerance,
             max_divergence,

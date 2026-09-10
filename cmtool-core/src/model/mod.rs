@@ -218,13 +218,15 @@ impl CMModel {
             }
         }
 
-        let balance = self.balance(&mut flows, settings);
-        if balance.residual > settings.max_divergence {
-            return Err(ModelError::CellToCellDivergence(
-                balance.residual,
-                settings.max_divergence,
-            )
-            .into());
+        if settings.do_balance {
+            let balance = self.balance(&mut flows, settings);
+            if balance.residual > settings.max_divergence {
+                return Err(ModelError::CellToCellDivergence(
+                    balance.residual,
+                    settings.max_divergence,
+                )
+                .into());
+            }
         }
 
         let data_flow = get_data_flow(self.geometry.n_zone(), &self.interfaces.ids, &flows);
