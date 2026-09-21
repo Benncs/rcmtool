@@ -115,6 +115,10 @@ fn parse_feed_phase(
 
     let id: Vec<String> = feeds.iter().map(|feed| feed.id.clone()).collect();
     let rd = connection_per_phase(info, mass_balance, &fluxes, phase)?;
+    let get_output = |flux: &cmtool_data::RawFlux, inlet| -> Option<usize> {
+        let target = flux.id_target as usize;
+        if target == inlet { None } else { Some(target) }
+    };
 
     Ok(rd
         .fluxes
@@ -126,7 +130,7 @@ fn parse_feed_phase(
                 FeedFlow {
                     flow: flux.flux_source_target,
                     position: flux.id_source as usize,
-                    output_position: None, //TODO
+                    output_position: get_output(flux, flux.id_source as usize), //TODO
                 },
             )
         })
