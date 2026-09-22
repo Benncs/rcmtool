@@ -67,10 +67,9 @@ fn default_gas_phase(n_zone: usize) -> RawPhase {
 
 ///Read the phases of a case directory, gas being None when the case does not declare one
 fn read_case_phases(
+    case: &CMCase,
     case_dir: &std::path::Path,
 ) -> Result<(RawPhase, Option<RawPhase>, [u32; 3]), CMError> {
-    let case = CMCaseJson::read_case(&case_dir.join(DEFAULT_CASE_FILE_NAME))?;
-
     let read_phase = |flow_type: CMAExportType,
                       volume_type: CMAExportType,
                       identifier: PhaseCM|
@@ -218,9 +217,11 @@ impl Generator {
         keep_in_memory: bool,
     ) -> Result<(), CMError> {
         let case_dir = PathBuf::from(case_dir);
+        let case = CMCaseJson::read_case(&case_dir.join(DEFAULT_CASE_FILE_NAME))?;
 
-        if keep_in_memory {
-            let (liquid, gas, _) = read_case_phases(&case_dir)?;
+        //A recursive case holds one flow map per i_* folder, it is used where it lies
+        if keep_in_memory && !case.is_recursive {
+            let (liquid, gas, _) = read_case_phases(&case, &case_dir)?;
             self.raw_phase.push(liquid);
             if let Some(gas) = gas {
                 self.raw_phase.push(gas);
@@ -229,6 +230,16 @@ impl Generator {
 
         self.existing_case.insert(id.to_owned(), case_dir);
         Ok(())
+    }
+
+    ///Whether a case read from an existing flow map is recursive
+    pub fn has_recursive_case(&self) -> Result<bool, CMError> {
+        for case_dir in self.existing_case.values() {
+            if CMCaseJson::read_case(&case_dir.join(DEFAULT_CASE_FILE_NAME))?.is_recursive {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub fn merge(
@@ -258,7 +269,9 @@ impl Generator {
                 .get(id)
                 .cloned()
                 .unwrap_or_else(|| root_dir.as_ref().join(id));
-            let (liquid, gas, partial_n_div) = read_case_phases(&case_dir)?;
+            //TODO: recursive merge
+            let case = CMCaseJson::read_case(&case_dir.join(DEFAULT_CASE_FILE_NAME))?;
+            let (liquid, gas, partial_n_div) = read_case_phases(&case, &case_dir)?;
 
             let n_zone = liquid.flow.header.n_zone as usize;
             add_ndiv(&partial_n_div);

@@ -162,12 +162,16 @@ pub fn generate_flowmap(
         return Err(CMError::Custom("No flowmap to generate".to_owned()));
     }
 
+    let has_recursive_case = generator.has_recursive_case()?;
+
     //Merging in place needs no contract, the partial cases are already on disk
     let gc = match root {
         Some(root) => {
             generator.merge(root, &ids, connections)?;
             None
         }
+        //TODO: recursive merge, a recursive case is used where it lies
+        None if has_recursive_case => None,
         None => Some(generator.merge_from_memory(connections)?),
     };
     Ok(gc)

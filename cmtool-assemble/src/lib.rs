@@ -48,9 +48,11 @@ impl Parser {
         //TODO: Do not create all, return error if not root_dir
         // std::fs::create_dir_all(root_path)?;
         let gc = generate_flowmap(None, &root.reactors, &mb, connections)?;
-        let path = root_dir.as_ref().to_owned();
 
-        domain.case_path = path.as_os_str().to_string_lossy().to_string();
+        //A contract is written in root_dir
+        if gc.is_some() {
+            domain.case_path = root_dir.as_ref().to_string_lossy().to_string();
+        }
         Ok((domain, gc))
     }
 }

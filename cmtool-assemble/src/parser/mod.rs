@@ -19,6 +19,23 @@ pub(super) use pfr_mb::PfrGlobalMassBalance;
 ///Schema version of datamodel/main.xsd
 const EXPECTED_VERSION: i32 = 3;
 
+impl generated_domain::RootElementType {
+    fn default_case(&self) -> std::path::PathBuf {
+        std::path::PathBuf::from(
+            self.reactors
+                .content
+                .iter()
+                .find_map(|reactor| match reactor {
+                    generated_domain::ReactorsTypeContent::ReactorFromFile(r) => {
+                        Some(r.path.clone())
+                    }
+                    _ => None,
+                })
+                .unwrap_or_default(),
+        )
+    }
+}
+
 pub fn parse_domain(
     root: &generated_domain::RootElementType,
 ) -> Result<(DomainData, PfrGlobalMassBalance, Option<ConnectionType>), CMError> {
@@ -44,11 +61,15 @@ pub fn parse_domain(
     }
     mass_balance.validate()?;
     let run_id = root.run_id.clone();
+
+    //A flow map from file is used where it lies, unless a contract merges it with others
+    let case_path = root.default_case().to_string_lossy().to_string(); //TODO make case_path a pathbuf
+
     Ok((
         DomainData {
             info,
             feeds: pfeeds,
-            case_path: String::new(),
+            case_path,
             run_id,
         },
         mass_balance,
