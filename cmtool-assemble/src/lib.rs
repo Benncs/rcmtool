@@ -95,3 +95,79 @@ pub fn headless_generate(
     generate_domain(&root_dir, &contents)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+
+    use super::Parser;
+    use crate::{
+        CMError, DomainData, GenerateContract,
+        generators::{Generator, Reactor0DDescriptor},
+    };
+    use cmtool_data::{CMCaseJson, CMCaseReader, CMCaseWriter, DEFAULT_CASE_FILE_NAME};
+
+    const XML_FROM_FILE: &str = r#"<?xml version="1.0"?>
+<Root run_id="from_file" version="3">
+  <Reactors>
+    <ReactorFromFile id="str">
+      <Path>PATH</Path>
+    </ReactorFromFile>
+  </Reactors>
+</Root>"#;
+
+    fn gen_reactor(
+        dir: &Path,
+        out_dir: &Path,
+    ) -> Result<(DomainData, Option<GenerateContract>), CMError> {
+        let steady_xml = XML_FROM_FILE.replace("PATH", dir.to_str().unwrap());
+        let (_, steady_parser) = Parser::start_parsing(&steady_xml).unwrap();
+        Parser::continue_parsing_with_path(steady_parser, out_dir)
+    }
+
+    ///Existing cases, recursive or not, are read as ReactorFromFile by the parser
+    #[test]
+    fn test_reactor_from_file() {
+        let root = std::env::temp_dir().join("cmtool_test_reactor_from_file");
+        let out_dir = root.join("out");
+        let steady_dir = root.join("steady");
+        let recursive_dir = root.join("recursive");
+        let first_state_dir = recursive_dir.join("i_0");
+        let second_state_dir = recursive_dir.join("i_1");
+        let _ = std::fs::remove_dir_all(&root);
+
+        //Single compartment case in each directory
+        for case_dir in [&steady_dir, &first_state_dir, &second_state_dir] {
+            std::fs::create_dir_all(case_dir).unwrap();
+            let descriptor = Reactor0DDescriptor::from_fraction(5., 0.).unwrap();
+            let case_dir_str = case_dir.to_string_lossy().to_string();
+            let case = Generator::new()
+                .generate_0d(descriptor, Some(case_dir_str))
+                .unwrap();
+            CMCaseJson::write_case(case, &case_dir.join(DEFAULT_CASE_FILE_NAME)).unwrap();
+        }
+
+        //The recursive case points to its i_* folders
+        let first_state_case_path = first_state_dir.join(DEFAULT_CASE_FILE_NAME);
+        let mut recursive_case = CMCaseJson::read_case(&first_state_case_path).unwrap();
+        recursive_case.toggle_recursive();
+        let recursive_case_path = recursive_dir.join(DEFAULT_CASE_FILE_NAME);
+        CMCaseJson::write_case(recursive_case, &recursive_case_path).unwrap();
+
+        let (steady_domain, steady_contract) = gen_reactor(&steady_dir, &out_dir).unwrap();
+
+        let (recursive_domain, recursive_contract) = gen_reactor(&recursive_dir, &out_dir).unwrap();
+
+        std::fs::remove_dir_all(&root).unwrap();
+
+        assert!(steady_contract.is_some());
+        assert_eq!(steady_domain.info().get_total_number_compartment(), 1);
+
+        assert!(recursive_contract.is_none());
+        assert_eq!(recursive_domain.info().get_total_number_compartment(), 1);
+        assert_eq!(
+            recursive_domain.get_case_path().as_ref(),
+            recursive_dir.as_path()
+        );
+    }
+}
