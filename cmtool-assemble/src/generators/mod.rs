@@ -393,10 +393,19 @@ impl Generator {
         let compartment_volume = volume_fraction * dx * reactor_section_area;
         let n_flow = n_compartment - 1;
 
+        let effective_area = volume_fraction * reactor_section_area;
+
         //PreCalculate velocity
-        let flow_velocity = flow / reactor_section_area;
-        let flow_source_target = reactor_section_area / dx * (flow_velocity + axial_dispersion);
-        let flow_target_source = reactor_section_area / dx * axial_dispersion;
+        let velocity = flow / effective_area;
+        let convective_flow = flow;
+        let numerical_dispersion = 0.5 * velocity * dx; //Upwind schema is meant for Peclet >2
+        let corrected_dispersion = (axial_dispersion - numerical_dispersion).max(0.0);
+        let diffusive_flow = effective_area * corrected_dispersion / dx;
+        let flow_source_target = convective_flow + diffusive_flow;
+        let flow_target_source = diffusive_flow;
+
+        // let flow_source_target = reactor_section_area / dx * (flow_velocity + axial_dispersion);
+        // let flow_target_source = reactor_section_area / dx * axial_dispersion;
 
         //Discretization should preserve geometrical volume
         assert!(
