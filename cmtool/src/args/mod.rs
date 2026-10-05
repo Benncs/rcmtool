@@ -25,6 +25,9 @@ pub struct CommonArgs {
     /// Divergence above which the generated flow map is rejected
     #[clap(long)]
     pub max_divergence: Option<f64>,
+
+    #[clap(long)]
+    pub no_balance: bool,
 }
 
 #[derive(Parser, Default, Clone)]

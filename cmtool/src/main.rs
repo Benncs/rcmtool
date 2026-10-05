@@ -53,6 +53,9 @@ fn balance_settings(common: &CommonArgs, handle: &cmtool_core::CMHandle) -> Bala
     if let Some(max_divergence) = common.max_divergence {
         balance.max_divergence = max_divergence;
     }
+    if common.no_balance {
+        balance.do_balance = false;
+    }
     balance
 }
 
@@ -195,9 +198,10 @@ fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolError> 
             .unwrap_or(path)
             .to_owned()
     };
-
+    let mut rs = Vec::new();
     for scalar in &args.scalars {
-        handle.dump_scalar(out_path(&file_name(scalar)), scalar_path(scalar))?;
+        let tmp_sc = handle.dump_scalar(out_path(&file_name(scalar)), scalar_path(scalar))?;
+        rs.push((tmp_sc, scalar.to_owned()));
     }
 
     for vector in &args.vectors {
@@ -214,6 +218,9 @@ fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolError> 
             root_dir
         );
     }
+
+    #[cfg(feature = "use_vtk")]
+    handle.export_vtk(format!("{}/cma_case.vtu", root_dir), rs)?;
 
     Ok(())
 }
@@ -248,6 +255,9 @@ fn auto_main(common: CommonArgs, autoargs: AutoArgs) -> Result<(), CmtoolError> 
     }
     if let Some(max_divergence) = common.max_divergence {
         balance.max_divergence = max_divergence;
+    }
+    if common.no_balance {
+        balance.do_balance = false;
     }
     handle.set_balance_settings(balance);
 

@@ -59,6 +59,8 @@ fn get_data_flow(
     }
 }
 
+const ABS_TOLERANCE_DIVERGENCE_CELL: f64 = 1e-7;
+
 impl CMModel {
     ///Both directions must carry a usable flow and both ids must address a compartment,
     ///check_flow indexes mass_balance with them right after
@@ -72,8 +74,6 @@ impl CMModel {
     }
 
     pub fn check_flow(&self, raw: &RawDataFlux, max_divergence: f64) -> Result<(), ModelError> {
-        const ABS_TOLERANCE_DIVERGENCE_CELL: f64 = 1e-7;
-
         //A field of zeros balances perfectly and transports nothing: it is missing data, not a
         //valid flow map
         if raw
@@ -230,8 +230,10 @@ impl CMModel {
         }
 
         let data_flow = get_data_flow(self.geometry.n_zone(), &self.interfaces.ids, &flows);
+        if settings.do_balance {
+            self.check_flow(&data_flow, settings.max_divergence)?;
+        }
 
-        self.check_flow(&data_flow, settings.max_divergence)?;
         Ok(data_flow)
     }
 
@@ -268,9 +270,12 @@ impl CMModel {
             report.iterations = iteration;
             report.residual = (0..n_zone)
                 .map(|zone| {
+                    let abs_diff = (inflow[zone] - outflow[zone]).abs();
                     let total = inflow[zone].abs() + outflow[zone].abs();
-                    if total > f64::EPSILON {
-                        2. * (inflow[zone] - outflow[zone]).abs() / total
+
+                    // use abs_diff to not reach numerical noise
+                    if abs_diff > ABS_TOLERANCE_DIVERGENCE_CELL && total > f64::EPSILON {
+                        2. * abs_diff / total
                     } else {
                         0.
                     }
