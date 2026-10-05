@@ -74,6 +74,12 @@ impl<T: VarTypeReader> PerElementVariable<T> {
                     // println!("{}", element_type_name);
                     if ElementsType::from_str(&element_type_name) == Ok(element.etype) {
                         data_in_part.push(T::read_elements(reader, element)?);
+                    } else if element_type_name == "coordinates" {
+                        //FIXM
+                        return Err(std::io::Error::new(
+                            ErrorKind::Unsupported,
+                            "Ensigh Gold export is 'per-node' instead of 'per-element'",
+                        ));
                     } else {
                         return Err(std::io::Error::new(
                             ErrorKind::Unsupported,

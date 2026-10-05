@@ -30,4 +30,7 @@ pub enum CoreError {
 
     #[error("Model: {0}")]
     Model(#[from] ModelError),
+
+    #[error("Ensigh Gold export is 'per-node' instead of 'per-element'")]
+    EGFormat,
 }

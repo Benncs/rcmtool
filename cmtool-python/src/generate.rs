@@ -15,6 +15,7 @@ impl From<CoreError> for CoreErrorWrapper {
 impl From<CoreErrorWrapper> for PyErr {
     fn from(error: CoreErrorWrapper) -> Self {
         let message = error.0.to_string();
+        //FIXME
         match error.0 {
             CoreError::IO(_) => PyIOError::new_err(message),
             //A divergence or an empty flow map is bad input, not an interpreter fault
@@ -22,6 +23,7 @@ impl From<CoreErrorWrapper> for PyErr {
             //Keep the mapping the `data` module already uses
             CoreError::Data(data) => crate::PythonError::from(data).into(),
             CoreError::Custom(_) | CoreError::Handle => PyRuntimeError::new_err(message),
+            CoreError::EGFormat => PyValueError::new_err(message),
         }
     }
 }
