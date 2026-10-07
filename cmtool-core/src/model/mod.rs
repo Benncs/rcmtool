@@ -8,7 +8,7 @@ use crate::{
     coordinates::{CartesianCoordinates, CartesianVec3},
     errors::ModelError,
     model::{
-        balance::{ABS_TOLERANCE_DIVERGENCE_CELL, balance},
+        balance::{ABS_TOLERANCE_DIVERGENCE_CELL, balance_2},
         compartments::{CompartmentInfo, CountVolumeElement, ElementVolumeInfo},
         interfaces::{AInterfacesInfo, InterfaceFlow, InterfaceInfo},
     },
@@ -25,7 +25,7 @@ pub use scalar::Scalar;
 pub use vectors::Vector as ModelVector;
 pub use vectors::Vector;
 
-pub use balance::{BalanceReport, BalanceSettings};
+pub use balance::{BalanceReport, BalanceSettings, InletPosition, OpenPhase};
 
 pub struct CMModel {
     geometry: Arc<CMGeometry>,
@@ -188,6 +188,7 @@ impl CMModel {
         &self,
         vector: Vector,
         settings: &BalanceSettings,
+        phase: Option<OpenPhase>,
     ) -> Result<cmtool_data::RawDataFlux, CoreError> {
         let n_fluxes = self.interfaces.n_interfaces();
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
@@ -219,21 +220,26 @@ impl CMModel {
         if settings.do_balance {
             let n_zone = self.geometry.n_zone();
 
-            let _balance = balance(settings, n_zone, &self.interfaces, &mut flows);
+            //A closed phase (None) needs no inlet/outlet
+            let is_open = phase.is_some();
+            let _balance = balance_2(
+                settings,
+                n_zone,
+                self.geometry.get_grid().unwrap(),
+                &self.interfaces,
+                &mut flows,
+                phase,
+            )?;
 
-            if _balance.residual > settings.max_divergence {
-                return Err(ModelError::CellToCellDivergence(
-                    _balance.residual,
-                    settings.max_divergence,
-                )
-                .into());
+            let data_flow = get_data_flow(n_zone, &self.interfaces.ids, &flows);
+            //TODO: check_flow does not know about inlet/outlet yet, only a closed phase is checked
+            if !is_open {
+                self.check_flow(&data_flow, settings.max_divergence)?;
             }
+            return Ok(data_flow);
         }
 
         let data_flow = get_data_flow(self.geometry.n_zone(), &self.interfaces.ids, &flows);
-        if settings.do_balance {
-            self.check_flow(&data_flow, settings.max_divergence)?;
-        }
 
         Ok(data_flow)
     }

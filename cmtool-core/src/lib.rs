@@ -203,14 +203,15 @@ impl CMHandle {
         res_name: impl AsRef<std::path::Path>,
         path: impl AsRef<std::path::Path>,
         phase_fraction: Scalar,
+        phase: Option<model::OpenPhase>,
     ) -> Result<(), CoreError> {
         let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
         let vector =
             Vector::new(v, &self.cm_geometry, &self.eg_geometry).scale_by(phase_fraction)?;
 
-        let flow_data = self
-            .model
-            .compute_flux_between_compartments(vector, &self.balance)?;
+        let flow_data =
+            self.model
+                .compute_flux_between_compartments(vector, &self.balance, phase)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -221,9 +222,9 @@ impl CMHandle {
         res_name: impl AsRef<std::path::Path>,
         vector: Vector,
     ) -> Result<(), CoreError> {
-        let flow_data = self
-            .model
-            .compute_flux_between_compartments(vector, &self.balance)?;
+        let flow_data =
+            self.model
+                .compute_flux_between_compartments(vector, &self.balance, None)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -236,9 +237,9 @@ impl CMHandle {
     ) -> Result<(), CoreError> {
         let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
         let vector = Vector::new(v, &self.cm_geometry, &self.eg_geometry);
-        let flow_data = self
-            .model
-            .compute_flux_between_compartments(vector, &self.balance)?;
+        let flow_data =
+            self.model
+                .compute_flux_between_compartments(vector, &self.balance, None)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(())
@@ -270,15 +271,16 @@ impl CMHandle {
         path_j: impl AsRef<std::path::Path>,
         path_k: impl AsRef<std::path::Path>,
         phase_fraction: Option<Scalar>,
+        phase: Option<model::OpenPhase>,
     ) -> Result<RawDataFlux, CoreError> {
         let vector = self.vector_from_scalar(path_i, path_j, path_k)?;
         let vector = match phase_fraction {
             Some(fraction) => vector.scale_by(fraction)?,
             None => vector,
         };
-        let flow_data = self
-            .model
-            .compute_flux_between_compartments(vector, &self.balance)?;
+        let flow_data =
+            self.model
+                .compute_flux_between_compartments(vector, &self.balance, phase)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
         Ok(flow_data)
@@ -348,7 +350,7 @@ impl CMHandle {
 mod test {
     use super::*;
 
-    ///An unreadable geometry used to be reported as "Arc error" by the io thread
+    ///An unreadable geometry
     #[test]
     fn test_init_reports_unreadable_geometry() {
         let error = match CMHandle::init(

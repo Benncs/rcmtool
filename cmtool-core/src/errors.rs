@@ -12,6 +12,12 @@ pub enum ModelError {
 
     #[error("Resulting flow is empty: the velocity field carries no data")]
     EmptyFlow,
+
+    #[error("Open phase has no {0} compartment in the grid")]
+    OpenBoundary(&'static str),
+
+    #[error("Compartments off the inlet to outlet path: {0:?}")]
+    DisconnectedCompartments(Vec<usize>),
 }
 
 #[derive(Error, Debug)]

@@ -14,53 +14,6 @@ pub(crate) mod vtk;
 use crate::coordinates::*;
 use crate::utils::AxisPoints;
 
-// fn get_tangent_plane_at_r(
-//     axis: usize,
-//     r0: f64,
-//     theta: f64,
-//     z: f64,
-//     extent_u: [f64; 2],
-//     extent_v: [f64; 2],
-// ) -> BoundedPlane {
-//     let x0 = r0 * theta.cos();
-//     let y0 = r0 * theta.sin();
-//     let z0 = z;
-
-//     let normal = CartesianVec3([x0 / r0, y0 / r0, 0.0]);
-
-//     let origin = CartesianCoordinates([x0, y0, z0]);
-
-//     BoundedPlane {
-//         normal,
-//         origin,
-//         extent_u,
-//         extent_v,
-//         axis,
-//     }
-// }
-//
-// fn get_tangent_plane_at_r(
-//     axis: usize,
-//     r0: f64,
-//     theta: f64,
-//     z: f64,
-//     extent_u: [f64; 2], // [theta0, theta1] — will be converted to arc length
-//     extent_v: [f64; 2], // [z0, z1] — already metric
-// ) -> BoundedPlane {
-//     let origin = CartesianCoordinates([r0 * theta.cos(), r0 * theta.sin(), z]);
-//     let normal = CartesianVec3([theta.cos(), theta.sin(), 0.0]);
-
-//     let extent_u_metric = [r0 * extent_u[0], r0 * extent_u[1]];
-
-//     BoundedPlane {
-//         normal,
-//         origin,
-//         extent_u: extent_u_metric,
-//         extent_v, // z is already metric
-//         axis,
-//     }
-// }
-
 /// Represents the type of mesh geometry.
 #[derive(PartialEq, Clone, Copy)]
 pub enum MeshType {

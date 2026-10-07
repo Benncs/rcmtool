@@ -144,6 +144,7 @@ impl CMHandleWrapper {
                 res_name,
                 path,
                 self.handle.get_scalar(gas_fraction)?.scalar_shift(1.),
+                None,
             )
         })
         .map_err(CoreErrorWrapper::from)
@@ -162,6 +163,7 @@ impl CMHandleWrapper {
                 res_name,
                 path,
                 self.handle.get_scalar(gas_fraction)?,
+                None,
             )
         })
         .map_err(CoreErrorWrapper::from)
@@ -178,7 +180,7 @@ impl CMHandleWrapper {
     ) -> PyResult<()> {
         py.detach(|| {
             self.handle
-                .dump_vector_from_scalar(res_name, path_i, path_j, path_k, None)
+                .dump_vector_from_scalar(res_name, path_i, path_j, path_k, None, None)
         })
         .map(|_| ())
         .map_err(CoreErrorWrapper::from)
@@ -202,6 +204,7 @@ impl CMHandleWrapper {
                 path_j,
                 path_k,
                 Some(self.handle.get_scalar(gas_fraction)?.scalar_shift(1.)),
+                None,
             )
         })
         .map(|_| ())
@@ -225,6 +228,7 @@ impl CMHandleWrapper {
                 path_j,
                 path_k,
                 Some(self.handle.get_scalar(gas_fraction)?),
+                None,
             )
         })
         .map(|_| ())

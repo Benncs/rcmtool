@@ -18,18 +18,19 @@ fn dump_phase_flow(
     files: &[String],
     res_name: String,
     fraction: Option<cmtool_core::model::Scalar>,
+    phase: Option<cmtool_core::model::OpenPhase>,
 ) -> Result<(), CmtoolError> {
     let path = |name: &String| Path::new(root).join(name);
 
     match files {
         [vector] => match fraction {
             Some(fraction) => {
-                handle.dump_vector_phase_fraction(res_name, path(vector), fraction)?
+                handle.dump_vector_phase_fraction(res_name, path(vector), fraction, phase)?
             }
             None => handle.dump_vector(res_name, path(vector))?,
         },
         [i, j, k] => {
-            handle.dump_vector_from_scalar(res_name, path(i), path(j), path(k), fraction)?;
+            handle.dump_vector_from_scalar(res_name, path(i), path(j), path(k), fraction, phase)?;
         }
         _ => {
             return Err(CmtoolError::Custom(format!(
@@ -101,18 +102,34 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
             &args.liquid,
             out_path("flowL"),
             fraction,
+            None,
         )?;
         case.add(CMAExportType::LiquidFlow, "flowL.raw");
         has_flow_map = true;
     }
 
     if !args.gas.is_empty() {
+        //TODO: quick and dirty, gas is open and liquid closed. Sparger of cfd_test_3 hardcoded as
+        //a ring (disk r<=0.0147 at z=0, ring at its half area radius), Q = alpha*v*A of the Fluent
+        //inlet
+        let phase = cmtool_core::model::OpenPhase(
+            cmtool_core::model::InletPosition::Ring(
+                [0., 0., 0.],
+                0.0147 / std::f64::consts::SQRT_2,
+                1e-4,
+            ),
+            0.049789912 * 0.25890034 * std::f64::consts::PI * 0.0147 * 0.0147,
+        );
+        // let mut b = *handle.balance_settings();
+        // b.do_balance = false;
+        // handle.set_balance_settings(b);
         dump_phase_flow(
             &handle,
             &args.root,
             &args.gas,
             out_path("flowG"),
             gas_fraction,
+            Some(phase),
         )?;
         case.add(CMAExportType::GasFlow, "flowG.raw");
     }
