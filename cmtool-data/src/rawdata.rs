@@ -115,6 +115,40 @@ pub struct RawDataScalar {
     pub values: Vec<RawScalar>,
 }
 
+impl RawDataScalar {
+    // fn element_wise_product(&self, rhs: &Self) -> Result<Self, DataError> {
+    //     if rhs.header.n_zone != self.header.n_zone {
+    //         return Err(DataError::BadData);
+    //     }
+
+    //     let mut res = self.clone();
+    //     res.values
+    //         .iter_mut()
+    //         .zip(rhs.values.iter())
+    //         .for_each(|(s, v)| s.value *= v.value);
+
+    //     Ok(res)
+    // }
+
+    // pub fn element_wise_divide(&self, rhs: &Self) -> Result<Self, DataError> {
+    //     if rhs.header.n_zone != self.header.n_zone {
+    //         return Err(DataError::BadData);
+    //     }
+
+    //     let mut res = self.clone();
+    //     res.values
+    //         .iter_mut()
+    //         .zip(rhs.values.iter())
+    //         .for_each(|(s, v)| {
+    //             if v.value != 0. {
+    //                 s.value /= v.value
+    //             }
+    //         });
+
+    //     Ok(res)
+    // }
+}
+
 /// Represents a phase in a multi-phase process or system.
 ///
 /// The `RawPhase` struct is likely used to capture the state or characteristics

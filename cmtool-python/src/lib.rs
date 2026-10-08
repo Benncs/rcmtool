@@ -59,6 +59,6 @@ mod pycmtool {
     #[pymodule]
     mod generate {
         #[pymodule_export]
-        use super::_g::CMHandleWrapper;
+        use super::_g::{CMHandleWrapper, ReductionWrapper};
     }
 }

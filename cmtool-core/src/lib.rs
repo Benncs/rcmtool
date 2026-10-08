@@ -28,6 +28,32 @@ pub enum ExportType {
     EnsightGold,
 }
 
+///How a scalar is reduced over a compartment
+#[derive(Debug, Clone, Copy)]
+pub enum Reduction {
+    ///Volume integral, the gas fraction gives the gas volume
+    Integral,
+    ///Volume weighted mean, the integral divided by the volume it is taken over
+    Mean,
+}
+
+///Divides each compartment integral by its volume
+fn divide_by_volume(scalar_data: &mut RawDataScalar, volume: &[f64]) {
+    ///Below it a compartment holds no phase and its mean is 0
+    const MIN_PHASE_VOLUME: f64 = 1e-15;
+    scalar_data
+        .values
+        .iter_mut()
+        .zip(volume)
+        .for_each(|(s, v)| {
+            s.value = if *v > MIN_PHASE_VOLUME {
+                s.value / v
+            } else {
+                0.
+            };
+        });
+}
+
 // trait GeometryInfo {}
 
 // trait CfdCase {
@@ -108,6 +134,7 @@ impl CMHandle {
                     let sc = self.dump_scalar(
                         resolve_path(&root_export, &v.name),
                         resolve_path(&root_input, &v.filepath),
+                        Reduction::Integral,
                     )?;
                     rs.push((sc, v.name.clone()));
                 }
@@ -148,10 +175,14 @@ impl CMHandle {
         eg_geometry: Arc<ensight_gold::Geometry>,
         cm_geometry: Arc<CMGeometry>,
         model: Arc<model::CMModel>,
+        reduction: Reduction,
     ) -> Result<RawDataScalar, CoreError> {
         let scalar = Self::s_get_scalar(path, eg_geometry, cm_geometry)?;
 
-        let scalar_data = model.export_volume_integral_per_zone(scalar)?;
+        let mut scalar_data = model.export_volume_integral_per_zone(scalar)?;
+        if let Reduction::Mean = reduction {
+            divide_by_volume(&mut scalar_data, &model.get_real_volume());
+        }
 
         scalar_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
 
@@ -162,6 +193,7 @@ impl CMHandle {
         &self,
         res_name: impl AsRef<std::path::Path>,
         path: impl AsRef<std::path::Path>,
+        reduction: Reduction,
     ) -> Result<RawDataScalar, CoreError> {
         Self::ts_dump_scalar(
             res_name,
@@ -169,6 +201,7 @@ impl CMHandle {
             self.eg_geometry.clone(),
             self.cm_geometry.clone(),
             self.model.clone(),
+            reduction,
         )
     }
 
@@ -176,14 +209,22 @@ impl CMHandle {
     ///first, so a field carried by one phase is integrated over the volume that phase occupies.
     ///Scaling the compartment integral afterwards is not the same number unless the field and
     ///the fraction are uncorrelated inside the compartment.
+    ///The mean is taken over the volume of the phase, the integral of `phase_fraction`
     pub fn dump_scalar_fraction(
         &self,
         res_name: impl AsRef<std::path::Path>,
         path: impl AsRef<std::path::Path>,
         phase_fraction: Scalar,
+        reduction: Reduction,
     ) -> Result<RawDataScalar, CoreError> {
         let scalar = self.get_scalar(path)?.element_wise(&phase_fraction)?;
-        let scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
+        let mut scalar_data = self.model.export_volume_integral_per_zone(scalar)?;
+        if let Reduction::Mean = reduction {
+            let phase_volume = self.model.export_volume_integral_per_zone(phase_fraction)?;
+            // scalar_data = scalar_data.element_wise_divide(&phase_volume)?;
+            let phase_volume: Vec<f64> = phase_volume.values.iter().map(|v| v.value).collect();
+            divide_by_volume(&mut scalar_data, &phase_volume);
+        }
 
         scalar_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
 

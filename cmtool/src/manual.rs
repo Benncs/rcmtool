@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use cmtool::CmtoolError;
+use cmtool_core::Reduction;
 use cmtool_data::{
     CMAExportType, CMCase, CMCaseJson, CMCaseWriter, DEFAULT_CASE_FILE_NAME, RawData, RawDataScalar,
 };
@@ -50,6 +51,8 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
         && args.gas.is_empty()
         && args.vectors.is_empty()
         && args.scalars.is_empty()
+        && args.scalar_means.is_empty()
+        && args.epsilon.is_none()
     {
         return Err(CmtoolError::Custom(String::from(
             "Nothing to generate: give a scalar, a vector, or the three velocity components of a phase",
@@ -59,6 +62,7 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
     let root_dir = out_or_default(common.out.clone());
     std::fs::create_dir_all(&root_dir).map_err(cmtool_data::DataError::IO)?;
 
+    let mut vtk_scalars = Vec::new();
     let mut handle = cmtool_core::CMHandle::init(
         [common.n_i, common.n_j, common.n_k],
         &args.root,
@@ -70,6 +74,13 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
     let scalar_path = |name: &str| Path::new(&args.root).join(name);
     let out_path = |name: &str| format!("{}/{}", root_dir, name);
 
+    let mut case = CMCase::new(
+        [common.n_i as u32, common.n_j as u32, common.n_k as u32],
+        0.,
+        Some(String::from("generated from scalar components")),
+        false,
+    );
+
     //The gas fraction splits the phases: a phase carries its share of the flow and of the volume
     let gas_fraction = args
         .gas_fraction
@@ -78,12 +89,6 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
         .transpose()?;
 
     let mut has_flow_map = false;
-    let mut case = CMCase::new(
-        [common.n_i as u32, common.n_j as u32, common.n_k as u32],
-        0.,
-        Some(String::from("generated from scalar components")),
-        false,
-    );
 
     if !args.liquid.is_empty() {
         //Liquid takes what the gas leaves
@@ -112,14 +117,27 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
         //TODO: quick and dirty, gas is open and liquid closed. Sparger of cfd_test_3 hardcoded as
         //a ring (disk r<=0.0147 at z=0, ring at its half area radius), Q = alpha*v*A of the Fluent
         //inlet
-        let phase = cmtool_core::model::OpenPhase(
-            cmtool_core::model::InletPosition::Ring(
-                [0., 0., 0.],
-                0.0147 / std::f64::consts::SQRT_2,
-                1e-4,
-            ),
-            0.049789912 * 0.25890034 * std::f64::consts::PI * 0.0147 * 0.0147,
+
+        // let phase = cmtool_core::model::OpenPhase(
+        //     cmtool_core::model::InletPosition::Ring(
+        //         [0., 0., 0.],
+        //         0.0147 / std::f64::consts::SQRT_2,
+        //         1e-4,
+        //     ),
+        //     0.049789912 * 0.25890034 * std::f64::consts::PI * 0.0147 * 0.0147,
+        // );
+
+        let q_sanofi = 2700.; //m3/h
+        //TODO: quick and dirty, sparger dimensions unknown: the whole bottom layer gets the gas
+        let grid = handle.grid();
+        let bottom = (0..grid.number_cell())
+            .filter(|&cell| grid.cell_points(cell)[2] == 0)
+            .collect();
+        let phase_sanofi = cmtool_core::model::OpenPhase(
+            cmtool_core::model::InletPosition::Positions(bottom),
+            q_sanofi / 3600.,
         );
+
         // let mut b = *handle.balance_settings();
         // b.do_balance = false;
         // handle.set_balance_settings(b);
@@ -129,7 +147,7 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
             &args.gas,
             out_path("flowG"),
             gas_fraction,
-            Some(phase),
+            Some(phase_sanofi),
         )?;
         case.add(CMAExportType::GasFlow, "flowG.raw");
     }
@@ -138,7 +156,7 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
     let total_volume = handle.real_volume();
     let gas_volume = match &args.gas_fraction {
         Some(name) => handle
-            .dump_scalar(out_path("vofG"), scalar_path(name))?
+            .dump_scalar(out_path("vofG"), scalar_path(name), Reduction::Integral)?
             .values
             .iter()
             .map(|v| v.value)
@@ -158,6 +176,21 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
         case.add(CMAExportType::GasVolume, "vofG.raw");
     }
 
+    //Epsilon is the one of the liquid, averaged over the liquid volume of the compartment
+    if let Some(name) = &args.epsilon {
+        let tmp_sc = match &args.gas_fraction {
+            Some(gas) => handle.dump_scalar_fraction(
+                out_path("epsturb"),
+                scalar_path(name),
+                handle.get_scalar(scalar_path(gas))?.scalar_shift(1.),
+                Reduction::Mean,
+            )?,
+            None => handle.dump_scalar(out_path("epsturb"), scalar_path(name), Reduction::Mean)?,
+        };
+        case.add(CMAExportType::EnergyDissipation, "epsturb.raw");
+        vtk_scalars.push((tmp_sc, name.to_owned()));
+    }
+
     //A scalar is integrated over each compartment, a vector becomes a flow map of its own
     let file_name = |path: &str| {
         Path::new(path)
@@ -166,10 +199,22 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
             .unwrap_or(path)
             .to_owned()
     };
-    let mut rs = Vec::new();
     for scalar in &args.scalars {
-        let tmp_sc = handle.dump_scalar(out_path(&file_name(scalar)), scalar_path(scalar))?;
-        rs.push((tmp_sc, scalar.to_owned()));
+        let tmp_sc = handle.dump_scalar(
+            out_path(&file_name(scalar)),
+            scalar_path(scalar),
+            Reduction::Integral,
+        )?;
+        vtk_scalars.push((tmp_sc, scalar.to_owned()));
+    }
+
+    for scalar in &args.scalar_means {
+        let tmp_sc = handle.dump_scalar(
+            out_path(&file_name(scalar)),
+            scalar_path(scalar),
+            Reduction::Mean,
+        )?;
+        vtk_scalars.push((tmp_sc, scalar.to_owned()));
     }
 
     for vector in &args.vectors {
@@ -188,7 +233,7 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
     }
 
     #[cfg(feature = "use_vtk")]
-    handle.export_vtk(format!("{}/cma_case.vtu", root_dir), rs)?;
+    handle.export_vtk(format!("{}/cma_case.vtu", root_dir), vtk_scalars)?;
 
     Ok(())
 }

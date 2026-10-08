@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use cmtool_core::{CMHandle, CoreError, grid::MeshType, model::BalanceSettings};
+use cmtool_core::{CMHandle, CoreError, Reduction, grid::MeshType, model::BalanceSettings};
 use pyo3::exceptions::{PyIOError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
@@ -24,6 +24,23 @@ impl From<CoreErrorWrapper> for PyErr {
             CoreError::Data(data) => crate::PythonError::from(data).into(),
             CoreError::Custom(_) | CoreError::Handle => PyRuntimeError::new_err(message),
             CoreError::EGFormat => PyValueError::new_err(message),
+        }
+    }
+}
+
+/// How a scalar is reduced over a compartment: volume integral or volume weighted mean
+#[pyclass(from_py_object, name = "Reduction")]
+#[derive(Clone, Copy)]
+pub enum ReductionWrapper {
+    Integral,
+    Mean,
+}
+
+impl From<ReductionWrapper> for Reduction {
+    fn from(value: ReductionWrapper) -> Self {
+        match value {
+            ReductionWrapper::Integral => Self::Integral,
+            ReductionWrapper::Mean => Self::Mean,
         }
     }
 }
@@ -82,26 +99,36 @@ impl CMHandleWrapper {
         .map_err(Into::into)
     }
 
-    fn dump_scalar(&self, py: Python<'_>, res_name: &str, path: &str) -> PyResult<()> {
-        py.detach(|| self.handle.dump_scalar(res_name, path))
+    #[pyo3(signature = (res_name, path, reduction = ReductionWrapper::Integral))]
+    fn dump_scalar(
+        &self,
+        py: Python<'_>,
+        res_name: &str,
+        path: &str,
+        reduction: ReductionWrapper,
+    ) -> PyResult<()> {
+        py.detach(|| self.handle.dump_scalar(res_name, path, reduction.into()))
             .map(|_| ())
             .map_err(CoreErrorWrapper::from)
             .map_err(Into::into)
     }
 
     /// The liquid carries what the gas leaves, `1 - gas_fraction`
+    #[pyo3(signature = (res_name, path, gas_fraction, reduction = ReductionWrapper::Integral))]
     fn dump_scalar_liquid(
         &self,
         py: Python<'_>,
         res_name: &str,
         path: &str,
         gas_fraction: &str,
+        reduction: ReductionWrapper,
     ) -> PyResult<()> {
         py.detach(|| {
             self.handle.dump_scalar_fraction(
                 res_name,
                 path,
                 self.handle.get_scalar(gas_fraction)?.scalar_shift(1.),
+                reduction.into(),
             )
         })
         .map(|_| ())
@@ -109,16 +136,22 @@ impl CMHandleWrapper {
         .map_err(Into::into)
     }
 
+    #[pyo3(signature = (res_name, path, gas_fraction, reduction = ReductionWrapper::Integral))]
     fn dump_scalar_gas(
         &self,
         py: Python<'_>,
         res_name: &str,
         path: &str,
         gas_fraction: &str,
+        reduction: ReductionWrapper,
     ) -> PyResult<()> {
         py.detach(|| {
-            self.handle
-                .dump_scalar_fraction(res_name, path, self.handle.get_scalar(gas_fraction)?)
+            self.handle.dump_scalar_fraction(
+                res_name,
+                path,
+                self.handle.get_scalar(gas_fraction)?,
+                reduction.into(),
+            )
         })
         .map(|_| ())
         .map_err(CoreErrorWrapper::from)

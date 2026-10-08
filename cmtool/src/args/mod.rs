@@ -54,6 +54,14 @@ pub struct ManualArgs {
     #[clap(long = "scalar")]
     pub scalars: Vec<String>,
 
+    /// Scalar file to average over each compartment volume, repeatable
+    #[clap(long = "scalar-mean")]
+    pub scalar_means: Vec<String>,
+
+    /// Turbulent dissipation rate, averaged over the liquid of each compartment
+    #[clap(long)]
+    pub epsilon: Option<String>,
+
     /// Vector file to turn into a flow map, repeatable
     #[clap(long = "vector")]
     pub vectors: Vec<String>,
