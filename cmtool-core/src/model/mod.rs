@@ -189,7 +189,7 @@ impl CMModel {
         vector: Vector,
         settings: &BalanceSettings,
         phase: Option<OpenPhase>,
-    ) -> Result<cmtool_data::RawDataFlux, CoreError> {
+    ) -> Result<(cmtool_data::RawDataFlux, Option<BalanceReport>), CoreError> {
         let n_fluxes = self.interfaces.n_interfaces();
         let mut flows: Vec<InterfaceFlow> = vec![Default::default(); n_fluxes];
 
@@ -222,7 +222,7 @@ impl CMModel {
 
             //A closed phase (None) needs no inlet/outlet
             let is_open = phase.is_some();
-            let _balance = balance_2(
+            let balance = balance_2(
                 settings,
                 n_zone,
                 self.geometry.get_grid().unwrap(),
@@ -236,12 +236,12 @@ impl CMModel {
             if !is_open {
                 self.check_flow(&data_flow, settings.max_divergence)?;
             }
-            return Ok(data_flow);
+            return Ok((data_flow, Some(balance)));
         }
 
         let data_flow = get_data_flow(self.geometry.n_zone(), &self.interfaces.ids, &flows);
 
-        Ok(data_flow)
+        Ok((data_flow, None))
     }
 
     // pub fn export_volume_integral_per_zone(&self,scalar:&mut cmtool_data::RawDataScalar) {

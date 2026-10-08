@@ -50,11 +50,11 @@ pub struct ManualArgs {
     #[clap(long)]
     pub gas_fraction: Option<String>,
 
-    /// Scalar file to integrate over each compartment, repeatable
+    /// Scalar file to integrate over each compartment
     #[clap(long = "scalar")]
     pub scalars: Vec<String>,
 
-    /// Scalar file to average over each compartment volume, repeatable
+    /// Scalar file to average over each compartment volume
     #[clap(long = "scalar-mean")]
     pub scalar_means: Vec<String>,
 
@@ -62,7 +62,7 @@ pub struct ManualArgs {
     #[clap(long)]
     pub epsilon: Option<String>,
 
-    /// Vector file to turn into a flow map, repeatable
+    /// Vector file to turn into a flow map
     #[clap(long = "vector")]
     pub vectors: Vec<String>,
 }

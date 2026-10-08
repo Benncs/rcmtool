@@ -42,6 +42,9 @@ impl Default for BalanceSettings {
 pub struct BalanceReport {
     pub iterations: usize,
     pub residual: f64,
+    ///Open phase compartments with their flow, empty for a closed phase
+    pub inlet: Vec<(usize, f64)>,
+    pub outlet: Vec<(usize, f64)>,
 }
 
 pub enum InletPosition {
@@ -188,19 +191,24 @@ fn fill_outlet_compartments(grid: &dyn CompartmentMesh, _: &OpenPhase) -> Vec<us
 ///Correction of an open phase, called once the interfaces flows are summed: the injected flow
 ///enters the inlet compartments and an outlet compartment lets out what it gets in excess of what
 ///it sends to its neighbors so that in == out. Nothing goes out of one sending more than it gets,
-///the scaling lowers what it sends
+///the scaling lowers what it sends. Returns the compartments really letting out with their flow
 fn apply_open_phase(
     inlet: &[(usize, f64)],
     outlet: &[usize],
     inflow: &mut [f64],
     outflow: &mut [f64],
-) {
+) -> Vec<(usize, f64)> {
     inlet.iter().for_each(|&(zone, f)| {
         inflow[zone] += f;
     });
-    outlet.iter().for_each(|&zone| {
-        outflow[zone] += (inflow[zone] - outflow[zone]).max(0.);
-    });
+    outlet
+        .iter()
+        .filter_map(|&zone| {
+            let f = (inflow[zone] - outflow[zone]).max(0.);
+            outflow[zone] += f;
+            (f > 0.).then_some((zone, f))
+        })
+        .collect()
 }
 
 ///Balance flow
@@ -224,6 +232,8 @@ pub fn balance_2(
     let mut report = BalanceReport {
         iterations: 0,
         residual: f64::INFINITY,
+        inlet: Vec::new(),
+        outlet: Vec::new(),
     };
 
     let (inlet, outlet) = match &phase {
@@ -240,7 +250,7 @@ pub fn balance_2(
         outflow.fill(0.);
 
         calculate_balance(flows, interfaces, &mut inflow, &mut outflow);
-        apply_open_phase(&inlet, &outlet, &mut inflow, &mut outflow);
+        report.outlet = apply_open_phase(&inlet, &outlet, &mut inflow, &mut outflow);
 
         report.iterations = iteration;
         report.residual = calculate_residuals(n_zone, &inflow, &outflow);
@@ -259,6 +269,14 @@ pub fn balance_2(
             settings.max_divergence,
         ));
     }
+
+    //What leaves has to be what enters
+    let q_in: f64 = inlet.iter().map(|(_, f)| f).sum();
+    let q_out: f64 = report.outlet.iter().map(|(_, f)| f).sum();
+    if !inlet.is_empty() && err(q_in, q_out) > settings.max_divergence {
+        return Err(ModelError::InletOutletMismatch(q_in, q_out));
+    }
+    report.inlet = inlet;
 
     Ok(report)
 }

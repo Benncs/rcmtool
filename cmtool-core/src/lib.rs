@@ -245,17 +245,17 @@ impl CMHandle {
         path: impl AsRef<std::path::Path>,
         phase_fraction: Scalar,
         phase: Option<model::OpenPhase>,
-    ) -> Result<(), CoreError> {
+    ) -> Result<Option<model::BalanceReport>, CoreError> {
         let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
         let vector =
             Vector::new(v, &self.cm_geometry, &self.eg_geometry).scale_by(phase_fraction)?;
 
-        let flow_data =
+        let (flow_data, report) =
             self.model
                 .compute_flux_between_compartments(vector, &self.balance, phase)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
-        Ok(())
+        Ok(report)
     }
 
     pub fn dump_vector_raw(
@@ -263,7 +263,7 @@ impl CMHandle {
         res_name: impl AsRef<std::path::Path>,
         vector: Vector,
     ) -> Result<(), CoreError> {
-        let flow_data =
+        let (flow_data, _) =
             self.model
                 .compute_flux_between_compartments(vector, &self.balance, None)?;
 
@@ -278,7 +278,7 @@ impl CMHandle {
     ) -> Result<(), CoreError> {
         let v = ensight_gold::vectors::VectorField::init(self.eg_geometry.clone(), path)?;
         let vector = Vector::new(v, &self.cm_geometry, &self.eg_geometry);
-        let flow_data =
+        let (flow_data, _) =
             self.model
                 .compute_flux_between_compartments(vector, &self.balance, None)?;
 
@@ -313,18 +313,18 @@ impl CMHandle {
         path_k: impl AsRef<std::path::Path>,
         phase_fraction: Option<Scalar>,
         phase: Option<model::OpenPhase>,
-    ) -> Result<RawDataFlux, CoreError> {
+    ) -> Result<(RawDataFlux, Option<model::BalanceReport>), CoreError> {
         let vector = self.vector_from_scalar(path_i, path_j, path_k)?;
         let vector = match phase_fraction {
             Some(fraction) => vector.scale_by(fraction)?,
             None => vector,
         };
-        let flow_data =
+        let (flow_data, report) =
             self.model
                 .compute_flux_between_compartments(vector, &self.balance, phase)?;
 
         flow_data.write_raw(&format!("{}.raw", res_name.as_ref().to_str().unwrap()))?;
-        Ok(flow_data)
+        Ok((flow_data, report))
     }
 
     pub fn export_geometry_compartments(&self) {

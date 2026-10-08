@@ -14,6 +14,21 @@ pub enum CMAExportType {
     EnergyDissipation,
     Kla,
     Other,
+    //Open phase, not part of the legacy format
+    LiquidInlet,
+    LiquidOutlet,
+    GasInlet,
+    GasOutlet,
+}
+
+impl CMAExportType {
+    ///Written by the legacy binary format, which knows nothing about open phases
+    pub fn is_legacy(self) -> bool {
+        !matches!(
+            self,
+            Self::LiquidInlet | Self::LiquidOutlet | Self::GasInlet | Self::GasOutlet
+        )
+    }
 }
 
 ///Phase name in compartment model
@@ -62,6 +77,8 @@ pub enum CMExportType {
     EnergyDissipation,
     Kla,
     Other(String),
+    Inlet(PhaseCM),
+    Outlet(PhaseCM),
 }
 
 impl From<CMAExportType> for CMExportType {
@@ -74,6 +91,10 @@ impl From<CMAExportType> for CMExportType {
             CMAExportType::EnergyDissipation => Self::EnergyDissipation,
             CMAExportType::Kla => Self::Kla,
             CMAExportType::Other => Self::Other("Unnamed".to_string()),
+            CMAExportType::LiquidInlet => Self::Inlet(PhaseCM::Liquid),
+            CMAExportType::LiquidOutlet => Self::Outlet(PhaseCM::Liquid),
+            CMAExportType::GasInlet => Self::Inlet(PhaseCM::Gas),
+            CMAExportType::GasOutlet => Self::Outlet(PhaseCM::Gas),
         }
     }
 }
@@ -89,6 +110,10 @@ impl From<CMExportType> for CMAExportType {
             CMExportType::EnergyDissipation => CMAExportType::EnergyDissipation,
             CMExportType::Kla => CMAExportType::Kla,
             CMExportType::Other(_) => CMAExportType::Other,
+            CMExportType::Inlet(PhaseCM::Liquid) => CMAExportType::LiquidInlet,
+            CMExportType::Outlet(PhaseCM::Liquid) => CMAExportType::LiquidOutlet,
+            CMExportType::Inlet(PhaseCM::Gas) => CMAExportType::GasInlet,
+            CMExportType::Outlet(PhaseCM::Gas) => CMAExportType::GasOutlet,
         }
     }
 }
@@ -106,6 +131,12 @@ impl CMExportType {
             Self::Kla => "kla.raw".to_string(),
             Self::Other(name) => {
                 format!("m_{}.raw", name)
+            }
+            Self::Inlet(g) => {
+                format!("inlet{}.raw", g.identifier())
+            }
+            Self::Outlet(g) => {
+                format!("outlet{}.raw", g.identifier())
             }
         }
     }

@@ -16,6 +16,9 @@ pub enum ModelError {
     #[error("Open phase has no {0} compartment in the grid")]
     OpenBoundary(&'static str),
 
+    #[error("Open phase lets out {1} but gets {0}")]
+    InletOutletMismatch(f64, f64),
+
     #[error("Compartments off the inlet to outlet path: {0:?}")]
     DisconnectedCompartments(Vec<usize>),
 }

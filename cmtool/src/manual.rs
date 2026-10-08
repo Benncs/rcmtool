@@ -20,18 +20,23 @@ fn dump_phase_flow(
     res_name: String,
     fraction: Option<cmtool_core::model::Scalar>,
     phase: Option<cmtool_core::model::OpenPhase>,
-) -> Result<(), CmtoolError> {
+) -> Result<Option<cmtool_core::model::BalanceReport>, CmtoolError> {
     let path = |name: &String| Path::new(root).join(name);
 
-    match files {
+    let report = match files {
         [vector] => match fraction {
             Some(fraction) => {
                 handle.dump_vector_phase_fraction(res_name, path(vector), fraction, phase)?
             }
-            None => handle.dump_vector(res_name, path(vector))?,
+            None => {
+                handle.dump_vector(res_name, path(vector))?;
+                None
+            }
         },
         [i, j, k] => {
-            handle.dump_vector_from_scalar(res_name, path(i), path(j), path(k), fraction, phase)?;
+            handle
+                .dump_vector_from_scalar(res_name, path(i), path(j), path(k), fraction, phase)?
+                .1
         }
         _ => {
             return Err(CmtoolError::Custom(format!(
@@ -39,9 +44,9 @@ fn dump_phase_flow(
                 files.len()
             )));
         }
-    }
+    };
 
-    Ok(())
+    Ok(report)
 }
 
 ///Builds a case out of velocities given as separate scalar components, which is how a CFD export
@@ -141,7 +146,7 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
         // let mut b = *handle.balance_settings();
         // b.do_balance = false;
         // handle.set_balance_settings(b);
-        dump_phase_flow(
+        let report = dump_phase_flow(
             &handle,
             &args.root,
             &args.gas,
@@ -150,6 +155,20 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
             Some(phase_sanofi),
         )?;
         case.add(CMAExportType::GasFlow, "flowG.raw");
+
+        //Compartments the gas went in and out through, dense: 0 outside of them
+        if let Some(report) = report {
+            let n_zone = handle.grid().number_cell();
+            for (boundary, file, stype) in [
+                (&report.inlet, "inletG.raw", CMAExportType::GasInlet),
+                (&report.outlet, "outletG.raw", CMAExportType::GasOutlet),
+            ] {
+                let mut dense = vec![0.; n_zone];
+                boundary.iter().for_each(|&(zone, f)| dense[zone] = f);
+                RawDataScalar::from(dense.as_slice()).write_raw(&out_path(file))?;
+                case.add(stype, file);
+            }
+        }
     }
 
     //Integrating the gas fraction over a compartment gives the volume the gas occupies in it

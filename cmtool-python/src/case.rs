@@ -17,6 +17,10 @@ pub enum CMExportTypeWrapper {
     EnergyDissipation,
     Kla,
     Other,
+    LiquidInlet,
+    LiquidOutlet,
+    GasInlet,
+    GasOutlet,
 }
 
 impl From<CMExportTypeWrapper> for cmtool_data::CMAExportType {
@@ -29,6 +33,10 @@ impl From<CMExportTypeWrapper> for cmtool_data::CMAExportType {
             CMExportTypeWrapper::EnergyDissipation => Self::EnergyDissipation,
             CMExportTypeWrapper::Kla => Self::Kla,
             CMExportTypeWrapper::Other => Self::Other,
+            CMExportTypeWrapper::LiquidInlet => Self::LiquidInlet,
+            CMExportTypeWrapper::LiquidOutlet => Self::LiquidOutlet,
+            CMExportTypeWrapper::GasInlet => Self::GasInlet,
+            CMExportTypeWrapper::GasOutlet => Self::GasOutlet,
         }
     }
 }
@@ -53,6 +61,16 @@ impl CMCaseWrapper {
     }
     pub fn resolve(&self, root: &str, stype: CMExportTypeWrapper) -> Option<Vec<String>> {
         self.0.resolve_all(root, stype.into())
+    }
+
+    ///Gas inlet compartments with their flow, None for a closed gas phase
+    pub fn get_inlet_gas(&self, root: &str) -> Option<Vec<(usize, f64)>> {
+        self.0.get_inlet(root, cmtool_data::PhaseCM::Gas)
+    }
+
+    ///Gas outlet compartments with their flow, None for a closed gas phase
+    pub fn get_outlet_gas(&self, root: &str) -> Option<Vec<(usize, f64)>> {
+        self.0.get_outlet(root, cmtool_data::PhaseCM::Gas)
     }
 }
 

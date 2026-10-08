@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::{CMAExportType, DataError};
+use crate::{CMAExportType, CMExportType, DataError, PhaseCM, RawData, RawDataScalar};
 use serde::{Deserialize, Serialize};
 use std::io::{BufReader, Read, Write};
 use std::{collections::HashMap, fs, path::Path};
@@ -158,7 +158,41 @@ impl CMCase {
             !has_liq_flow || has_liq_volume
         };
 
-        ok_liq && ok_gas
+        //An open phase has both an inlet and an outlet, on a flow map
+        let ok_open = [PhaseCM::Liquid, PhaseCM::Gas].iter().all(|&phase| {
+            let has_inlet = self.paths.contains_key(&CMExportType::Inlet(phase).into());
+            let has_outlet = self.paths.contains_key(&CMExportType::Outlet(phase).into());
+            let has_flow = self.paths.contains_key(&CMExportType::Flow(phase).into());
+            has_inlet == has_outlet && (!has_inlet || has_flow)
+        });
+
+        ok_liq && ok_gas && ok_open
+    }
+
+    ///Compartments the phase enters through with their flow, None for a closed phase.
+    ///`root` is the folder of the flow map (`i_<n>` for a recursive case)
+    pub fn get_inlet(&self, root: &str, phase: PhaseCM) -> Option<Vec<(usize, f64)>> {
+        self.read_boundary(root, CMExportType::Inlet(phase).into())
+    }
+
+    ///Compartments the phase leaves through with their flow, None for a closed phase.
+    ///`root` is the folder of the flow map (`i_<n>` for a recursive case)
+    pub fn get_outlet(&self, root: &str, phase: PhaseCM) -> Option<Vec<(usize, f64)>> {
+        self.read_boundary(root, CMExportType::Outlet(phase).into())
+    }
+
+    //The file is dense, a compartment outside the boundary holds 0
+    fn read_boundary(&self, root: &str, stype: CMAExportType) -> Option<Vec<(usize, f64)>> {
+        let scalar = RawDataScalar::read_raw(self.resolve(root, stype)?)?;
+        Some(
+            scalar
+                .values
+                .iter()
+                .enumerate()
+                .filter(|(_, v)| v.value != 0.)
+                .map(|(zone, v)| (zone, v.value))
+                .collect(),
+        )
     }
 
     pub fn new(
@@ -344,9 +378,15 @@ impl CMCaseWriter for CCMCaseInfo {
 
         file.write_all(&case.time_per_flow_map.to_le_bytes())?;
 
-        file.write_all(&(case.paths.len() as u64).to_le_bytes())?;
+        //Open phase entries are not part of the legacy format
+        let legacy_paths: Vec<_> = case
+            .paths
+            .iter()
+            .filter(|(key, _)| key.is_legacy())
+            .collect();
+        file.write_all(&(legacy_paths.len() as u64).to_le_bytes())?;
 
-        for (key, value) in &case.paths {
+        for (key, value) in legacy_paths {
             file.write_all(&(*key as i8).to_le_bytes())?;
             let value_bytes = value.as_bytes();
             file.write_all(&(value_bytes.len() as u32).to_le_bytes())?;
@@ -513,6 +553,64 @@ mod test {
         let folders = case.get_folders(root.to_str().unwrap()).unwrap();
 
         assert_eq!(folders, vec!["i_0", "i_2", "i_10"]);
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn open_phase_needs_inlet_outlet_and_flow() {
+        let mut case = CMCase::new([1, 1, 2], 1., None, false);
+        case.add(CMAExportType::GasFlow, "flowG.raw");
+        case.add(CMAExportType::GasVolume, "vofG.raw");
+        case.add(CMAExportType::GasInlet, "inletG.raw");
+        assert!(!case.check());
+
+        case.add(CMAExportType::GasOutlet, "outletG.raw");
+        assert!(case.check());
+
+        let mut no_flow = CMCase::new([1, 1, 2], 1., None, false);
+        no_flow.add(CMAExportType::GasInlet, "inletG.raw");
+        no_flow.add(CMAExportType::GasOutlet, "outletG.raw");
+        assert!(!no_flow.check());
+    }
+
+    #[test]
+    fn legacy_ignores_open_phase() {
+        let path = std::env::temp_dir().join("cmtool_legacy_open_cma_case");
+        let mut case = CMCase::new([1, 1, 2], 1., None, false);
+        case.add(CMAExportType::GasFlow, "flowG.raw");
+        case.add(CMAExportType::GasVolume, "vofG.raw");
+        case.add(CMAExportType::GasInlet, "inletG.raw");
+        case.add(CMAExportType::GasOutlet, "outletG.raw");
+
+        CCMCaseInfo::write_case(case, &path).unwrap();
+        let read = CCMCaseInfo::read_case(&path).unwrap();
+        assert!(read.paths.contains_key(&CMAExportType::GasFlow));
+        assert!(!read.paths.contains_key(&CMAExportType::GasInlet));
+        assert!(!read.paths.contains_key(&CMAExportType::GasOutlet));
+
+        remove_file(&path).unwrap();
+    }
+
+    #[test]
+    fn get_inlet_drops_zeros() {
+        let root = std::env::temp_dir().join("cmtool_get_inlet_test");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        RawDataScalar::from([0., 0.5, 0., 0.25].as_slice())
+            .write_raw(root.join("inletG.raw").to_str().unwrap())
+            .unwrap();
+
+        let mut case = CMCase::new([1, 1, 4], 1., None, false);
+        case.add(CMAExportType::GasInlet, "inletG.raw");
+        let root_str = root.to_str().unwrap();
+
+        assert_eq!(
+            case.get_inlet(root_str, PhaseCM::Gas),
+            Some(vec![(1, 0.5), (3, 0.25)])
+        );
+        assert_eq!(case.get_outlet(root_str, PhaseCM::Gas), None);
+        assert_eq!(case.get_inlet(root_str, PhaseCM::Liquid), None);
 
         std::fs::remove_dir_all(&root).unwrap();
     }

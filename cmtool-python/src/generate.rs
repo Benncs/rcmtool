@@ -180,6 +180,7 @@ impl CMHandleWrapper {
                 None,
             )
         })
+        .map(|_| ())
         .map_err(CoreErrorWrapper::from)
         .map_err(Into::into)
     }
@@ -199,6 +200,7 @@ impl CMHandleWrapper {
                 None,
             )
         })
+        .map(|_| ())
         .map_err(CoreErrorWrapper::from)
         .map_err(Into::into)
     }
