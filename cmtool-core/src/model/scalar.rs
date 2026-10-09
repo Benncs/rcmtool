@@ -26,7 +26,8 @@ impl Scalar {
 
         for (i_part, part) in eg_geometry.parts.iter().enumerate() {
             for (i_e, element) in part.elements.iter().enumerate() {
-                if let ElementsType::VolumeElementType(vetype) = element.etype {
+                let &element_type = element.get_type();
+                if let ElementsType::VolumeElementType(vetype) = element_type {
                     let element_index = vetype.to_index();
 
                     for volume_element_id in 0..element.n_elements {

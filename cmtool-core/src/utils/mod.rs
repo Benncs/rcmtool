@@ -60,6 +60,7 @@ impl VolumeElementTypes {
     /// where each group defines one tetrahedron.
     fn tetra_subdivisions(&self) -> &'static [[usize; 4]] {
         match self {
+            Self::Nfaced | Self::GNfaced => unimplemented!("Can´t split Nface into tetra4"),
             Self::Tetra4 | Self::GTetra4 => &[[0, 1, 2, 3]],
             Self::Pyramid5 | Self::GPyramid5 => &[[0, 1, 3, 4], [1, 2, 3, 4]],
             Self::Penta6 | Self::GPenta6 => &[[0, 1, 2, 3], [1, 2, 3, 4], [2, 3, 4, 5]],

@@ -70,9 +70,10 @@ impl<T: VarTypeReader> PerElementVariable<T> {
                     if element_type_name.contains("undef") {
                         unimplemented!("Undef varaible per element");
                     }
+                    let &element_type = element.get_type();
                     // let _ = reader.read_f32()?; //undef
                     // println!("{}", element_type_name);
-                    if ElementsType::from_str(&element_type_name) == Ok(element.etype) {
+                    if ElementsType::from_str(&element_type_name) == Ok(element_type) {
                         data_in_part.push(T::read_elements(reader, element)?);
                     } else if element_type_name == "coordinates" {
                         //FIXM
@@ -85,7 +86,7 @@ impl<T: VarTypeReader> PerElementVariable<T> {
                             ErrorKind::Unsupported,
                             format!(
                                 "Scalar and geometry part are not the same: {} vs {:?}",
-                                element_type_name, element.etype
+                                element_type_name, element_type
                             ),
                         ));
                     }

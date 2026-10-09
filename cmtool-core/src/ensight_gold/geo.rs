@@ -48,11 +48,20 @@ fn read_section_header(reader: &mut EnsightGoldReader) -> std::io::Result<String
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct FaceElement {
+    vertices: Vec<usize>,
+}
+
+#[derive(Debug, Default, Clone)]
 pub(crate) struct MeshElementType {
-    pub n_nodes: usize,
+    // pub n_nodes: usize,
+    //TODO remove: n_nodes is not used and since v0.1.6 reader works for nface and nsided which have no fixed n_nodes
+    n_nodes: usize,
     pub(crate) n_elements: usize,
-    pub etype: ElementsType,
+    etype: ElementsType, //n_nodes is inside !
     pub vertices: Vec<usize>,
+
+    pub faces: Option<Vec<FaceElement>>,
 }
 
 pub struct Part {
@@ -91,6 +100,11 @@ impl std::fmt::Display for Geometry {
 }
 
 impl MeshElementType {
+    #[inline]
+    pub fn get_type(&self) -> &ElementsType {
+        &self.etype
+    }
+
     pub fn get_vertex(&self, i_element: usize, i_vertex: usize) -> usize {
         self.vertices[i_element * self.n_nodes + i_vertex]
     }
@@ -109,35 +123,102 @@ impl MeshElementType {
 
         let n_elements = reader.read_i32()? as usize;
 
-        if ignore_element_id {
+        if !ignore_element_id {
             for _ in 0..n_elements {
                 reader.ignore_line()?;
             }
         }
+
+        //TODO: i think condition should be if volume element /else {skip}
+        // match volume element like the follwoing if/else if /else
+
         //Regular
-        if etype != ElementsType::Nfaced {
-            // let n_vertex = etype.number_vertex();
+        if etype != ElementsType::VolumeElementType(super::types::VolumeElementTypes::Nfaced)
+            && etype != ElementsType::Nsided
+        {
             let n_nodes = etype.node_count() as usize;
-            let mut max = 0;
+
             let mut vertices = Vec::with_capacity(n_elements * n_nodes);
             for _ in 0..n_elements * n_nodes {
                 let cn = reader.read_i32()?;
                 vertices.push(cn as usize);
-                if cn > max {
-                    max = cn;
-                }
             }
+
             Ok(Self {
                 n_nodes,
                 n_elements,
                 etype,
                 vertices,
+                faces: None,
+            })
+        } else if etype == ElementsType::VolumeElementType(super::types::VolumeElementTypes::Nfaced)
+        {
+            //Nface defines polygon by their face alowing to have more complexe shape
+            let n_nodes = etype.node_count() as usize;
+
+            let mut n_face_per_element = Vec::with_capacity(n_elements);
+            let mut n_tot_faces = 0;
+            for _ in 0..n_elements {
+                let n_face = reader.read_i32()? as usize;
+                n_face_per_element.push(n_face);
+                n_tot_faces += n_face;
+            }
+
+            let faces: Vec<FaceElement> = Vec::new();
+
+            let mut n_tot_nodes = 0;
+            let mut n_nodes_pf = Vec::with_capacity(n_tot_faces);
+            for i in 0..n_elements {
+                for _ in 0..n_face_per_element[i] {
+                    let n_nodes_per_face = reader.read_i32()? as usize;
+                    n_tot_nodes += n_nodes_per_face;
+                    n_nodes_pf.push(n_nodes_per_face);
+                }
+            }
+            let mut vertices = Vec::with_capacity(n_tot_nodes);
+            let mut offset = 0;
+            for i in 0..n_elements {
+                for j in 0..n_face_per_element[i] {
+                    let k = offset + j;
+                    for _ in 0..n_nodes_pf[k] {
+                        let node_number = reader.read_i32()? as usize;
+                        vertices.push(node_number);
+                    }
+                }
+                offset += n_face_per_element[i]
+            }
+
+            Ok(Self {
+                n_nodes,
+                n_elements,
+                etype,
+                vertices,
+                faces: Some(faces),
+            })
+        } else if etype == ElementsType::Nsided {
+            // let n_nodes = etype.node_count() as usize;
+
+            let n_nodes = 1;
+            let number_of_nodes_per_element = (0..n_elements)
+                .map(|_| reader.read_i32())
+                .collect::<Result<Vec<_>, _>>()?;
+            let n_nodes_tot: i32 = number_of_nodes_per_element.iter().sum();
+            let mut vertices = Vec::with_capacity(n_nodes_tot as usize);
+            for i in 0..n_elements {
+                for _ in 0..number_of_nodes_per_element[i] {
+                    let node_number = reader.read_i32()? as usize;
+                    vertices.push(node_number);
+                }
+            }
+
+            Ok(Self {
+                n_nodes,
+                n_elements,
+                etype,
+                vertices: vec![],
+                faces: None,
             })
         } else {
-            let n_nodes = etype.node_count() as usize;
-            for _ in 0..n_nodes * n_elements {
-                println!("{}", reader.read_i32()? as usize);
-            }
             todo!()
         }
     }
@@ -155,11 +236,6 @@ impl Part {
     }
 
     pub fn get_vertex_coordinates_vec(&self, k_vertex: usize) -> Coords3 {
-        // [
-        //     self.vertex_coordinates[utils::linear_index_coordinates_matrix(k_vertex, 0)],
-        //     self.vertex_coordinates[utils::linear_index_coordinates_matrix(k_vertex, 1)],
-        //     self.vertex_coordinates[utils::linear_index_coordinates_matrix(k_vertex, 2)],
-        // ]
         let offset = k_vertex * 3;
         [
             self.vertex_coordinates[offset],
@@ -197,7 +273,7 @@ impl Part {
 
         let n_nodes = reader.read_i32()? as usize;
 
-        if ignore_node_id {
+        if !ignore_node_id {
             for _ in 0..n_nodes {
                 reader.ignore_line()?;
             }
@@ -230,6 +306,18 @@ impl Part {
     }
 }
 
+fn do_ignore(arg: &str) -> bool {
+    let parts: Vec<&str> = arg.split(' ').collect();
+    if parts.is_empty() {
+        panic!("bad args for id choice");
+    }
+    match *parts.last().unwrap() {
+        "assign" | "given" => false,
+        "off" | "ignore" => true,
+        _ => false,
+    }
+}
+
 impl Geometry {
     pub fn new(path: &Path) -> std::io::Result<Self> {
         let mut reader = Reader::new(path)?;
@@ -256,15 +344,12 @@ impl Geometry {
 
         let (ignore_node_id, ignore_element_id) = {
             let _node_id_choice = reader.get_line_string()?;
-
-            let ignore_node_id = false; //TODO find in node_id_choice: assign
-
             let _element_id_choice = reader.get_line_string()?;
-            let ignore_element_id = false; //TODO find in element_id_choice: assign
+
+            let ignore_node_id = do_ignore(&_node_id_choice);
+            let ignore_element_id = do_ignore(&_node_id_choice);
             (ignore_node_id, ignore_element_id)
         };
-
-        // println!("{} {}", node_id_choice, element_id_choice);
 
         let buf = reader.get_line_string()?;
         if buf.contains("extents") {
@@ -280,7 +365,10 @@ impl Geometry {
             match Part::read(reader, ignore_node_id, ignore_element_id) {
                 Ok(part) => parts.push(part),
                 Err(error) if is_section_end(&error) => break,
-                Err(error) => return Err(error),
+                Err(error) => {
+                    println!("Error reading part");
+                    return Err(error);
+                }
             }
         }
 

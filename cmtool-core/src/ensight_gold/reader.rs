@@ -85,6 +85,10 @@ impl<const N: usize> Reader<N> {
         self.ignore_bytes(N as i64)
     }
 
+    pub fn ignore_i32(&mut self) -> std::io::Result<()> {
+        self.ignore_bytes(4)
+    }
+
     pub fn ignore_bytes(&mut self, n: i64) -> std::io::Result<()> {
         self.reader.seek(SeekFrom::Current(n))?;
         Ok(())

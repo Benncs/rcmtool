@@ -157,8 +157,9 @@ impl VolumeElementData {
         let i_part_base_index = i_part * N_NUMBER_TYPE;
 
         for element in part.elements.iter() {
-            if let ElementsType::VolumeElementType(vol_elem) = element.etype {
-                let n_vertex = element.etype.node_count() as usize;
+            let &element_type = element.get_type();
+            if let ElementsType::VolumeElementType(vol_elem) = element_type {
+                let n_vertex = element_type.node_count() as usize;
                 let element_index = vol_elem.to_index();
                 let n_volume_element = velem_detail[i_part_base_index + element_index];
 

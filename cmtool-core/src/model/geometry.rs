@@ -42,7 +42,8 @@ impl CMGeometry {
             // vertex_detail.push(part.n_vertex);
 
             for element in &part.elements {
-                if let ElementsType::VolumeElementType(vol_element) = element.etype {
+                let &element_type = element.get_type();
+                if let ElementsType::VolumeElementType(vol_element) = element_type {
                     let index_element = vol_element.to_index();
                     n_volume_elements_total += element.n_elements;
                     //TODO:  prefetch slices in the outer loop as number of element type is known

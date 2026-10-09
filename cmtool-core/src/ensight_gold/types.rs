@@ -20,12 +20,15 @@ pub enum VolumeElementTypes {
     GHexa20,
     Pyramid13,
     GPyramid13,
+
+    Nfaced,
+    GNfaced,
 }
 
-//"tetra4", "tetra10", "pyramid5", "pyramid13", "penta6", "penta15", "hexa8", "hexa20"
+//"tetra4", "tetra10", "pyramid5", "pyramid13", "penta6", "penta15", "hexa8", "hexa20", "nfaced", "nsised"
 
 impl VolumeElementTypes {
-    pub const NUMBER_OF_TYPES: usize = 8; //G and non G type count for 1
+    pub const NUMBER_OF_TYPES: usize = 9; //G and non G type count for 1
 
     pub fn to_index(&self) -> usize {
         match self {
@@ -37,6 +40,8 @@ impl VolumeElementTypes {
             VolumeElementTypes::Hexa8 | VolumeElementTypes::GHexa8 => 5,
             VolumeElementTypes::Hexa20 | VolumeElementTypes::GHexa20 => 6,
             VolumeElementTypes::GPyramid13 | VolumeElementTypes::Pyramid13 => 7,
+
+            VolumeElementTypes::Nfaced | VolumeElementTypes::GNfaced => 8,
         }
     }
 }
@@ -59,8 +64,6 @@ pub enum ElementsType {
     GQuad8,
     Nsided,
     GNsided,
-    Nfaced,
-    GNfaced,
     VolumeElementType(VolumeElementTypes),
 }
 #[allow(clippy::derivable_impls)]
@@ -110,8 +113,8 @@ impl FromStr for ElementsType {
             "g_hexa20" => Ok(VolumeElementType(GHexa20)),
             "nsided" => Ok(Nsided),
             "g_nsided" => Ok(GNsided),
-            "nfaced" => Ok(Nfaced),
-            "g_nfaced" => Ok(GNfaced),
+            "nfaced" => Ok(VolumeElementType(Nfaced)),
+            "g_nfaced" => Ok(VolumeElementType(GNfaced)),
             _ => Err(()),
         }
     }
@@ -132,8 +135,8 @@ impl ElementsType {
             Quad4 | GQuad4 => 4,
             Quad8 | GQuad8 => 8,
 
-            Nsided | GNsided => panic!("Nsided has variable node count"),
-            Nfaced | GNfaced => -1,
+            // Nsided | GNsided => panic!("Nsided has variable node count"),
+            // Nfaced | GNfaced => -1,
             VolumeElementType(Tetra4) | VolumeElementType(GTetra4) => 4,
             VolumeElementType(Tetra10) | VolumeElementType(GTetra10) => 10,
             VolumeElementType(Pyramid5) | VolumeElementType(GPyramid5) => 5,
@@ -142,6 +145,9 @@ impl ElementsType {
             VolumeElementType(Hexa8) | VolumeElementType(GHexa8) => 8,
             VolumeElementType(Hexa20) | VolumeElementType(GHexa20) => 20,
             VolumeElementType(Pyramid13) | VolumeElementType(GPyramid13) => 13,
+
+            Nsided | GNsided => unimplemented!(),
+            VolumeElementType(Nfaced) | VolumeElementType(GNfaced) => 1,
         }
     }
 }
