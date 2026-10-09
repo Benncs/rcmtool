@@ -57,6 +57,9 @@ pub enum DataError {
     /// An index does not address any element of the accessed collection.
     #[error("Index {index} is out of range, {size} element(s) available")]
     OutOfRange { index: usize, size: usize },
+
+    #[error("Case not correct")]
+    IncorectCase,
 }
 
 #[inline(always)]

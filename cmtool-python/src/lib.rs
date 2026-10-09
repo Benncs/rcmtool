@@ -21,6 +21,7 @@ impl From<PythonError> for PyErr {
             DataError::Serde | DataError::BadData => PyValueError::new_err(message),
             DataError::OutOfRange { .. } => PyIndexError::new_err(message),
             DataError::Unknown => PyRuntimeError::new_err(message),
+            _ => PyRuntimeError::new_err(message),
         }
     }
 }

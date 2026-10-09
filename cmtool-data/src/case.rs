@@ -279,7 +279,7 @@ impl CMCaseReader for CMCaseJson {
 impl CMCaseWriter for CMCaseJson {
     fn write_case(case: CMCase, path: &Path) -> Result<(), DataError> {
         if !case.check() {
-            return Err(DataError::BadData);
+            return Err(DataError::IncorectCase);
         }
 
         let json_string = serde_json::to_string(&case).map_err(|_| DataError::Serde)?;
