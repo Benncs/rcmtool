@@ -47,10 +47,10 @@ fn read_section_header(reader: &mut EnsightGoldReader) -> std::io::Result<String
     }
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct FaceElement {
-    vertices: Vec<usize>,
-}
+// #[derive(Debug, Default, Clone)]
+// pub struct FaceElement {
+//     vertices: Vec<usize>,
+// }
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct MeshElementType {
@@ -60,8 +60,7 @@ pub(crate) struct MeshElementType {
     pub(crate) n_elements: usize,
     etype: ElementsType, //n_nodes is inside !
     pub vertices: Vec<usize>,
-
-    pub faces: Option<Vec<FaceElement>>,
+    // pub faces: Option<Vec<FaceElement>>,
 }
 
 pub struct Part {
@@ -109,6 +108,7 @@ impl MeshElementType {
         self.vertices[i_element * self.n_nodes + i_vertex]
     }
 
+    #[allow(clippy::needless_range_loop)]
     pub fn read(reader: &mut EnsightGoldReader, ignore_element_id: bool) -> std::io::Result<Self> {
         let element_type = read_section_header(reader)?;
 
@@ -125,7 +125,7 @@ impl MeshElementType {
 
         if !ignore_element_id {
             for _ in 0..n_elements {
-                reader.ignore_line()?;
+                reader.ignore_i32()?;
             }
         }
 
@@ -149,7 +149,7 @@ impl MeshElementType {
                 n_elements,
                 etype,
                 vertices,
-                faces: None,
+                // faces: None,
             })
         } else if etype == ElementsType::VolumeElementType(super::types::VolumeElementTypes::Nfaced)
         {
@@ -164,17 +164,26 @@ impl MeshElementType {
                 n_tot_faces += n_face;
             }
 
-            let faces: Vec<FaceElement> = Vec::new();
+            // let faces: Vec<FaceElement> = Vec::new();
 
             let mut n_tot_nodes = 0;
             let mut n_nodes_pf = Vec::with_capacity(n_tot_faces);
-            for i in 0..n_elements {
-                for _ in 0..n_face_per_element[i] {
+            // for i in 0..n_elements {
+            //     for _ in 0..n_face_per_element[i] {
+            //         let n_nodes_per_face = reader.read_i32()? as usize;
+            //         n_tot_nodes += n_nodes_per_face;
+            //         n_nodes_pf.push(n_nodes_per_face);
+            //     }
+            // }
+            //
+            for &n in n_face_per_element.iter() {
+                for _ in 0..n {
                     let n_nodes_per_face = reader.read_i32()? as usize;
                     n_tot_nodes += n_nodes_per_face;
                     n_nodes_pf.push(n_nodes_per_face);
                 }
             }
+
             let mut vertices = Vec::with_capacity(n_tot_nodes);
             let mut offset = 0;
             for i in 0..n_elements {
@@ -193,7 +202,7 @@ impl MeshElementType {
                 n_elements,
                 etype,
                 vertices,
-                faces: Some(faces),
+                // faces: Some(faces),
             })
         } else if etype == ElementsType::Nsided {
             // let n_nodes = etype.node_count() as usize;
@@ -204,6 +213,7 @@ impl MeshElementType {
                 .collect::<Result<Vec<_>, _>>()?;
             let n_nodes_tot: i32 = number_of_nodes_per_element.iter().sum();
             let mut vertices = Vec::with_capacity(n_nodes_tot as usize);
+
             for i in 0..n_elements {
                 for _ in 0..number_of_nodes_per_element[i] {
                     let node_number = reader.read_i32()? as usize;
@@ -216,7 +226,7 @@ impl MeshElementType {
                 n_elements,
                 etype,
                 vertices: vec![],
-                faces: None,
+                // faces: None,
             })
         } else {
             todo!()
@@ -275,7 +285,7 @@ impl Part {
 
         if !ignore_node_id {
             for _ in 0..n_nodes {
-                reader.ignore_line()?;
+                reader.ignore_i32()?;
             }
         }
 

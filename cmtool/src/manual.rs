@@ -52,17 +52,17 @@ fn dump_phase_flow(
 ///Builds a case out of velocities given as separate scalar components, which is how a CFD export
 ///stores them when it holds no vector variable
 pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolError> {
-    if args.liquid.is_empty()
-        && args.gas.is_empty()
-        && args.vectors.is_empty()
-        && args.scalars.is_empty()
-        && args.scalar_means.is_empty()
-        && args.epsilon.is_none()
-    {
-        return Err(CmtoolError::Custom(String::from(
-            "Nothing to generate: give a scalar, a vector, or the three velocity components of a phase",
-        )));
-    }
+    // if args.liquid.is_empty()
+    //     && args.gas.is_empty()
+    //     && args.vectors.is_empty()
+    //     && args.scalars.is_empty()
+    //     && args.scalar_means.is_empty()
+    //     && args.epsilon.is_none()
+    // {
+    //     return Err(CmtoolError::Custom(String::from(
+    //         "Nothing to generate: give a scalar, a vector, or the three velocity components of a phase",
+    //     )));
+    // }
 
     let root_dir = out_or_default(common.out.clone());
     std::fs::create_dir_all(&root_dir).map_err(cmtool_data::DataError::IO)?;
@@ -123,25 +123,25 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
         //a ring (disk r<=0.0147 at z=0, ring at its half area radius), Q = alpha*v*A of the Fluent
         //inlet
 
-        // let phase = cmtool_core::model::OpenPhase(
-        //     cmtool_core::model::InletPosition::Ring(
-        //         [0., 0., 0.],
-        //         0.0147 / std::f64::consts::SQRT_2,
-        //         1e-4,
-        //     ),
-        //     0.049789912 * 0.25890034 * std::f64::consts::PI * 0.0147 * 0.0147,
-        // );
-
-        let q_sanofi = 2700.; //m3/h
-        //TODO: quick and dirty, sparger dimensions unknown: the whole bottom layer gets the gas
-        let grid = handle.grid();
-        let bottom = (0..grid.number_cell())
-            .filter(|&cell| grid.cell_points(cell)[2] == 0)
-            .collect();
-        let phase_sanofi = cmtool_core::model::OpenPhase(
-            cmtool_core::model::InletPosition::Positions(bottom),
-            q_sanofi / 3600.,
+        let phase = cmtool_core::model::OpenPhase(
+            cmtool_core::model::InletPosition::Ring(
+                [0., 0., 0.],
+                0.0147 / std::f64::consts::SQRT_2,
+                1e-4,
+            ),
+            0.049789912 * 0.25890034 * std::f64::consts::PI * 0.0147 * 0.0147,
         );
+
+        // let q_sanofi = 2700.; //m3/h
+        // //TODO: quick and dirty, sparger dimensions unknown: the whole bottom layer gets the gas
+        // let grid = handle.grid();
+        // let bottom = (0..grid.number_cell())
+        //     .filter(|&cell| grid.cell_points(cell)[2] == 0)
+        //     .collect();
+        // let phase_sanofi = cmtool_core::model::OpenPhase(
+        //     cmtool_core::model::InletPosition::Positions(bottom),
+        //     q_sanofi / 3600.,
+        // );
 
         // let mut b = *handle.balance_settings();
         // b.do_balance = false;
@@ -152,7 +152,7 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
             &args.gas,
             out_path("flowG"),
             gas_fraction,
-            Some(phase_sanofi),
+            Some(phase),
         )?;
         case.add(CMAExportType::GasFlow, "flowG.raw");
 
