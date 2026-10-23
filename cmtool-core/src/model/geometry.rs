@@ -15,6 +15,7 @@ use crate::{
     utils::compute_centroid,
 };
 
+#[derive(Clone)]
 pub enum InletPosition {
     Point(Coords3),
     //center, radius, height above the center
@@ -24,9 +25,26 @@ pub enum InletPosition {
     Positions(Vec<usize>),
 }
 
+#[derive(Clone)]
 pub struct OpenPhase {
     pub position: InletPosition,
     pub flow_rate: f64,
+}
+
+impl OpenPhase {
+    pub fn new_from_position(position: Vec<usize>, flow_rate: f64) -> Self {
+        OpenPhase {
+            position: InletPosition::Positions(position),
+            flow_rate,
+        }
+    }
+
+    pub fn new_ring(center: Coords3, radius: f64, height: f64, flow_rate: f64) -> Self {
+        OpenPhase {
+            position: InletPosition::Ring(center, radius, height),
+            flow_rate,
+        }
+    }
 }
 
 pub struct CMGeometry {

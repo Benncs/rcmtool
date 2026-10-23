@@ -60,6 +60,9 @@ mod pycmtool {
     #[pymodule]
     mod generate {
         #[pymodule_export]
-        use super::_g::{CMHandleWrapper, ReductionWrapper};
+        use super::_g::{
+            CMHandleWrapper, OpenPhaseWrapper, ReductionWrapper, phase_from_position,
+            phase_from_ring,
+        };
     }
 }

@@ -9,9 +9,7 @@ pub mod utils;
 pub use errors::CoreError;
 
 #[cfg(feature = "use_vtk")]
-use grid::vtk::VtkCm;
-#[cfg(feature = "use_vtk")]
-use grid::vtk::add_celldata_to_vtk;
+use grid::vtk::{VtkCm, add_celldata_to_vtk};
 
 use cmtool_data::{RawData, RawDataFlux, RawDataScalar};
 use model::{CMGeometry, CMModel, Scalar, Vector};

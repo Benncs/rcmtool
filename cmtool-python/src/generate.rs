@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use cmtool_core::model::OpenPhase;
 use cmtool_core::{CMHandle, CoreError, Reduction, grid::MeshType, model::BalanceSettings};
 use pyo3::exceptions::{PyIOError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -26,6 +27,32 @@ impl From<CoreErrorWrapper> for PyErr {
             CoreError::EGFormat => PyValueError::new_err(message),
         }
     }
+}
+
+#[pyclass(from_py_object, name = "OpenPhase")]
+#[derive(Clone)]
+pub struct OpenPhaseWrapper(cmtool_core::model::OpenPhase);
+
+#[pyfunction]
+pub fn phase_from_ring(
+    x_c: f64,
+    y_c: f64,
+    z_c: f64,
+    radius: f64,
+    height: f64,
+    flow_rate: f64,
+) -> OpenPhaseWrapper {
+    OpenPhaseWrapper(OpenPhase::new_ring(
+        [x_c, y_c, z_c],
+        radius,
+        height,
+        flow_rate,
+    ))
+}
+
+#[pyfunction]
+pub fn phase_from_position(pos: Vec<usize>, flow_rate: f64) -> OpenPhaseWrapper {
+    OpenPhaseWrapper(OpenPhase::new_from_position(pos, flow_rate))
 }
 
 /// How a scalar is reduced over a compartment: volume integral or volume weighted mean
@@ -191,13 +218,20 @@ impl CMHandleWrapper {
         res_name: &str,
         path: &str,
         gas_fraction: &str,
+        phase: Option<OpenPhaseWrapper>,
     ) -> PyResult<()> {
+        let phase: Option<cmtool_core::model::OpenPhase> = {
+            match phase {
+                Some(v) => Some(v.0),
+                None => None,
+            }
+        };
         py.detach(|| {
             self.handle.dump_vector_phase_fraction(
                 res_name,
                 path,
                 self.handle.get_scalar(gas_fraction)?,
-                None,
+                phase,
             )
         })
         .map(|_| ())
@@ -246,7 +280,7 @@ impl CMHandleWrapper {
         .map_err(CoreErrorWrapper::from)
         .map_err(Into::into)
     }
-
+    #[allow(clippy::too_many_arguments)]
     fn dump_vector_from_scalar_gas(
         &self,
         py: Python<'_>,
@@ -255,7 +289,14 @@ impl CMHandleWrapper {
         path_j: &str,
         path_k: &str,
         gas_fraction: &str,
+        phase: Option<OpenPhaseWrapper>,
     ) -> PyResult<()> {
+        let phase: Option<cmtool_core::model::OpenPhase> = {
+            match phase {
+                Some(v) => Some(v.0),
+                None => None,
+            }
+        };
         py.detach(|| {
             self.handle.dump_vector_from_scalar(
                 res_name,
@@ -263,7 +304,7 @@ impl CMHandleWrapper {
                 path_j,
                 path_k,
                 Some(self.handle.get_scalar(gas_fraction)?),
-                None,
+                phase,
             )
         })
         .map(|_| ())
