@@ -317,14 +317,11 @@ impl Part {
 }
 
 fn do_ignore(arg: &str) -> bool {
-    let parts: Vec<&str> = arg.split(' ').collect();
-    if parts.is_empty() {
-        panic!("bad args for id choice");
-    }
-    match *parts.last().unwrap() {
-        "assign" | "given" => false,
-        "off" | "ignore" => true,
-        _ => false,
+    //Ids are written in the file only for "given" and "ignore"
+    match arg.split_whitespace().last() {
+        Some("off") | Some("assign") => true,
+        Some("given") | Some("ignore") => false,
+        _ => panic!("bad args for id choice"),
     }
 }
 
@@ -357,7 +354,7 @@ impl Geometry {
             let _element_id_choice = reader.get_line_string()?;
 
             let ignore_node_id = do_ignore(&_node_id_choice);
-            let ignore_element_id = do_ignore(&_node_id_choice);
+            let ignore_element_id = do_ignore(&_element_id_choice);
             (ignore_node_id, ignore_element_id)
         };
 
