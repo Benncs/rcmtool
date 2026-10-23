@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::{
-    coordinates::Coords3,
     errors::ModelError,
     grid::CompartmentMesh,
+    model::geometry::{InletPosition, OpenPhase},
     model::interfaces::{AInterfacesInfo, InterfaceFlow},
 };
 use std::collections::HashMap;
@@ -45,15 +45,6 @@ pub struct BalanceReport {
     ///Open phase compartments with their flow, empty for a closed phase
     pub inlet: Vec<(usize, f64)>,
     pub outlet: Vec<(usize, f64)>,
-}
-
-pub enum InletPosition {
-    Point(Coords3),
-    //center, radius, height above the center
-    Ring(Coords3, f64, f64),
-    Circle(Coords3, f64, f64),
-    //list of compartment indice (extractor from Eg reader or from elsewhere)
-    Positions(Vec<usize>),
 }
 
 ///Relative error between a and b, 0 under the abs or rel tolerance
@@ -118,18 +109,19 @@ fn apply_scaling(flows: &mut [InterfaceFlow], interfaces: &AInterfacesInfo, fact
     }
 }
 
-pub struct OpenPhase(pub InletPosition, pub f64);
-
 ///Compartments receiving the injected flow and their share, summing up to the flow rate of the
 ///phase
 fn fill_inlet_compartments(
     grid: &dyn CompartmentMesh,
-    OpenPhase(pos, fr): &OpenPhase,
+    OpenPhase {
+        position,
+        flow_rate,
+    }: &OpenPhase,
 ) -> Vec<(usize, f64)> {
-    match pos {
+    match position {
         InletPosition::Point(point) => grid
             .cell_from_coordinates(point)
-            .map(|cell| vec![(cell, *fr)])
+            .map(|cell| vec![(cell, *flow_rate)])
             .unwrap_or_default(),
         InletPosition::Ring(center, radius, height) => {
             //Every theta sector crossed by the ring gets the same share
@@ -147,7 +139,10 @@ fn fill_inlet_compartments(
             cells.dedup();
 
             let n_cell = cells.len() as f64;
-            cells.into_iter().map(|cell| (cell, fr / n_cell)).collect()
+            cells
+                .into_iter()
+                .map(|cell| (cell, flow_rate / n_cell))
+                .collect()
         }
         InletPosition::Circle(center, radius, height) => {
             //Midpoint sampling of the disk, a sample stands for the area r*dr*dphi, dr*dphi being
@@ -170,12 +165,15 @@ fn fill_inlet_compartments(
 
             let total: f64 = area.values().sum();
             area.into_iter()
-                .map(|(cell, a)| (cell, fr * a / total))
+                .map(|(cell, a)| (cell, flow_rate * a / total))
                 .collect()
         }
         InletPosition::Positions(cells) => {
             let n_cell = cells.len() as f64;
-            cells.iter().map(|&cell| (cell, fr / n_cell)).collect()
+            cells
+                .iter()
+                .map(|&cell| (cell, flow_rate / n_cell))
+                .collect()
         }
     }
 }
@@ -299,10 +297,16 @@ mod test {
 
     #[test]
     fn test_fill_point() {
-        let pos = InletPosition::Point([0., 0., 0.]);
-        let flowrate = 0.1;
-        let inlet = fill_inlet_compartments(&*mesh(), &super::OpenPhase(pos, flowrate));
-        assert!((inlet.iter().map(|(_, f)| f).sum::<f64>() - flowrate).abs() < 1e-12);
+        let position = InletPosition::Point([0., 0., 0.]);
+        let flow_rate = 0.1;
+        let inlet = fill_inlet_compartments(
+            &*mesh(),
+            &super::OpenPhase {
+                position,
+                flow_rate,
+            },
+        );
+        assert!((inlet.iter().map(|(_, f)| f).sum::<f64>() - flow_rate).abs() < 1e-12);
     }
 
     #[test]
@@ -310,10 +314,16 @@ mod test {
         let ring_center = [0., 0., 0.];
         let ring_radius = 1.;
         let ring_height = 1.;
-        let pos = InletPosition::Ring(ring_center, ring_radius, ring_height);
-        let flowrate = 0.1;
-        let inlet = fill_inlet_compartments(&*mesh(), &super::OpenPhase(pos, flowrate));
-        assert!((inlet.iter().map(|(_, f)| f).sum::<f64>() - flowrate).abs() < 1e-12);
+        let position = InletPosition::Ring(ring_center, ring_radius, ring_height);
+        let flow_rate = 0.1;
+        let inlet = fill_inlet_compartments(
+            &*mesh(),
+            &super::OpenPhase {
+                position,
+                flow_rate,
+            },
+        );
+        assert!((inlet.iter().map(|(_, f)| f).sum::<f64>() - flow_rate).abs() < 1e-12);
     }
 
     #[test]
@@ -321,17 +331,29 @@ mod test {
         let circle_center = [0., 0., 0.];
         let circle_radius = 1.;
         let circle_height = 1.;
-        let pos = InletPosition::Circle(circle_center, circle_radius, circle_height);
-        let flowrate = 0.1;
-        let inlet = fill_inlet_compartments(&*mesh(), &super::OpenPhase(pos, flowrate));
-        assert!((inlet.iter().map(|(_, f)| f).sum::<f64>() - flowrate).abs() < 1e-12);
+        let position = InletPosition::Circle(circle_center, circle_radius, circle_height);
+        let flow_rate = 0.1;
+        let inlet = fill_inlet_compartments(
+            &*mesh(),
+            &super::OpenPhase {
+                position,
+                flow_rate,
+            },
+        );
+        assert!((inlet.iter().map(|(_, f)| f).sum::<f64>() - flow_rate).abs() < 1e-12);
     }
 
     #[test]
     fn test_fill_positions() {
-        let pos = InletPosition::Positions(vec![0, 5, 4, 3]);
-        let flowrate = 0.1;
-        let inlet = fill_inlet_compartments(&*mesh(), &super::OpenPhase(pos, flowrate));
-        assert!((inlet.iter().map(|(_, f)| f).sum::<f64>() - flowrate).abs() < 1e-12);
+        let position = InletPosition::Positions(vec![0, 5, 4, 3]);
+        let flow_rate = 0.1;
+        let inlet = fill_inlet_compartments(
+            &*mesh(),
+            &super::OpenPhase {
+                position,
+                flow_rate,
+            },
+        );
+        assert!((inlet.iter().map(|(_, f)| f).sum::<f64>() - flow_rate).abs() < 1e-12);
     }
 }

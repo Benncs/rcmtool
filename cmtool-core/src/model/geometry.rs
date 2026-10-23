@@ -3,7 +3,7 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use crate::{
-    coordinates::CartesianCoordinates,
+    coordinates::{CartesianCoordinates, Coords3},
     ensight_gold::{self, types::ElementsType},
     grid::{
         CompartmentMesh, CylindricalAxis, MeshType, NeighborDirection, cylindrical_index, get_mesh,
@@ -14,6 +14,20 @@ use crate::{
     },
     utils::compute_centroid,
 };
+
+pub enum InletPosition {
+    Point(Coords3),
+    //center, radius, height above the center
+    Ring(Coords3, f64, f64),
+    Circle(Coords3, f64, f64),
+    //list of compartment indice (extractor from Eg reader or from elsewhere)
+    Positions(Vec<usize>),
+}
+
+pub struct OpenPhase {
+    pub position: InletPosition,
+    pub flow_rate: f64,
+}
 
 pub struct CMGeometry {
     pub vertices: VerticesData,

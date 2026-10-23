@@ -25,15 +25,13 @@ pub use scalar::Scalar;
 pub use vectors::Vector as ModelVector;
 pub use vectors::Vector;
 
-pub use balance::{BalanceReport, BalanceSettings, InletPosition, OpenPhase};
-
+pub use balance::{BalanceReport, BalanceSettings};
+pub use geometry::{CMGeometry, InletPosition, OpenPhase};
 pub struct CMModel {
     geometry: Arc<CMGeometry>,
     c_info: CompartmentInfo,
     interfaces: AInterfacesInfo,
 }
-
-pub use geometry::CMGeometry;
 
 fn get_data_flow(
     n_zones: usize,

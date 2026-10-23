@@ -123,14 +123,14 @@ pub fn manual_main(common: CommonArgs, args: ManualArgs) -> Result<(), CmtoolErr
         //a ring (disk r<=0.0147 at z=0, ring at its half area radius), Q = alpha*v*A of the Fluent
         //inlet
 
-        let phase = cmtool_core::model::OpenPhase(
-            cmtool_core::model::InletPosition::Ring(
+        let phase = cmtool_core::model::OpenPhase {
+            position: cmtool_core::model::InletPosition::Ring(
                 [0., 0., 0.],
                 0.0147 / std::f64::consts::SQRT_2,
                 1e-4,
             ),
-            0.049789912 * 0.25890034 * std::f64::consts::PI * 0.0147 * 0.0147,
-        );
+            flow_rate: 0.049789912 * 0.25890034 * std::f64::consts::PI * 0.0147 * 0.0147,
+        };
 
         // let q_sanofi = 2700.; //m3/h
         // //TODO: quick and dirty, sparger dimensions unknown: the whole bottom layer gets the gas
